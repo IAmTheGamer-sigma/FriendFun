@@ -316,7 +316,7 @@ function adminOnly(req, res, next) {
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const users = await User.find({ name: { $regex: q, $options: 'i' } }).sort({ name: 1 }).limit(100);
-  res.json(users.map(u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix })));
+  res.json(await Promise.all(users.map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
