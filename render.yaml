@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: friendfun
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: FF_ADMINS
+        sync: false
+    # The app stores accounts and game data in data/db.json.
+    # Attach a Render persistent disk for production data durability.
+    disk:
+      name: friendfun-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

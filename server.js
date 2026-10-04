@@ -101,6 +101,7 @@ const app = express();
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/three', express.static(path.join(__dirname, 'node_modules/three')));
+app.get('/health', (req, res) => res.json({ ok: true }));
 
 function auth(req, res, next) {
   const tok = (req.headers.authorization || '').replace('Bearer ', '');
