@@ -509,7 +509,7 @@ wss.on('connection', (ws) => {
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
-      broadcast(room, { t: 'chat', system: true, text: \`${player.name} has joined the game.\` });
+      broadcast(room, { t: 'chat', system: true, text:  `${player.name} has joined the game. ` });
       return;
     }
     if (!player) return;
@@ -536,7 +536,7 @@ wss.on('connection', (ws) => {
       if (player.won) return; player.won = true;
       player.user.funtix += ECON.WIN_TIX; player.user.champ = true; await player.user.save();
       send(ws, { t: 'money', ...money(player.user) });
-      broadcast(room, { t: 'chat', system: true, text: \`${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)\` });
+      broadcast(room, { t: 'chat', system: true, text:  `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix) ` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
   });
@@ -544,7 +544,7 @@ wss.on('connection', (ws) => {
     if (!player || !room) return;
     room.players.delete(player.id);
     broadcast(room, { t: 'left', id: player.id });
-    broadcast(room, { t: 'chat', system: true, text: \`${player.name} has left the game.\` });
+    broadcast(room, { t: 'chat', system: true, text:  `${player.name} has left the game. ` });
     touch(player.name, null);
   });
 });
@@ -559,6 +559,6 @@ wss.on('connection', (ws) => {
   }, 66);
 }
 
-if (server) server.listen(PORT, () => console.log(\`FriendFun running on http://localhost:\${PORT}\`));
+if (server) server.listen(PORT, () => console.log( `FriendFun running on http://localhost:\${PORT} `));
 
 export default app;
