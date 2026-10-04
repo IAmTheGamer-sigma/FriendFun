@@ -10,6 +10,7 @@ import { ITEM, CATALOG, DEFAULT_AVATAR, ECON } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
+const ADMINS = (process.env.FF_ADMINS || 'fun').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PORT = process.env.PORT || 3000;
 
@@ -40,6 +41,7 @@ function load() {
     u.funtix ??= ECON.START_TIX; delete u.funbux;
     for (const id of free) if (!u.inventory.includes(id)) u.inventory.push(id);
     u.avatar.head ??= DEFAULT_AVATAR.head;
+    if (isClub(u)) for (const it of CATALOG) if (it.club && !u.inventory.includes(it.id)) u.inventory.push(it.id);
   }
 }
 let saveTimer = null;
@@ -67,9 +69,10 @@ function statusOf(name) {
 }
 
 // ---------- helpers ----------
-function isClub(u) { return (u.clubUntil || 0) > Date.now(); }
+function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()); }
+function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function publicUser(u) {
-  return { name: u.name, club: isClub(u), avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
+  return { name: u.name, club: isClub(u), admin: isAdmin(u), avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
 }
 function gameSummary(g) {
   return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world.sky };
@@ -132,8 +135,9 @@ function dailyTix(u) {
 const money = u => ({ funtix: u.funtix });
 app.get('/api/me', auth, (req, res) => {
   const u = req.user;
+  if (isClub(u)) { const miss = CATALOG.filter(it => it.club && !u.inventory.includes(it.id)); if (miss.length) { u.inventory.push(...miss.map(it => it.id)); save(); } }
   const daily = dailyTix(u);
-  res.json({ ...publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0 });
+  res.json({ ...publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever });
 });
 app.post('/api/ping', auth, (req, res) => { touch(req.user.name, null); res.json({ ...money(req.user), daily: dailyTix(req.user), requests: req.user.requests.length }); });
 
@@ -160,6 +164,7 @@ app.post('/api/buy/:item', auth, (req, res) => {
 
 app.post('/api/club/join', auth, (req, res) => {
   const u = req.user;
+  if (isAdmin(u) || u.clubForever) return res.status(400).json({ error: 'You already have free FriendClub' });
   if (u.funtix < ECON.CLUB_PRICE) return res.status(400).json({ error: 'Not enough FunTix' });
   u.funtix -= ECON.CLUB_PRICE;
   u.clubUntil = Math.max(Date.now(), u.clubUntil || 0) + ECON.CLUB_DAYS * 86400000;
@@ -185,6 +190,25 @@ app.get('/api/users/:name', auth, (req, res) => {
 app.get('/api/search/users', auth, (req, res) => {
   const q = key(String(req.query.q || ''));
   res.json(Object.values(db.users).filter(u => key(u.name).includes(q)).slice(0, 30).map(publicUser));
+});
+function adminOnly(req, res, next) {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admins only' });
+  next();
+}
+const adminUser = u => ({ ...publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix });
+app.get('/api/admin/users', auth, adminOnly, (req, res) => {
+  const q = key(String(req.query.q || ''));
+  res.json(Object.values(db.users).filter(u => key(u.name).includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 100).map(adminUser));
+});
+app.post('/api/admin/club/:name', auth, adminOnly, (req, res) => {
+  const u = db.users[key(req.params.name)];
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  if (isAdmin(u)) return res.status(400).json({ error: 'Admins always have FriendClub' });
+  if (req.body?.on) {
+    u.clubForever = true;
+    for (const it of CATALOG) if (it.club && !u.inventory.includes(it.id)) u.inventory.push(it.id);
+  } else { u.clubForever = false; u.clubUntil = 0; }
+  save(); res.json(adminUser(u));
 });
 app.get('/api/friends', auth, (req, res) => {
   res.json({

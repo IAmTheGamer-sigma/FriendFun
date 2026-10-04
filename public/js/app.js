@@ -35,10 +35,13 @@ const icons = {
   create: '<svg viewBox="0 0 24 24"><path d="M3 17l11-11 4 4-11 11H3zM15 5l2-2 4 4-2 2z"/></svg>',
   discover: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
   club: '<svg viewBox="0 0 24 24"><path d="M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z"/></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/></svg>',
   trophy: '<svg viewBox="0 0 24 24"><path d="M6 3h12v2h3v3a5 5 0 0 1-4.6 5A6 6 0 0 1 13 16.9V19h4v2H7v-2h4v-2.1A6 6 0 0 1 7.6 13 5 5 0 0 1 3 8V5h3zM5 7v1a3 3 0 0 0 1.3 2.5C6.1 9.7 6 8.9 6 8V7zm13 0v1c0 .9-.1 1.7-.3 2.5A3 3 0 0 0 19 8V7z"/></svg>',
   thumb: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2 10h4v11H2zM8 21V10l5-8c1.5 0 2.5 1 2.2 2.6L14.5 9H21c1 0 2 1 1.7 2.2l-2 8.3c-.2.9-1 1.5-2 1.5z"/></svg>',
   people: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM0 20c0-4 3.5-7 8-7s8 3 8 7zm17 0c0-2-.7-4-2-5.3 4.5-.8 9 1 9 5.3z"/></svg>',
 };
+
+const ADMIN = '<span class="admin-badge">ADMIN</span>';
 
 // ---------- thumbnails ----------
 const thumbCache = new Map();
@@ -84,7 +87,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create]]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
   </aside>
   <main class="content">${content}</main>`;
@@ -333,7 +336,7 @@ async function profilePage(name) {
   mount('users', `
     <div class="profile-head">
       <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}"><img src="${avatarImage(u.avatar)}"></div>
-      <div class="ph-info"><h1>${esc(u.name)}${u.club ? CLUB : ''}</h1><div class="muted">@${esc(u.name)}</div>
+      <div class="ph-info"><h1>${esc(u.name)}${u.club ? CLUB : ''}${u.admin ? ADMIN : ''}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
       <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
@@ -398,6 +401,31 @@ async function leaderboardPage() {
         <span class="lbp-name">${u.club ? CLUB : ''}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
 }
+async function adminPage(q = '') {
+  if (!me.admin) { location.hash = '#/home'; return; }
+  const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
+  const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
+  mount('admin', `<h1>Admin Panel</h1>
+    <p class="muted">Give FriendClub to any player for free, or take it away.</p>
+    <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
+    <div class="lbp">${users.map(u => `
+      <div class="lbp-row">
+        <img src="${avatarImage(u.avatar)}"><a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
+        <span class="admin-status">${status(u)}</span>
+        ${u.admin ? '' : u.club
+          ? `<button class="btn-secondary club-toggle" data-name="${esc(u.name)}" data-on="0">Remove FriendClub</button>`
+          : `<button class="btn-primary club-toggle" data-name="${esc(u.name)}" data-on="1">Give FriendClub</button>`}
+      </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
+    app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
+    app.querySelectorAll('.club-toggle').forEach(b => b.onclick = async () => {
+      const on = b.dataset.on === '1';
+      try {
+        await api('POST', '/api/admin/club/' + encodeURIComponent(b.dataset.name), { on });
+        toast(on ? `Gave FriendClub to ${b.dataset.name}` : `Removed FriendClub from ${b.dataset.name}`); adminPage(q);
+      } catch (e) { toast(e.message, true); }
+    });
+  });
+}
 function clubPage() {
   const bal = me.funtix ?? 0, active = me.club, short = ECON.CLUB_PRICE - bal;
   const days = Math.ceil(((me.clubUntil || 0) - Date.now()) / 86400000);
@@ -405,9 +433,9 @@ function clubPage() {
     <div class="club-hero">
       <div class="club-logo">${LOGO}${CLUB}</div>
       <div class="club-info"><h1>FriendClub</h1><p class="muted">The membership for true FriendFun fans.</p>
-        <div class="club-status ${active ? 'on' : ''}">${active ? `${CLUB} You're a member! ${days} day${days === 1 ? '' : 's'} left` : 'You are not a member yet.'}</div>
-        <button class="btn-primary club-join" ${short > 0 ? 'disabled' : ''}>${active ? 'Renew' : 'Join'} for ${tix} ${ECON.CLUB_PRICE} &middot; ${ECON.CLUB_DAYS} days</button>
-        ${short > 0 ? `<div class="muted small">You need ${short} more FunTix. <a href="#/funtix">How to earn</a></div>` : ''}
+        <div class="club-status ${active ? 'on' : ''}">${me.clubForever ? `${CLUB} You have free FriendClub forever${me.admin ? ' (admin)' : ''}!` : active ? `${CLUB} You're a member! ${days} day${days === 1 ? '' : 's'} left` : 'You are not a member yet.'}</div>
+        ${me.clubForever ? '' : `<button class="btn-primary club-join" ${short > 0 ? 'disabled' : ''}>${active ? 'Renew' : 'Join'} for ${tix} ${ECON.CLUB_PRICE} &middot; ${ECON.CLUB_DAYS} days</button>`}
+        ${!me.clubForever && short > 0 ? `<div class="muted small">You need ${short} more FunTix. <a href="#/funtix">How to earn</a></div>` : ''}
       </div>
     </div>
     <h2>Member Benefits</h2>
@@ -417,7 +445,8 @@ function clubPage() {
       <div class="bux-way"><h3>${CLUB} Member Badge</h3><p>A gold hard hat next to your name on your profile, the leaderboard, in chat and above your head in games.</p></div>
       <div class="bux-way"><h3>Exclusive Hard Hat</h3><p>The FriendClub Hard Hat goes straight into your inventory. Only members can get it.</p></div>
     </div>`, () => {
-    app.querySelector('.club-join').onclick = () => confirmModal(active ? 'Renew FriendClub' : 'Join FriendClub',
+    const jb = app.querySelector('.club-join');
+    if (jb) jb.onclick = () => confirmModal(active ? 'Renew FriendClub' : 'Join FriendClub',
       `Spend ${tix} ${ECON.CLUB_PRICE} FunTix for ${ECON.CLUB_DAYS} days of FriendClub?`, active ? 'Renew' : 'Join', async () => {
         try {
           const r = await api('POST', '/api/club/join');
@@ -466,6 +495,7 @@ async function route() {
       case 'studio': return await studioPage(seg[1], seg[2]);
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
+      case 'admin': return await adminPage();
       case 'funtix': case 'funbux': return funtixPage();
       default: return await homePage();
     }
