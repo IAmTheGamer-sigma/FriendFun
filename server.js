@@ -316,7 +316,7 @@ function adminOnly(req, res, next) {
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const users = await User.find({ name: { $regex: q, $options: 'i' } }).sort({ name: 1 }).limit(100);
-  res.json(await Promise.all(users.map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
+  res.json(users.map(u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix })));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -478,11 +478,8 @@ app.get('/api/catalog', (req, res) => res.json(CATALOG));
 // ---------- realtime ----------
 const rooms = new Map();
 let nextPid = 1;
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-const server = isDirectRun ? http.createServer(app) : null;
-const wss = server ? new WebSocketServer({ server, path: '/ws' }) : null;
-
-if (wss) {
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (const p of room.players.values()) if (p.ws !== except && p.ws.readyState === 1) p.ws.send(s); }
@@ -509,7 +506,7 @@ wss.on('connection', (ws) => {
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
-      broadcast(room, { t: 'chat', system: true, text:  `${player.name} has joined the game. ` });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
       return;
     }
     if (!player) return;
@@ -536,7 +533,7 @@ wss.on('connection', (ws) => {
       if (player.won) return; player.won = true;
       player.user.funtix += ECON.WIN_TIX; player.user.champ = true; await player.user.save();
       send(ws, { t: 'money', ...money(player.user) });
-      broadcast(room, { t: 'chat', system: true, text:  `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix) ` });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
   });
@@ -544,7 +541,7 @@ wss.on('connection', (ws) => {
     if (!player || !room) return;
     room.players.delete(player.id);
     broadcast(room, { t: 'left', id: player.id });
-    broadcast(room, { t: 'chat', system: true, text:  `${player.name} has left the game. ` });
+    broadcast(room, { t: 'chat', system: true, text: `${player.name} has left the game.` });
     touch(player.name, null);
   });
 });
@@ -559,6 +556,6 @@ wss.on('connection', (ws) => {
   }, 66);
 }
 
-if (server) server.listen(PORT, () => console.log( `FriendFun running on http://localhost:\${PORT} `));
+server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
