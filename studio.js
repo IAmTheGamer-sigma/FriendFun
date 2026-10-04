@@ -229,7 +229,33 @@ export class Studio {
   focusSpawn() { const sp = findSpawn(this.world); this.camPos.set(sp.x + 18, sp.y + 12, sp.z + 18); this.yaw = Math.PI * 1.25; this.pitch = -0.45; }
   topView() { const p = this.sel ? new THREE.Vector3(...this.sel.p) : findSpawn(this.world); this.camPos.set(p.x, p.y + 80, p.z + 0.01); this.yaw = 0; this.pitch = -Math.PI / 2 + 0.001; }
   exportWorld() { const payload = JSON.stringify({ format: 'FriendFun Studio World', version: 1, name: this.name, description: this.description, world: this.world }, null, 2); const blob = new Blob([payload], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (this.name || 'friendfun-game').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); this.o.toast('World exported'); }
-  async importWorld(file) { if (!file) return; try { const data = JSON.parse(await file.text()); const world = data.world || data; if (!Array.isArray(world.parts)) throw new Error('Invalid world file'); this.pushUndo(); this.world = { sky: /^#[0-9a-fA-F]{6}$/.test(world.sky) ? world.sky : '#8fc8ff', parts: world.parts }; this.rebuildAll(); this.markDirty(); this.o.toast('World imported'); } catch (e) { this.o.toast('Could not import that world file', true); } this.importInput.value = ''; }
+  async importWorld(file) {
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text()), world = data.world || data;
+      if (!Array.isArray(world.parts)) throw new Error('Invalid world file');
+      const parts = world.parts.slice(0, 5000).map((p, i) => {
+        const vec = (v, fallback) => Array.isArray(v) ? [0, 1, 2].map(j => Number.isFinite(+v[j]) ? +v[j] : fallback[j]) : [...fallback];
+        return {
+          id: String(p.id || 'imported_' + i).slice(0, 20),
+          name: String(p.name || 'Part').slice(0, 40),
+          p: vec(p.p, [0, 0, 0]),
+          s: vec(p.s, [1, 1, 1]).map(v => Math.max(0.05, Math.min(2048, v))),
+          c: /^#[0-9a-fA-F]{6}$/.test(p.c) ? p.c : '#a3a2a5',
+          k: KINDS.includes(p.k) ? p.k : 'part',
+          m: MATERIALS.includes(p.m) ? p.m : 'plastic',
+          ...(p.cc === false ? { cc: false } : {}),
+          ...(p.tr ? { tr: Math.max(0, Math.min(1, +p.tr || 0)) } : {})
+        };
+      });
+      const ids = new Set();
+      for (const p of parts) { while (ids.has(p.id)) p.id += 'x'; ids.add(p.id); }
+      this.pushUndo();
+      this.world = { sky: /^#[0-9a-fA-F]{6}$/.test(world.sky) ? world.sky : '#8fc8ff', parts };
+      this.rebuildAll(); this.markDirty(); this.o.toast('World imported');
+    } catch (e) { this.o.toast('Could not import that world file', true); }
+    this.importInput.value = '';
+  }
   insertStairs() {
     this.pushUndo();
     const base = this.sel ? new THREE.Vector3(...this.sel.p) : this.camPos.clone().addScaledVector(this.forward(), 10);
