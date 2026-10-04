@@ -24,6 +24,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ---------- helper functions ----------
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const key = n => n.toLowerCase();
+const money = u => ({ funtix: u.funtix });
 
 async function seed() {
   const now = Date.now();
@@ -287,7 +288,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   const { data: u, error: uErr } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
-  if (uErr || !u) return res.status(404).json({ error: 'User not found' });
+  if (uErr || !u) return res.status(400).json({ error: 'User not found' });
   if (isAdmin(u)) return res.status(400).json({ error: 'Admins always have FriendClub' });
   if (req.body?.on) {
     const updatedInv = [...(u.inventory || []), ...CATALOG.filter(it => it.club && !u.inventory?.includes(it.id)).map(it => it.id)];
@@ -462,10 +463,19 @@ wss.on('connection', (ws) => {
   ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (m.t === 'join' && !player) {
+      // SPEED UP: Parallelize initial lookups
       const { data: session } = await supabase.from('sessions').select('username').eq('token', m.token).single();
-      const uname = session?.username;
-      const { data: u } = await supabase.from('users').select('*').eq('name', uname).maybeSingle();
-      const { data: g } = await supabase.from('games').select('*').eq('id', m.gameId).maybeSingle();
+      if (!session) return send(ws, { t: 'error', error: 'Could not join' });
+      
+      const uname = session.username;
+      const [userRes, gameRes] = await Promise.all([
+        supabase.from('users').select('*').eq('name', uname).maybeSingle(),
+        supabase.from('games').select('*').eq('id', m.gameId).maybeSingle(),
+      ]);
+      
+      const u = userRes.data;
+      const g = gameRes.data;
+
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
       if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map() });
       room = rooms.get(g.id);
@@ -473,9 +483,15 @@ wss.on('connection', (ws) => {
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       
-      await supabase.from('games').update({ visits: (g.visits || 0) + 1 }).eq('id', g.id);
+      // SPEED UP: Background updates (don't await)
+      supabase.from('games').update({ visits: (g.visits || 0) + 1 }).eq('id', g.id).then(res => {
+        if (res.error) console.error('Visit update failed:', res.error);
+      });
+      
       const updatedRecent = [g.id, ... (u.recent || []).filter(x => x !== g.id)].slice(0, 12);
-      await supabase.from('users').update({ recent: updatedRecent }).eq('name', u.name);
+      supabase.from('users').update({ recent: updatedRecent }).eq('name', u.name).then(res => {
+        if (res.error) console.error('Recent games update failed:', res.error);
+      });
       
       touch(u.name, g.id);
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
