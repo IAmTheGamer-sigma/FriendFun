@@ -9,7 +9,8 @@ import { templates } from './public/js/worlds.js';
 import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, 'data');
+// Vercel's deployment filesystem is read-only; /tmp is the writable per-instance area.
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'friendfun-data') : path.join(__dirname, 'data');
 const ADMINS = (process.env.FF_ADMINS || 'fun').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PORT = process.env.PORT || 3000;
