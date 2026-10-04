@@ -68,10 +68,15 @@ function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()); }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
   const has = {
-    admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
-    creator: false, 
+    admin: isAdmin(u), club: isClub(u), champ: !!u.champ, newcomer: true,
+    tix_100: (Number(u.funtix) || 0) >= 100, tix_500: (Number(u.funtix) || 0) >= 500,
+    tix_1000: (Number(u.funtix) || 0) >= 1000, tix_5000: (Number(u.funtix) || 0) >= 5000,
+    friend_1: list(u, 'friends').length >= 1, friend_5: list(u, 'friends').length >= 5, friend_10: list(u, 'friends').length >= 10,
+    collector_5: list(u, 'inventory').length >= 5, collector_15: list(u, 'inventory').length >= 15,
+    collector_all: CATALOG.every(item => list(u, 'inventory').includes(item.id)), creator: false,
   };
-  return Object.keys(BADGES).filter(b => has[b]);
+  const earned = list(u, 'earnedBadges').filter(id => BADGES[id]);
+  return [...new Set([...Object.keys(BADGES).filter(b => has[b]), ...earned])];
 }
 function badgeOf(u) {
   if (u.badge === 'none') return null;
@@ -79,13 +84,9 @@ function badgeOf(u) {
   return list.includes(u.badge) ? u.badge : list[0] || null;
 }
 async function publicUser(u) {
-  const { count: gameCount } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(u.name)).eq('unpublished', false);
-  const isCreator = (gameCount || 0) > 0;
-  const has = {
-    admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
-    creator: isCreator,
-  };
-  const badges = Object.keys(BADGES).filter(b => has[b]);
+  const { data: publishedGames } = await supabase.from('games').select('id, visits').eq('creator', key(u.name)).eq('unpublished', false);
+  const games = publishedGames || [], visits = games.reduce((total, game) => total + (Number(game.visits) || 0), 0);
+  const badges = [...new Set([...badgesOf(u), ...(games.length ? ['creator'] : []), ...(games.length >= 5 ? ['builder_5'] : []), ...(games.length >= 10 ? ['builder_10'] : []), ...(visits >= 100 ? ['popular_100'] : []), ...(visits >= 1000 ? ['popular_1000'] : [])])];
   const badge = u.badge === 'none' ? null : (badges.includes(u.badge) ? u.badge : badges[0] || null);
   
   return { 
@@ -133,7 +134,7 @@ app.post('/api/signup', async (req, res) => {
   const userData = {
     name: key(username), salt, pw: hash(password, salt), created: Date.now(), funtix: ECON.START_TIX,
     avatar: structuredClone(DEFAULT_AVATAR), inventory: CATALOG.filter(i => i.free).map(i => i.id),
-    friends: [], requests: [], favorites: [], recent: [], bio: '',
+    friends: [], requests: [], favorites: [], recent: [], earnedBadges: [], bio: '',
   };
   const { data: user, error: uErr } = await supabase.from('users').insert(userData).select().single();
   if (uErr) return res.status(500).json({ error: uErr.message });
@@ -205,10 +206,8 @@ app.put('/api/me/avatar', auth, async (req, res) => {
 app.put('/api/me/badge', auth, async (req, res) => {
   const b = String(req.body?.badge || '');
   if (b !== 'none') {
-    const { data: isCreator } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(req.user.name)).eq('unpublished', false);
-    const has = { admin: isAdmin(req.user), club: isClub(req.user), champ: !!req.user.champ, creator: isCreator?.count > 0 };
-    const badges = Object.keys(BADGES).filter(badge => has[badge]);
-    if (!badges.includes(b)) return res.status(400).json({ error: "You don't have that badge" });
+    const profile = await publicUser(req.user);
+    if (!profile.badges.includes(b)) return res.status(400).json({ error: "You don't have that badge" });
   }
   await supabase.from('users').update({ badge: b }).eq('name', req.user.name);
   res.json({ badge: badgeOf({ ...req.user, badge: b }) });
@@ -308,6 +307,70 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   const { data: updated, error } = await supabase.from('users').update(changes).eq('name', u.name).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ...await publicUser(updated), clubForever: isAdmin(updated) || !!updated.clubForever, clubUntil: updated.clubUntil || 0, funtix: updated.funtix });
+});
+
+app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => {
+  const { data: user, error: findError } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
+  if (findError || !user) return res.status(404).json({ error: 'User not found' });
+  const command = String(req.body?.command || '');
+  let updates, message;
+  if (command === 'grant_tix') {
+    const amount = Math.max(1, Math.min(10000, Math.floor(Number(req.body?.amount) || 100)));
+    updates = { funtix: (Number(user.funtix) || 0) + amount };
+    message = `Gave ${amount} FunTix to ${user.name}`;
+  } else if (command === 'give_all_items') {
+    updates = { inventory: CATALOG.map(item => item.id) };
+    message = `Gave every marketplace item to ${user.name}`;
+  } else if (command === 'reset_daily') {
+    updates = { tixDay: null };
+    message = `Reset ${user.name}'s daily reward`;
+  } else {
+    return res.status(400).json({ error: 'Unknown admin command' });
+  }
+  const { data: updated, error } = await supabase.from('users').update(updates).eq('name', user.name).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever } });
+});
+
+function groupView(group, username) {
+  const members = Array.isArray(group.members) ? group.members : [];
+  return { id: group.id, name: group.name, description: group.description || '', owner: group.owner, created: group.created, members: members.length, joined: members.includes(username), isOwner: group.owner === username };
+}
+
+app.get('/api/groups', auth, async (req, res) => {
+  const { data: groups, error } = await supabase.from('groups').select('*').order('created', { ascending: false }).limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json((groups || []).map(group => groupView(group, req.user.name)));
+});
+
+app.post('/api/groups', auth, async (req, res) => {
+  const name = filter(req.body?.name || '').trim().slice(0, 40);
+  const description = filter(req.body?.description || '').trim().slice(0, 240);
+  if (name.length < 3) return res.status(400).json({ error: 'Group name must be at least 3 characters' });
+  const { data: existing } = await supabase.from('groups').select('id').ilike('name', name).maybeSingle();
+  if (existing) return res.status(400).json({ error: 'That group name is already taken' });
+  const group = { id: `group_${crypto.randomUUID()}`, name, description, owner: req.user.name, members: [req.user.name], created: Date.now() };
+  const { data, error } = await supabase.from('groups').insert(group).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(groupView(data, req.user.name));
+});
+
+app.post('/api/groups/:id/:action(join|leave)', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const members = Array.isArray(group.members) ? group.members : [];
+  let updatedMembers;
+  if (req.params.action === 'join') {
+    if (members.includes(req.user.name)) return res.json(groupView(group, req.user.name));
+    if (members.length >= 100) return res.status(400).json({ error: 'This group is full' });
+    updatedMembers = [...members, req.user.name];
+  } else {
+    if (group.owner === req.user.name) return res.status(400).json({ error: 'The owner cannot leave their own group' });
+    updatedMembers = members.filter(name => name !== req.user.name);
+  }
+  const { data, error } = await supabase.from('groups').update({ members: updatedMembers }).eq('id', group.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(groupView(data, req.user.name));
 });
 
 app.get('/api/friends', auth, async (req, res) => {
@@ -458,6 +521,19 @@ function sanitizeWorld(w) {
   return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts };
 }
 
+function winBadges(game) {
+  const kinds = new Set((game?.world?.parts || []).map(part => part.k));
+  return [
+    'game_first_win',
+    ...(kinds.has('coin') ? ['game_coin_hunter'] : []),
+    ...(kinds.has('speed') ? ['game_speedster'] : []),
+    ...(kinds.has('bounce') ? ['game_bouncer'] : []),
+    ...(kinds.has('checkpoint') ? ['game_checkpoint'] : []),
+    ...(kinds.has('kill') ? ['game_survivor'] : []),
+    ...((game?.world?.parts || []).length >= 50 ? ['game_explorer'] : []),
+  ];
+}
+
 app.get('/api/catalog', (req, res) => res.json(CATALOG));
 
 // ---------- realtime ----------
@@ -491,7 +567,7 @@ wss.on('connection', (ws) => {
       room = rooms.get(g.id);
       if (room.players.size >= (g.max_players || 30)) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
-      player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
+      player = { id: nextPid++, gameId: g.id, game: g, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       
       // SPEED UP: Background updates (no await)
       supabase.from('games').update({ visits: (g.visits || 0) + 1 }).eq('id', g.id).then(res => {
@@ -531,13 +607,14 @@ wss.on('connection', (ws) => {
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
-      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true }).eq('name', player.user.name).select().single();
+      const earnedBadges = [...new Set([...list(player.user, 'earnedBadges'), ...winBadges(player.game)])];
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges }).eq('name', player.user.name).select().single();
       if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned: ECON.WIN_TIX });
-      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix, ${winBadges(player.game).length} badge${winBadges(player.game).length === 1 ? '' : 's'} earned)` });
     }
-    else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
+    else if (m.t === 'emote' && ['wave', 'dance', 'sit'].includes(m.e)) broadcast(room, { t: 'emote', id: player.id, e: m.e }, ws);
   });
   ws.on('close', () => {
     if (!player || !room) return;

@@ -87,7 +87,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.friends], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
   </aside>
   <main class="content">${content}</main>`;
@@ -410,20 +410,34 @@ async function leaderboardPage() {
         <span class="lbp-name">${badgeIcon(u.badge)}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
 }
+async function groupsPage() {
+  const groups = await api('GET', '/api/groups');
+  mount('groups', `<h1>Groups</h1><p class="muted">Create a crew, invite friends, and build a community.</p>
+    <form class="group-create"><input name="name" maxlength="40" placeholder="Group name" required><input name="description" maxlength="240" placeholder="Short description (optional)"><button class="btn-primary">Create Group</button></form>
+    <div class="group-grid">${groups.map(g => `<div class="group-card"><h2>${esc(g.name)}</h2><p>${esc(g.description || 'No description yet.')}</p><div class="muted small">Owned by @${esc(g.owner)} · ${g.members}/100 members</div><div class="group-actions">${g.isOwner ? '<span class="tag">Owner</span>' : `<button class="btn-${g.joined ? 'secondary' : 'primary'} group-action" data-id="${g.id}" data-action="${g.joined ? 'leave' : 'join'}">${g.joined ? 'Leave Group' : 'Join Group'}</button>`}</div></div>`).join('') || '<p class="muted">No groups yet. Create the first one!</p>'}</div>`, () => {
+    app.querySelector('.group-create').onsubmit = async e => { e.preventDefault(); try { await api('POST', '/api/groups', { name: e.target.name.value, description: e.target.description.value }); toast('Group created!'); groupsPage(); } catch (err) { toast(err.message, true); } };
+    app.querySelectorAll('.group-action').forEach(b => b.onclick = async () => { try { await api('POST', `/api/groups/${b.dataset.id}/${b.dataset.action}`); toast(b.dataset.action === 'join' ? 'Joined group!' : 'Left group'); groupsPage(); } catch (err) { toast(err.message, true); } });
+  });
+}
 async function adminPage(q = '') {
   if (!me.admin) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
   const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('admin', `<h1>Admin Panel</h1>
-    <p class="muted">Give FriendClub to any player for free, or take it away.</p>
+    <p class="muted">Manage player memberships, FunTix rewards, daily claims, and marketplace items.</p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <div class="lbp">${users.map(u => `
       <div class="lbp-row">
         <img src="${avatarImage(u.avatar)}"><a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
-        <span class="admin-status">${status(u)}</span>
+        <span class="admin-status">${status(u)} · ${fmt(u.funtix)} FunTix</span>
+        <div class="admin-actions">
         ${u.admin ? '' : u.club
           ? `<button class="btn-secondary club-toggle" data-name="${esc(u.name)}" data-on="0">Remove FriendClub</button>`
           : `<button class="btn-primary club-toggle" data-name="${esc(u.name)}" data-on="1">Give FriendClub</button>`}
+        <button class="btn-secondary admin-command" data-name="${esc(u.name)}" data-command="grant_tix">+100 FunTix</button>
+        <button class="btn-secondary admin-command" data-name="${esc(u.name)}" data-command="give_all_items">Give All Items</button>
+        <button class="btn-secondary admin-command" data-name="${esc(u.name)}" data-command="reset_daily">Reset Daily</button>
+        </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
     app.querySelectorAll('.club-toggle').forEach(b => b.onclick = async () => {
@@ -431,6 +445,12 @@ async function adminPage(q = '') {
       try {
         await api('POST', '/api/admin/club/' + encodeURIComponent(b.dataset.name), { on });
         toast(on ? `Gave FriendClub to ${b.dataset.name}` : `Removed FriendClub from ${b.dataset.name}`); adminPage(q);
+      } catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('.admin-command').forEach(b => b.onclick = async () => {
+      try {
+        const r = await api('POST', `/api/admin/users/${encodeURIComponent(b.dataset.name)}/command`, { command: b.dataset.command });
+        toast(r.message); adminPage(q);
       } catch (e) { toast(e.message, true); }
     });
   });
@@ -499,6 +519,7 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
+      case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
