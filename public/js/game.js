@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage } from './avatar3d.js';
 import { sfx } from './sound.js';
+import { ECON } from './catalog.js';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
@@ -11,7 +12,7 @@ export class Game {
   constructor(container, opts) {
     this.c = container; this.o = opts;
     this.world = opts.world; this.me = opts.me;
-    this.keys = {}; this.t = 0; this.players = new Map();
+    this.keys = {}; this.joy = { x: 0, y: 0 }; this.touchJump = false; this.t = 0; this.players = new Map();
     this.camYaw = Math.PI; this.camPitch = 0.35; this.camDist = 18;
     this.health = 100; this.dead = false; this.emote = null; this.speedTimer = 0;
     this.collected = new Set(); this.won = false;
@@ -24,8 +25,9 @@ export class Game {
 
   // ---------- DOM / HUD ----------
   buildDom() {
+    const touch = localStorage.ff_touch ? localStorage.ff_touch === '1' : matchMedia('(pointer: coarse)').matches;
     this.c.innerHTML = `
-    <div class="game-root">
+    <div class="game-root${touch ? ' touch' : ''}">
       <canvas class="game-canvas"></canvas>
       <div class="hud-topleft">
         <button class="hud-btn menu-btn" title="Menu (Esc)"><span class="ff-mini">FF</span></button>
@@ -36,7 +38,8 @@ export class Game {
         <div class="lb"><div class="lb-head"><span>${esc(this.o.gameName || 'Game')}</span></div><div class="lb-list"></div></div>
         <div class="health"><div class="health-fill"></div></div>
       </div>
-      <div class="hud-bottom"><div class="funbux-hud">${bux} <span class="fb-count">${this.o.funbux ?? ''}</span></div>${this.o.test ? '<button class="stop-btn">Stop</button>' : ''}</div>
+      <div class="touch-ui"><div class="joy-zone"><div class="joy"><div class="joy-knob"></div></div></div><button class="jump-btn" aria-label="Jump"><svg viewBox="0 0 24 24" width="42" height="42"><path fill="currentColor" d="M12 4l8 9h-5v7H9v-7H4z"/></svg></button></div>
+      <div class="hud-bottom"><div class="funbux-hud" title="FunTix">${tix} <span class="tx-count">${this.o.funtix ?? ''}</span></div>${this.o.test ? '<button class="stop-btn">Stop</button>' : ''}</div>
       <div class="big-msg"></div>
       <div class="esc-menu hidden">
         <div class="esc-panel">
@@ -49,7 +52,8 @@ export class Game {
           </div>
           <label class="esc-opt"><input type="checkbox" data-o="shadows" checked> Shadows</label>
           <label class="esc-opt"><input type="checkbox" data-o="sound" ${sfx.enabled ? 'checked' : ''}> Sound</label>
-          <div class="esc-help">WASD / arrows: move &middot; Space: jump &middot; Right-drag: rotate camera &middot; Wheel: zoom &middot; Shift: shift-lock &middot; /: chat &middot; /e wave, /e dance</div>
+          <label class="esc-opt"><input type="checkbox" data-o="touch" ${touch ? 'checked' : ''}> Touch controls</label>
+          <div class="esc-help">WASD / arrows: move &middot; Space: jump &middot; Right-drag: rotate camera &middot; Wheel: zoom &middot; Shift: shift-lock &middot; /: chat &middot; /e wave, /e dance<br>Touch: left thumbstick to move &middot; jump button &middot; drag to look &middot; pinch to zoom</div>
         </div>
       </div>
       <div class="loading"><div class="loading-card"><div class="ff-logo-big">FriendFun</div><div class="loading-name">${esc(this.o.gameName || '')}</div><div class="loading-sub">${this.o.test ? 'Starting test...' : 'Joining server...'}</div><div class="spinner"></div></div></div>
@@ -57,7 +61,7 @@ export class Game {
     const q = s => this.c.querySelector(s);
     this.canvas = q('.game-canvas'); this.chatLog = q('.chat-log'); this.chatInput = q('.chat-input');
     this.lbList = q('.lb-list'); this.escMenu = q('.esc-menu'); this.bigMsg = q('.big-msg');
-    this.healthFill = q('.health-fill'); this.fbCount = q('.fb-count');
+    this.healthFill = q('.health-fill'); this.txCount = q('.tx-count'); this.root = q('.game-root');
     q('.menu-btn').onclick = () => this.toggleMenu();
     q('.chat-toggle').onclick = () => q('.chat-box').classList.toggle('hidden');
     if (q('.stop-btn')) q('.stop-btn').onclick = () => this.exit();
@@ -70,6 +74,7 @@ export class Game {
     };
     this.escMenu.querySelector('[data-o=shadows]').onchange = (e) => { this.renderer.shadowMap.enabled = e.target.checked; this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); };
     this.escMenu.querySelector('[data-o=sound]').onchange = (e) => { sfx.enabled = e.target.checked; };
+    this.escMenu.querySelector('[data-o=touch]').onchange = (e) => { localStorage.ff_touch = e.target.checked ? '1' : '0'; this.root.classList.toggle('touch', e.target.checked); };
     this.chatInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { this.sendChat(this.chatInput.value); this.chatInput.value = ''; this.chatInput.blur(); }
@@ -198,15 +203,57 @@ export class Game {
     };
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
     this.onResize = () => this.resize(); addEventListener('resize', this.onResize);
-    let drag = false, lx = 0, ly = 0;
+    const ptrs = new Map(); let pinch = 0;
     this.canvas.addEventListener('contextmenu', e => e.preventDefault());
-    this.canvas.addEventListener('pointerdown', e => { if (e.button === 2 || e.pointerType === 'touch') { drag = true; lx = e.clientX; ly = e.clientY; this.canvas.setPointerCapture(e.pointerId); } this.chatInput.blur(); });
-    this.canvas.addEventListener('pointerup', () => { drag = false; });
+    this.canvas.addEventListener('pointerdown', e => {
+      this.chatInput.blur();
+      if (e.button !== 2 && e.pointerType !== 'touch') return;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.canvas.setPointerCapture(e.pointerId);
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
+    });
+    const ptrUp = e => { ptrs.delete(e.pointerId); pinch = 0; };
+    this.canvas.addEventListener('pointerup', ptrUp); this.canvas.addEventListener('pointercancel', ptrUp);
     this.canvas.addEventListener('pointermove', e => {
       if (document.pointerLockElement === this.canvas) { this.rotateCam(e.movementX, e.movementY); return; }
-      if (!drag) return; this.rotateCam(e.clientX - lx, e.clientY - ly); lx = e.clientX; ly = e.clientY;
+      const p = ptrs.get(e.pointerId); if (!p) return;
+      if (ptrs.size >= 2) {
+        p.x = e.clientX; p.y = e.clientY;
+        const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinch && d) this.camDist = THREE.MathUtils.clamp(this.camDist * pinch / d, 0.5, 80);
+        pinch = d; return;
+      }
+      const k = e.pointerType === 'touch' ? 1.3 : 1;
+      this.rotateCam((e.clientX - p.x) * k, (e.clientY - p.y) * k); p.x = e.clientX; p.y = e.clientY;
     });
+    this.bindTouch();
     this.canvas.addEventListener('wheel', e => { e.preventDefault(); this.camDist = THREE.MathUtils.clamp(this.camDist * (e.deltaY > 0 ? 1.12 : 0.89), 0.5, 80); }, { passive: false });
+  }
+  bindTouch() {
+    const zone = this.c.querySelector('.joy-zone'), base = this.c.querySelector('.joy'), knob = this.c.querySelector('.joy-knob');
+    const R = 52; let id = null, cx = 0, cy = 0;
+    zone.addEventListener('pointerdown', e => {
+      if (id !== null) return; e.preventDefault(); this.chatInput.blur();
+      id = e.pointerId; zone.setPointerCapture(id);
+      const r = zone.getBoundingClientRect(); cx = e.clientX; cy = e.clientY;
+      base.style.left = (cx - r.left) + 'px'; base.style.top = (cy - r.top) + 'px'; base.classList.add('active');
+    });
+    zone.addEventListener('pointermove', e => {
+      if (e.pointerId !== id) return;
+      let dx = e.clientX - cx, dy = e.clientY - cy; const l = Math.hypot(dx, dy);
+      if (l > R) { dx *= R / l; dy *= R / l; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      const dead = l < 6 ? 0 : 1; this.joy.x = dead * dx / R; this.joy.y = dead * dy / R;
+    });
+    const end = e => {
+      if (e.pointerId !== id) return; id = null; this.joy.x = this.joy.y = 0;
+      knob.style.transform = ''; base.style.left = base.style.top = ''; base.classList.remove('active');
+    };
+    zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+    const jb = this.c.querySelector('.jump-btn');
+    jb.addEventListener('pointerdown', e => { e.preventDefault(); this.touchJump = true; jb.classList.add('down'); });
+    const jup = () => { this.touchJump = false; jb.classList.remove('down'); };
+    jb.addEventListener('pointerup', jup); jb.addEventListener('pointercancel', jup); jb.addEventListener('pointerleave', jup);
+    jb.addEventListener('contextmenu', e => e.preventDefault());
   }
   rotateCam(dx, dy) { this.camYaw -= dx * 0.006; this.camPitch = THREE.MathUtils.clamp(this.camPitch + dy * 0.006, -1.35, 1.4); }
   toggleShiftLock() {
@@ -221,7 +268,7 @@ export class Game {
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.t === 'welcome') {
-        this.myId = m.id; this.hideLoading(); this.setFunbux(m.funbux);
+        this.myId = m.id; this.hideLoading(); this.setMoney(m);
         for (const p of m.players) this.addPlayer(p);
         this.updateLeaderboard();
       } else if (m.t === 'joined') { this.addPlayer(m); this.updateLeaderboard(); }
@@ -229,14 +276,17 @@ export class Game {
       else if (m.t === 'S') {
         for (const s of m.p) { if (s[0] === this.myId) continue; const p = this.players.get(s[0]); if (p) p.target = s; }
       } else if (m.t === 'chat') this.onChat(m);
-      else if (m.t === 'funbux') this.setFunbux(m.funbux);
+      else if (m.t === 'money') { this.setMoney(m); if (m.reason === 'play') this.sys(`+${m.amount} FunTix for playing!`); }
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
   }
   send(m) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(m)); }
-  setFunbux(n) { if (n != null) { this.fbCount.textContent = n; this.o.onFunbux?.(n); } }
+  setMoney(m) {
+    if (m.funtix != null) this.txCount.textContent = m.funtix;
+    this.o.onMoney?.({ funtix: m.funtix });
+  }
   hideLoading() { const l = this.c.querySelector('.loading'); if (l) { l.classList.add('fade'); setTimeout(() => l.remove(), 500); } }
   addPlayer(p) {
     if (this.players.has(p.id)) return;
@@ -268,16 +318,16 @@ export class Game {
   }
   physics(dt) {
     const k = this.keys;
-    const f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0);
-    const s = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
+    const f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0) - this.joy.y;
+    const s = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + this.joy.x;
     if (k.ArrowLeft) this.camYaw += dt * 2.5; if (k.ArrowRight) this.camYaw -= dt * 2.5;
     const fwd = new THREE.Vector3(-Math.sin(this.camYaw), 0, -Math.cos(this.camYaw));
     const right = new THREE.Vector3(Math.cos(this.camYaw), 0, -Math.sin(this.camYaw));
     const move = fwd.multiplyScalar(f).add(right.multiplyScalar(s));
-    if (move.lengthSq() > 0) move.normalize();
+    if (move.lengthSq() > 1) move.normalize();
     const speed = this.speedTimer > 0 ? WALK * 2 : WALK;
     this.vel.x = move.x * speed; this.vel.z = move.z * speed;
-    if (k.Space && this.onGround) { this.vel.y = JUMP; this.onGround = false; sfx.jump(); }
+    if ((k.Space || this.touchJump) && this.onGround) { this.vel.y = JUMP; this.onGround = false; sfx.jump(); }
     this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
     this.wasGround = this.onGround; this.onGround = false; this.ground = null;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z)) * dt / 0.4));
@@ -306,11 +356,11 @@ export class Game {
         const cp = new THREE.Vector3(p.p[0], p.p[1] + p.s[1] / 2, p.p[2]);
         if (!this.checkpoint || !this.checkpoint.equals(cp)) { this.checkpoint = cp; sfx.checkpoint(); this.showBig('Checkpoint reached!', 1500); }
       }
-      if (p.k === 'win' && !this.won) { this.won = true; sfx.win(); this.showBig('YOU WIN! +25 FunBux', 4000); this.send({ t: 'win' }); confetti(this.c); }
+      if (p.k === 'win' && !this.won) { this.won = true; sfx.win(); this.showBig(this.o.test ? 'YOU WIN!' : `YOU WIN! +${ECON.WIN_TIX} FunTix`, 4000); this.send({ t: 'win' }); confetti(this.c); }
       if (p.k === 'coin' && !this.collected.has(p.id)) {
         this.collected.add(p.id); this.meshes.get(p.id).visible = false; sfx.coin();
         this.send({ t: 'coin', part: p.id });
-        if (this.o.test) this.fbCount.textContent = this.collected.size + ' coins';
+        if (this.o.test) this.txCount.textContent = this.collected.size + ' coins';
       }
     }
   }
@@ -422,4 +472,4 @@ function confetti(root) {
   root.querySelector('.game-root').appendChild(box); setTimeout(() => box.remove(), 5000);
 }
 const chatIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>';
-export const bux = '<svg class="bux" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 1l9.5 5.5v11L12 23l-9.5-5.5v-11z"/><path fill="#1b1d1f" d="M9 6.5h7v2.4h-4.4v2.2h3.8v2.3h-3.8v4.1H9z"/></svg>';
+export const tix = '<svg class="tix" viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="#1b1d1f" stroke-width="1.4" opacity=".35"/><path fill="#1b1d1f" d="M7.5 7h9v2.6h-3.2V18h-2.6V9.6H7.5z"/></svg>';

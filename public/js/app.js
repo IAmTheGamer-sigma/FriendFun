@@ -1,8 +1,8 @@
-import { Game, nameColor, bux } from './game.js';
+import { Game, nameColor, tix } from './game.js';
 import { Studio } from './studio.js';
 import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
-import { CATALOG, ITEM } from './catalog.js';
+import { CATALOG, ITEM, ECON } from './catalog.js';
 import { templates } from './worlds.js';
 import * as THREE from 'three';
 
@@ -73,11 +73,11 @@ function shell(active, content) {
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
     <a class="logo" href="#/home"><span class="logo-icon"></span><span class="logo-text">FriendFun</span></a>
-    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funbux">FunBux</a></nav>
+    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
       <a class="tb-user" href="#/users/${encodeURIComponent(me.name)}"><img src="${avatarImage(me.avatar)}"><span>${esc(me.name)}</span></a>
-      <a class="tb-bux" href="#/funbux">${bux}<span class="me-bux">${fmt(me.funbux)}</span></a>
+      <a class="tb-bux" href="#/funtix" title="FunTix">${tix}<span class="me-tix">${fmt(me.funtix ?? 0)}</span></a>
       <button class="tb-logout" title="Log out">Log Out</button>
     </div>
   </header>
@@ -93,7 +93,10 @@ function mount(active, html, after) {
   document.body.classList.remove('nav-open');
   after?.(); fillThumbs();
 }
-function setBux(n) { if (me) me.funbux = n; document.querySelectorAll('.me-bux').forEach(e => (e.textContent = fmt(n))); }
+function setMoney(r) {
+  if (r.funtix != null) { if (me) me.funtix = r.funtix; document.querySelectorAll('.me-tix').forEach(e => (e.textContent = fmt(r.funtix))); }
+}
+function dailyToast(r) { if (r?.daily) toast(`Daily reward: +${r.daily} FunTix!`); }
 
 // ---------- pages ----------
 function loginPage() {
@@ -110,7 +113,7 @@ function loginPage() {
         <label>Password<input name="password" type="password" autocomplete="current-password" placeholder="At least 4 characters" required></label>
         <div class="auth-err"></div>
         <button class="btn-primary big" type="submit">Sign Up</button>
-        <p class="auth-fine">Start with 100 FunBux free!</p>
+        <p class="auth-fine">Start with ${ECON.START_TIX} FunTix free!</p>
       </form>
     </div>
   </div>`;
@@ -196,8 +199,8 @@ async function playPage(id) {
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
   const game = new Game(app.querySelector('.play-container'), {
-    world: g.world, gameId: g.id, gameName: g.name, me, token, funbux: me.funbux,
-    onFunbux: n => (me.funbux = n), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
+    world: g.world, gameId: g.id, gameName: g.name, me, token, funtix: me.funtix,
+    onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
   });
   cleanup = () => game.destroy();
 }
@@ -266,15 +269,30 @@ async function catalogPage(filter = 'all') {
     <div class="cat-filters">${['all', 'hat', 'face', 'shirt'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[f]}</a>`).join('')}</div>
     <div class="cat-grid">${CATALOG.filter(i => filter === 'all' || i.type === filter).map(i => `
       <div class="cat-item"><div class="cat-img"><img src="${itemImage(i)}"></div><div class="cat-name">${esc(i.name)}</div>
-        <div class="cat-price">${i.price ? `${bux} ${i.price}` : '<span class="free">Free</span>'}</div>
+        <div class="cat-price">${priceHtml(i)}</div>
         ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
     app.querySelectorAll('.btn-buy').forEach(b => b.onclick = () => {
-      const it = ITEM[b.dataset.id];
-      confirmModal('Buy Item', `Would you like to buy <b>${esc(it.name)}</b> for ${it.price ? bux + ' ' + it.price : 'free'}?`, 'Buy Now', async () => {
-        try { const r = await api('POST', '/api/buy/' + it.id); me.inventory = r.inventory; setBux(r.funbux); toast(`You bought ${it.name}!`); catalogPage(filter); }
-        catch (e) { toast(e.message, true); }
-      });
+      buyModal(ITEM[b.dataset.id], () => catalogPage(filter));
     });
+  });
+}
+function priceHtml(i) {
+  return i.free ? '<span class="free">Free</span>' : `<span class="pc">${tix} ${i.price}</span>`;
+}
+function buyModal(it, onDone) {
+  const opts = [['tix', tix, it.price, me.funtix ?? 0]];
+  const d = document.createElement('div'); d.className = 'modal-bg';
+  d.innerHTML = `<div class="modal"><h2>Buy Item</h2>
+    <div class="buy-row"><img src="${itemImage(it)}"><div><p>Would you like to buy <b>${esc(it.name)}</b>?</p>
+    <p class="muted small">You have ${tix} ${fmt(me.funtix ?? 0)}</p></div></div>
+    <div class="modal-actions"><button class="btn-secondary">Cancel</button>${opts.map(([c, ic, p, bal]) => `<button class="btn-primary buy-with" data-c="${c}" ${bal < p ? 'disabled title="Not enough"' : ''}>Buy for ${ic} ${p}</button>`).join('')}</div></div>`;
+  document.body.appendChild(d);
+  d.querySelector('.btn-secondary').onclick = () => d.remove();
+  d.onclick = e => { if (e.target === d) d.remove(); };
+  d.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => {
+    d.remove();
+    try { const r = await api('POST', '/api/buy/' + it.id); me.inventory = r.inventory; setMoney(r); toast(`You bought ${it.name}!`); onDone(); }
+    catch (e) { toast(e.message, true); }
   });
 }
 function confirmModal(title, html, ok, onOk) {
@@ -366,12 +384,15 @@ async function studioPage(id, tpl) {
   cleanup = () => { game?.destroy(); studio.destroy(); };
 }
 
-function funbuxPage() {
-  mount('funbux', `<h1>FunBux</h1>
-    <div class="bux-hero">${bux}<div><div class="bux-big">${fmt(me.funbux)}</div><div class="muted">Your balance</div></div></div>
+function funtixPage() {
+  mount('funtix', `<h1>FunTix</h1>
+    <div class="bux-hero">${tix}<div><div class="bux-big me-tix">${fmt(me.funtix ?? 0)}</div><div class="muted">Your balance</div></div></div>
+    <h2>How to Earn FunTix</h2>
     <div class="bux-ways">
-      <div class="bux-way"><h3>Collect Coins</h3><p>Every gold coin you pick up in a game gives you 1 FunBux.</p></div>
-      <div class="bux-way"><h3>Beat Obbies</h3><p>Touch a Win Pad at the end of an obby for 25 FunBux (once per visit).</p></div>
+      <div class="bux-way"><h3>${tix} Daily Reward</h3><p>Log in every day to get ${ECON.DAILY_TIX} free FunTix.</p></div>
+      <div class="bux-way"><h3>${tix} Play Games</h3><p>Earn ${ECON.PLAY_TIX} FunTix for every minute you spend playing.</p></div>
+      <div class="bux-way"><h3>${tix} Collect Coins</h3><p>Every gold coin you pick up in a game gives you ${ECON.COIN_TIX} FunTix.</p></div>
+      <div class="bux-way"><h3>${tix} Beat Obbies</h3><p>Touch a Win Pad at the end of an obby for ${ECON.WIN_TIX} FunTix (once per visit).</p></div>
       <div class="bux-way"><h3>Spend Them</h3><p>Visit the <a href="#/catalog">Marketplace</a> to buy hats, faces and shirts for your avatar.</p></div>
     </div>`);
 }
@@ -385,7 +406,7 @@ async function route() {
   const seg = (path || '/home').split('/').filter(Boolean);
   if (!token) { if (seg[0] !== 'login') history.replaceState(null, '', '#/login'); return loginPage(); }
   try {
-    if (!me) me = await api('GET', '/api/me');
+    if (!me) { me = await api('GET', '/api/me'); dailyToast(me); }
     if (my !== routing) return;
     const qp = new URLSearchParams(query || '');
     switch (seg[0]) {
@@ -399,7 +420,7 @@ async function route() {
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
-      case 'funbux': return funbuxPage();
+      case 'funtix': case 'funbux': return funtixPage();
       default: return await homePage();
     }
   } catch (e) {
@@ -410,6 +431,6 @@ async function route() {
 addEventListener('hashchange', route);
 setInterval(async () => {
   if (!token || !me) return;
-  try { const r = await api('POST', '/api/ping'); setBux(r.funbux); if (r.requests !== me.requests.length) { me = await api('GET', '/api/me'); } } catch {}
+  try { const r = await api('POST', '/api/ping'); setMoney(r); dailyToast(r); if (r.requests !== me.requests.length) { me = await api('GET', '/api/me'); } } catch {}
 }, 20000);
 route();

@@ -6,7 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { templates } from './public/js/worlds.js';
-import { ITEM, CATALOG, DEFAULT_AVATAR } from './public/js/catalog.js';
+import { ITEM, CATALOG, DEFAULT_AVATAR, ECON } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -23,7 +23,7 @@ function seed() {
     g('g1', 'Mega Fun Obby', 'FriendFun', 'Jump, dodge and bounce through 10 stages of obstacles! Touch the blue checkpoints to save your progress. Reach the golden platform to win!', 'obby', 1543210, 8912, 412),
     g('g2', 'Hangout Town', 'FriendFun', 'Chill with friends in a little town. Explore houses, sit on benches, collect coins and chat with everyone.', 'hangout', 987654, 5321, 210),
     g('g3', 'Sky Tower Climb', 'FriendFun', 'Climb the spiral around the giant tower. Don\'t touch the red bricks! Can you reach the top?', 'tower', 654321, 4210, 380),
-    g('g4', 'Coin Rush Islands', 'FriendFun', 'Hop between floating islands and grab every coin. Every coin = 1 FunBux!', 'coinRush', 432100, 3999, 155),
+    g('g4', 'Coin Rush Islands', 'FriendFun', 'Hop between floating islands and grab every coin. Every coin = 1 FunTix!', 'coinRush', 432100, 3999, 155),
     g('g5', 'Classic Baseplate', 'FriendFun', 'The classic. A big grey baseplate. Hang out and do whatever you want.', 'baseplate', 210987, 1500, 90),
   ];
   return { users: {}, sessions: {}, games: Object.fromEntries(games.map(x => [x.id, x])), nextGame: 6 };
@@ -31,6 +31,7 @@ function seed() {
 function load() {
   try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
   catch { db = seed(); save(true); }
+  for (const u of Object.values(db.users)) { u.funtix ??= ECON.START_TIX; delete u.funbux; }
 }
 let saveTimer = null;
 function save(now = false) {
@@ -92,7 +93,7 @@ app.post('/api/signup', (req, res) => {
   if (db.users[key(username)]) return res.status(400).json({ error: 'That username is taken' });
   const salt = crypto.randomBytes(8).toString('hex');
   db.users[key(username)] = {
-    name: username, salt, pw: hash(password, salt), created: Date.now(), funbux: 100,
+    name: username, salt, pw: hash(password, salt), created: Date.now(), funtix: ECON.START_TIX,
     avatar: structuredClone(DEFAULT_AVATAR), inventory: CATALOG.filter(i => i.free).map(i => i.id),
     friends: [], requests: [], favorites: [], recent: [], bio: '',
   };
@@ -111,11 +112,19 @@ app.post('/api/login', (req, res) => {
 app.post('/api/logout', auth, (req, res) => {
   delete db.sessions[(req.headers.authorization || '').replace('Bearer ', '')]; save(); res.json({ ok: true });
 });
+function dailyTix(u) {
+  const day = new Date().toISOString().slice(0, 10);
+  if (u.tixDay === day) return 0;
+  u.tixDay = day; u.funtix += ECON.DAILY_TIX; save();
+  return ECON.DAILY_TIX;
+}
+const money = u => ({ funtix: u.funtix });
 app.get('/api/me', auth, (req, res) => {
   const u = req.user;
-  res.json({ ...publicUser(u), funbux: u.funbux, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent });
+  const daily = dailyTix(u);
+  res.json({ ...publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent });
 });
-app.post('/api/ping', auth, (req, res) => { touch(req.user.name, null); res.json({ funbux: req.user.funbux, requests: req.user.requests.length }); });
+app.post('/api/ping', auth, (req, res) => { touch(req.user.name, null); res.json({ ...money(req.user), daily: dailyTix(req.user), requests: req.user.requests.length }); });
 
 app.put('/api/me/avatar', auth, (req, res) => {
   const a = req.body || {};
@@ -131,9 +140,10 @@ app.post('/api/buy/:item', auth, (req, res) => {
   const it = ITEM[req.params.item];
   if (!it) return res.status(404).json({ error: 'No such item' });
   if (req.user.inventory.includes(it.id)) return res.status(400).json({ error: 'You already own this' });
-  if (req.user.funbux < it.price) return res.status(400).json({ error: 'Not enough FunBux' });
-  req.user.funbux -= it.price; req.user.inventory.push(it.id); save();
-  res.json({ funbux: req.user.funbux, inventory: req.user.inventory });
+  const price = it.free ? 0 : it.price;
+  if (req.user.funtix < price) return res.status(400).json({ error: 'Not enough FunTix' });
+  req.user.funtix -= price; req.user.inventory.push(it.id); save();
+  res.json({ ...money(req.user), inventory: req.user.inventory });
 });
 
 app.get('/api/users/:name', auth, (req, res) => {
@@ -276,17 +286,23 @@ wss.on('connection', (ws) => {
       if (room.players.size >= g.maxPlayers) return send(ws, { t: 'error', error: 'Server is full' });
       // kick duplicate sessions of the same user in this room
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
-      player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0 };
+      player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       g.visits++; u.recent = [g.id, ...u.recent.filter(x => x !== g.id)].slice(0, 12); save();
       touch(u.name, g.id);
-      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s })), funbux: u.funbux });
+      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s })), ...money(u) });
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar }, ws);
       broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
       return;
     }
     if (!player) return;
-    if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId); }
+    if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
+      const now = Date.now();
+      if (now - player.lastTix >= ECON.PLAY_TIX_EVERY) {
+        player.lastTix = now; player.user.funtix += ECON.PLAY_TIX; save();
+        send(ws, { t: 'money', ...money(player.user), reason: 'play', amount: ECON.PLAY_TIX });
+      }
+    }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const text = filter(m.text.trim());
       broadcast(room, { t: 'chat', id: player.id, name: player.name, text });
@@ -295,14 +311,14 @@ wss.on('connection', (ws) => {
       const now = Date.now();
       if (player.coins.has(m.part) || now - player.lastCoin < 150) return;
       player.coins.add(m.part); player.lastCoin = now;
-      player.user.funbux += 1; save();
-      send(ws, { t: 'funbux', funbux: player.user.funbux });
+      player.user.funtix += ECON.COIN_TIX; save();
+      send(ws, { t: 'money', ...money(player.user) });
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
-      player.user.funbux += 25; save();
-      send(ws, { t: 'funbux', funbux: player.user.funbux });
-      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+25 FunBux)` });
+      player.user.funtix += ECON.WIN_TIX; save();
+      send(ws, { t: 'money', ...money(player.user) });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
   });

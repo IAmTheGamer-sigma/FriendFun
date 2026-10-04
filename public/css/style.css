@@ -208,3 +208,31 @@ section { margin-bottom: 34px; }
   .content { margin-left: 0; padding: 18px; } .tb-burger { display: block; } .tb-nav, .tb-search, .tb-user span, .tb-logout { display: none; }
   .gp-stats { grid-template-columns: repeat(3, 1fr); } .profile-grid { grid-template-columns: 1fr; } .chat-box { width: 70vw; }
 }
+
+/* ---------- FunTix ---------- */
+.tix { color: var(--gold); }
+.cat-price { flex-wrap: wrap; gap: 10px; } .pc { display: inline-flex; align-items: center; gap: 3px; }
+.buy-row { display: flex; gap: 14px; align-items: center; } .buy-row img { width: 84px; height: 84px; background: #393b3d; border-radius: 10px; flex: none; } .buy-row p { margin: 4px 0; }
+.buy-row .muted { display: flex; align-items: center; gap: 4px; }
+.buy-with { display: inline-flex; align-items: center; gap: 6px; } .modal-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.money-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 20px; } .money-grid .bux-hero { margin-bottom: 0; } .bux-hero .tix { width: 70px; height: 70px; }
+.bux-way h3 { display: flex; align-items: center; gap: 6px; }
+
+/* ---------- touch controls ---------- */
+.funbux-hud { pointer-events: none; }
+.touch-ui { display: none; } .game-root.touch .touch-ui { display: block; }
+.game-root.touch, .game-canvas { touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; }
+.joy-zone { position: absolute; left: 0; bottom: 0; width: 45%; height: 55%; z-index: 4; touch-action: none; }
+.joy { position: absolute; left: 100px; top: calc(100% - 100px); width: 124px; height: 124px; border-radius: 50%; background: rgba(0,0,0,.22); border: 3px solid rgba(255,255,255,.45); transform: translate(-50%, -50%); pointer-events: none; transition: background .15s; }
+.joy.active { background: rgba(0,0,0,.35); }
+.joy-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,.8); box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.jump-btn { position: absolute; right: 40px; bottom: 44px; width: 92px; height: 92px; border-radius: 50%; background: rgba(0,0,0,.28); border: 3px solid rgba(255,255,255,.6); color: #fff; z-index: 4; display: grid; place-items: center; touch-action: none; transition: transform .08s; }
+.jump-btn.down { background: rgba(255,255,255,.35); transform: scale(.93); }
+.game-root.touch .hud-bottom { bottom: auto; top: 12px; }
+.game-root.touch .chat-box { width: min(320px, 50vw); } .game-root.touch .chat-log { max-height: 110px; font-size: 13px; }
+@media (max-width: 700px) {
+  .lb { min-width: 120px; } .lb-head, .lb-row { font-size: 12px; } .health { width: 120px; } .big-msg { font-size: 28px; }
+  .game-root.touch .hud-bottom { flex-direction: column; gap: 4px; } .game-root.touch .funbux-hud { padding: 4px 10px; font-size: 13px; }
+  .jump-btn { right: 24px; bottom: 30px; width: 80px; height: 80px; }
+  .esc-actions { grid-template-columns: 1fr; }
+}
