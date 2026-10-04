@@ -12,7 +12,8 @@
   "dependencies": {
     "express": "^4.22.3",
     "three": "^0.160.0",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "mongoose": "^8.0.0"
   },
   "type": "module"
 }
