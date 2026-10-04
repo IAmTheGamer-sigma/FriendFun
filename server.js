@@ -27,8 +27,8 @@ const key = n => n.toLowerCase();
 
 async function seed() {
   const now = Date.now();
-  const g = (id, name, creator, desc, tpl, visits, likes, dislikes, maxPlayers = 30) =>
-    ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, maxPlayers, created: now, updated: now, thumbnail: null });
+  const g = (id, name, creator, desc, tpl, visits, likes, dislikes, maxPlayer = 30) =>
+    ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, maxPlayer, created: now, updated: now, thumbnail: null });
   
   const games = [
     g('g1', 'Mega Fun Obby', 'FriendFun', 'Jump, dodge and bounce through 10 stages of obstacles!', 'obby', 1543210, 8912, 412),
@@ -255,19 +255,23 @@ app.get('/api/leaderboard', auth, async (req, res) => {
 app.get('/api/users/:name', auth, async (req, res) => {
   const { data: u, error: uErr } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
   if (uErr || !u) return res.status(404).json({ error: 'User not found' });
-  const { data: games } = await supabase.from('games').select('*').eq('creator', key(u.name)).then(r => r.data.map(gameSummary));
-  const { data: friends } = await supabase.from('users').select('*').in('name', u.friends).then(r => Promise.all(r.data.map(publicUser)));
+  
+  const { data: gamesData } = await supabase.from('games').select('*').eq('creator', key(u.name));
+  const games = (gamesData || []).map(gameSummary);
+  
+  const { data: friendsData } = await supabase.from('users').select('*').in('name', u.friends || []);
+  const friends = await Promise.all((friendsData || []).map(publicUser));
+  
   res.json({ 
-    ...await publicUser(u), games, friendsList: await friends, 
-    isFriend: req.user.friends.includes(key(u.name)), requested: u.requests.includes(key(req.user.name)) 
+    ...await publicUser(u), games: games || [], friendsList: friends || [], 
+    isFriend: (req.user.friends || []).includes(key(u.name)), requested: (u.requests || []).includes(key(req.user.name)) 
   });
 });
 
 app.get('/api/search/users', auth, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users } = await supabase.from('users').select('*').ilike('name', `%${q}%`).limit(30);
-  res.json(await Promise.//FIXED a typo here
-Promise.all(users.map(publicUser)));
+  res.json(await Promise.all((users || []).map(publicUser)));
 });
 
 function adminOnly(req, res, next) {
@@ -286,20 +290,20 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   if (uErr || !u) return res.status(404).json({ error: 'User not found' });
   if (isAdmin(u)) return res.status(400).json({ error: 'Admins always have FriendClub' });
   if (req.body?.on) {
-    const updatedInv = [...u.inventory, ...CATALOG.filter(it => it.club && !u.inventory.includes(it.id)).map(it => it.id)];
-    await supabase.from('users').update({ clubFirestore: true, inventory: updatedInv }).eq('name', u.name);
+    const updatedInv = [...(u.inventory || []), ...CATALOG.filter(it => it.club && !u.inventory?.includes(it.id)).map(it => it.id)];
+    await supabase.from('users').update({ clubForever: true, inventory: updatedInv }).eq('name', u.name);
   } else { 
-    await supabase.from('users').update({ clubFirestore: false, clubUntil: 0 }).eq('name', u.name); 
+    await supabase.from('users').update({ clubForever: false, clubUntil: 0 }).eq('name', u.name); 
   }
   res.json({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix });
 });
 
 app.get('/api/friends', auth, async (req, res) => {
-  const { data: friends } = await supabase.from('users').select('*').in('name', req.user.friends);
-  const { data: requests } = await supabase.from('users').select('*').in('name', req.user.requests);
+  const { data: friends } = await supabase.from('users').select('*').in('name', req.user.friends || []);
+  const { data: requests } = await supabase.from('users').select('*').in('name', req.user.requests || []);
   res.json({
-    friends: await Promise.all(friends.map(publicUser)),
-    requests: await Promise.all(requests.map(publicUser)),
+    friends: await Promise.all((friends || []).map(publicUser)),
+    requests: await Promise.all((requests || []).map(publicUser)),
   });
 });
 
@@ -308,14 +312,14 @@ app.post('/api/friends/:name', auth, async (req, res) => {
   const me = req.user, mk = key(me.name);
   if (oErr || !other || other.name === me.name) return res.status(400).json({ error: 'Invalid user' });
   const ok = other.name;
-  if (me.friends.includes(ok)) return res.json({ status: 'friends' });
-  if (me.requests.includes(ok)) {
-    const updatedMe = { friends: [...me.friends, ok], requests: me.requests.filter(x => x !== ok) };
+  if ((me.friends || []).includes(ok)) return res.json({ status: 'friends' });
+  if ((me.requests || []).includes(ok)) {
+    const updatedMe = { friends: [...(me.friends || []), ok], requests: (me.requests || []).filter(x => x !== ok) };
     await supabase.from('users').update(updatedMe).eq('name', me.name);
-    await supabase.from('users').update({ friends: [...other.friends, mk] }).eq('name', ok);
+    await supabase.from('users').update({ friends: [...(other.friends || []), mk] }).eq('name', ok);
     return res.json({ status: 'friends' });
   }
-  const updatedOther = { requests: [...other.requests, mk] };
+  const updatedOther = { requests: [...(other.requests || []), mk] };
   await supabase.from('users').update(updatedOther).eq('name', ok);
   res.json({ status: 'requested' });
 });
@@ -323,33 +327,33 @@ app.post('/api/friends/:name', auth, async (req, res) => {
 app.delete('/api/friends/:name', auth, async (req, res) => {
   const { data: other, error: oErr } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
   if (oErr || !other) return res.status(404).json({ error: 'User not found' });
-  const ok = other.name, mk = me.name;
-  const updatedMe = { friends: me.friends.filter(x => x !== ok), requests: me.requests.filter(x => x !== ok) };
-  await supabase.from('users').update(updatedMe).eq('name', me.name);
-  await supabase.from('users').update({ friends: other.friends.filter(x => x !== mk) }).eq('name', ok);
+  const ok = other.name, mk = req.user.name;
+  const updatedMe = { friends: (req.user.friends || []).filter(x => x !== ok), requests: (req.user.requests || []).filter(x => x !== ok) };
+  await supabase.from('users').update(updatedMe).eq('name', req.user.name);
+  await supabase.from('users').update({ friends: (other.friends || []).filter(x => x !== mk) }).eq('name', ok);
   res.json({ ok: true });
 });
 
 app.get('/api/games', auth, async (req, res) => {
   const q = key(String(req.query.q || ''));
   let query = supabase.from('games').select('*').eq('unpublished', false);
-  if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
+  if (q) query = query.or(\`name.ilike.%\${q}%,creator.ilike.%\${q}%\`);
   const { data: games } = await query;
-  const list = games.map(gameSummary);
+  const list = (games || []).map(gameSummary);
   list.sort((a, b) => (b.playing - a.playing) || (b.visits - a.visits));
   res.json(list);
 });
 
 app.get('/api/mygames', auth, async (req, res) => {
   const { data: games } = await supabase.from('games').select('*').eq('creator', key(req.user.name));
-  res.json(games.map(g => ({ ...gameSummary(g), unpublished: !!g.unpublished })));
+  res.json((games || []).map(g => ({ ...gameSummary(g), unpublished: !!g.unpublished })));
 });
 
 app.get('/api/games/:id', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const vote = g.votes?.[key(req.user.name)] || 0;
-  res.json({ ...gameSummary(g), description: g.description, maxPlayers: g.maxPlayers, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: req.user.favorites.includes(g.id), favorites: g.favoriteCount || 0 });
+  res.json({ ...gameSummary(g), description: g.description, maxPlayer: g.maxPlayer, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favoriteCount || 0 });
 });
 
 app.post('/api/games', auth, async (req, res) => {
@@ -357,7 +361,7 @@ app.post('/api/games', auth, async (req, res) => {
   const { count } = await supabase.from('games').select('*', { count: 'exact', head: true });
   const id = 'g' + (count + 1);
   const game = {
-    id, name: filter(name || 'Untitled Game').slice(0, 50), creator: req.user.name, description: filter(description || '').slice(0, 1000), world: sanitizeWorld(world), visits: 0, likes: 0, dislikes: 0, maxPlayers: 30, created: Date.now(), updated: Date.now(), thumbnail: validThumb(thumbnail), unpublished: !publish
+    id, name: filter(name || 'Untitled Game').slice(0, 50), creator: req.user.name, description: filter(description || '').slice(0, 1000), world: sanitizeWorld(world), visits: 0, likes: 0, dislikes: 0, maxPlayer: 30, created: Date.now(), updated: Date.now(), thumbnail: validThumb(thumbnail), unpublished: !publish
   };
   const { data, error } = await supabase.from('games').insert(game).select().single();
   if (error) return res.status(500).json({ error: error.message });
@@ -403,7 +407,7 @@ app.post('/api/games/:id/vote', auth, async (req, res) => {
 app.post('/api/games/:id/favorite', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
-  const f = req.user.favorites;
+  const f = req.user.favorites || [];
   let favoriteCount = g.favoriteCount || 0;
   if (f.includes(g.id)) { 
     const updatedF = f.filter(x => x !== g.id);
@@ -465,7 +469,7 @@ wss.on('connection', (ws) => {
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
       if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map() });
       room = rooms.get(g.id);
-      if (room.players.size >= g.maxPlayers) return send(ws, { t: 'error', error: 'Server is full' });
+      if (room.players.size >= g.maxPlayer) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       
@@ -477,7 +481,7 @@ wss.on('connection', (ws) => {
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
-      broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
+      broadcast(room, { t: 'chat', system: true, text: \`${player.name} has joined the game.\` });
       return;
     }
     if (!player) return;
@@ -497,7 +501,8 @@ wss.on('connection', (ws) => {
     else if (m.t === 'coin' && typeof m.part === 'string') {
       const now = Date.now();
       if (player.coins.has(m.part) || now - player.lastCoin < 150) return;
-      player.coins.add(m.part); player.lastCoin = now;
+      const coinId = m.part;
+      player.coins.add(coinId); player.lastCoin = now;
       await supabase.from('users').update({ funtix: player.user.funtix + ECON.COIN_TIX }).eq('name', player.user.name);
       send(ws, { t: 'money', ...money(player.user) });
     }
@@ -505,7 +510,7 @@ wss.on('connection', (ws) => {
       if (player.won) return; player.won = true;
       await supabase.from('users').update({ funtix: player.user.funtix + ECON.WIN_TIX, champ: true }).eq('name', player.user.name);
       send(ws, { t: 'money', ...money(player.user) });
-      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
+      broadcast(room, { t: 'chat', system: true, text: \`${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)\` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
   });
@@ -513,7 +518,7 @@ wss.on('connection', (ws) => {
     if (!player || !room) return;
     room.players.delete(player.id);
     broadcast(room, { t: 'left', id: player.id });
-    broadcast(room, { t: 'chat', system: true, text: `${player.name} has left the game.` });
+    broadcast(room, { t: 'chat', system: true, text: \`${player.name} has left the game.\` });
     touch(player.name, null);
   });
 });
@@ -527,6 +532,6 @@ setInterval(() => {
   }
 }, 66);
 
-server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(\`FriendFun running on http://localhost:\${PORT}\`));
 
 export default app;
