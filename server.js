@@ -334,7 +334,17 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
 
 function groupView(group, username) {
   const members = Array.isArray(group.members) ? group.members : [];
-  return { id: group.id, name: group.name, description: group.description || '', owner: group.owner, created: group.created, members: members.length, joined: members.includes(username), isOwner: group.owner === username };
+  const creator = group.creator || group.owner || 'Unknown';
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description || '',
+    creator,
+    created: group.created,
+    members: members.length,
+    joined: members.includes(username),
+    isOwner: creator === username,
+  };
 }
 
 app.get('/api/groups', auth, async (req, res) => {
@@ -349,7 +359,7 @@ app.post('/api/groups', auth, async (req, res) => {
   if (name.length < 3) return res.status(400).json({ error: 'Group name must be at least 3 characters' });
   const { data: existing } = await supabase.from('groups').select('id').ilike('name', name).maybeSingle();
   if (existing) return res.status(400).json({ error: 'That group name is already taken' });
-  const group = { id: `group_${crypto.randomUUID()}`, name, description, owner: req.user.name, members: [req.user.name], created: Date.now() };
+  const group = { id: `group_${crypto.randomUUID()}`, name, description, creator: req.user.name, members: [req.user.name], created: Date.now() };
   const { data, error } = await supabase.from('groups').insert(group).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(groupView(data, req.user.name));
@@ -365,7 +375,7 @@ app.post('/api/groups/:id/:action(join|leave)', auth, async (req, res) => {
     if (members.length >= 100) return res.status(400).json({ error: 'This group is full' });
     updatedMembers = [...members, req.user.name];
   } else {
-    if (group.owner === req.user.name) return res.status(400).json({ error: 'The owner cannot leave their own group' });
+    if ((group.creator || group.owner) === req.user.name) return res.status(400).json({ error: 'The creator cannot leave their own group' });
     updatedMembers = members.filter(name => name !== req.user.name);
   }
   const { data, error } = await supabase.from('groups').update({ members: updatedMembers }).eq('id', group.id).select().single();
