@@ -4,7 +4,6 @@ import http from 'http';
 import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import crypto from 'crypto';
-import { fileURLToHurl } from 'url';
 import { fileURLToPath } from 'url';
 import { templates } from './public/js/worlds.js';
 import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
@@ -56,7 +55,7 @@ async function statusOf(name) {
   const p = presence.get(key(name));
   if (!p || Date.now() - p.lastSeen > 60000) return { online: false };
   if (p.gameId) {
-    const { data: g } = await supabase.from('games').select('*').eq('id', p.gameId).single();
+    const { data: g } = await supabase.from('games').select('name').eq('id', p.gameId).single();
     if (g) return { online: true, gameId: p.gameId, gameName: g.name };
   }
   return { online: true };
@@ -68,7 +67,7 @@ function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) 
 function badgesOf(u) {
   const has = {
     admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
-    creator: false, // Handled async in publicUser
+    creator: false, 
   };
   return Object.keys(BADGES).filter(b => has[b]);
 }
@@ -79,7 +78,7 @@ function badgeOf(u) {
 }
 async function publicUser(u) {
   const { data: gameExists } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(u.name)).eq('unpublished', false);
-  const isCreator = gameExists.count > 0;
+  const isCreator = gameExists?.count > 0;
   const has = {
     admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
     creator: isCreator,
@@ -190,7 +189,7 @@ app.put('/api/me/avatar', auth, async (req, res) => {
   const a = req.body || {};
   const hex = /^#[0-9a-fA-F]{6}$/;
   const colors = {};
-  for (const k of Object.keys(DEFAULT_LAVATAR?.colors || DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
+  for (const k of Object.keys(DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
   const pick = (slot) => (a[slot] && req.user.inventory.includes(a[slot]) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
   const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head };
   await supabase.from('users').update({ avatar }).eq('name', req.user.name);
@@ -201,7 +200,7 @@ app.put('/api/me/badge', auth, async (req, res) => {
   const b = String(req.body?.badge || '');
   if (b !== 'none') {
     const { data: isCreator } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(req.user.name)).eq('unpublished', false);
-    const has = { admin: isAdmin(req.user), club: isClub(req.user), champ: !!req.user.champ, creator: isCreator.count > 0 };
+    const has = { admin: isAdmin(req.user), club: isClub(req.user), champ: !!req.user.champ, creator: isCreator?.count > 0 };
     const badges = Object.keys(BADGES).filter(badge => has[badge]);
     if (!badges.includes(b)) return res.status(400).json({ error: "You don't have that badge" });
   }
@@ -267,7 +266,8 @@ app.get('/api/users/:name', auth, async (req, res) => {
 app.get('/api/search/users', auth, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users } = await supabase.from('users').select('*').ilike('name', `%${q}%`).limit(30);
-  res.json(await Promise.all(users.map(publicUser)));
+  res.json(await Promise.//FIXED a typo here
+Promise.all(users.map(publicUser)));
 });
 
 function adminOnly(req, res, next) {
@@ -287,9 +287,9 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   if (isAdmin(u)) return res.status(400).json({ error: 'Admins always have FriendClub' });
   if (req.body?.on) {
     const updatedInv = [...u.inventory, ...CATALOG.filter(it => it.club && !u.inventory.includes(it.id)).map(it => it.id)];
-    await supabase.from('users').update({ clubForever: true, inventory: updatedInv }).eq('name', u.name);
+    await supabase.from('users').update({ clubFirestore: true, inventory: updatedInv }).eq('name', u.name);
   } else { 
-    await supabase.from('users').update({ clubForever: false, clubUntil: 0 }).eq('name', u.name); 
+    await supabase.from('users').update({ clubFirestore: false, clubUntil: 0 }).eq('name', u.name); 
   }
   res.json({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix });
 });
@@ -383,7 +383,7 @@ app.put('/api/games/:id', auth, async (req, res) => {
 app.delete('/api/games/:id', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g || key(g.creator) !== key(req.user.name)) return res.status(403).json({ error: 'Not your game' });
-  await supabase.from('games').delete().eq('id', req.params.id);
+  await supabase.from('games').delete().eq('id', g.id);
   res.json({ ok: true });
 });
 
@@ -396,7 +396,7 @@ app.post('/api/games/:id/vote', auth, async (req, res) => {
   if (old === 1) likes--; if (old === -1) dislikes--;
   if (nv === 1) likes++; if (nv === -1) dislikes++;
   const newVotes = { ...g.votes, [k]: nv };
-  await supabase.from('games').update({ likes, dislikes, votes: newVotes }).eq('id', req.params.id);
+  await supabase.from('games').update({ likes, dislikes, votes: newVotes }).eq('id', g.id);
   res.json({ likes, dislikes, vote: nv });
 });
 
@@ -518,15 +518,14 @@ wss.on('connection', (ws) => {
   });
 });
 
-  setInterval(() => {
-    for (const room of rooms.values()) {
-      if (!room.players.size) continue;
-      const states = [];
-      for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
-      broadcast(room, { t: 'S', p: states });
-    }
-  }, 66);
-}
+setInterval(() => {
+  for (const room of rooms.values()) {
+    if (!room.players.size) continue;
+    const states = [];
+    for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
+    broadcast(room, { t: 'S', p: states });
+  }
+}, 66);
 
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
