@@ -24,7 +24,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ---------- helper functions ----------
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const key = n => n.toLowerCase();
-const money = u => ({ funtix: u.funtix });
+const money = u => ({ funtix: Number(u.funtix) || 0 });
+const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
 
 async function seed() {
   const now = Date.now();
@@ -78,8 +79,8 @@ function badgeOf(u) {
   return list.includes(u.badge) ? u.badge : list[0] || null;
 }
 async function publicUser(u) {
-  const { data: gameExists } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(u.name)).eq('unpublished', false);
-  const isCreator = gameExists?.count > 0;
+  const { count: gameCount } = await supabase.from('games').select('id', { count: 'exact', head: true }).eq('creator', key(u.name)).eq('unpublished', false);
+  const isCreator = (gameCount || 0) > 0;
   const has = {
     admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
     creator: isCreator,
@@ -89,12 +90,12 @@ async function publicUser(u) {
   
   return { 
     name: u.name, club: isClub(u), admin: isAdmin(u), badges, badge, 
-    avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, 
+    avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length, 
     ...(await statusOf(u.name)) 
   };
 }
 function gameSummary(g) {
-  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky };
+  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky, maxPlayers: g.max_players || 30 };
 }
 const BAD = ['damn', 'hell', 'stupid', 'idiot', 'dumb', 'crap', 'shut up', 'loser'];
 function filter(text) {
@@ -160,30 +161,34 @@ app.post('/api/logout', auth, async (req, res) => {
 
 async function dailyTix(u) {
   const day = new Date().toISOString().slice(0, 10);
-  if (u.tixDay === day) return 0;
+  if (u.tixDay === day) return { amount: 0, user: u };
   const amt = ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0);
-  const updatedUser = { ...u, tixDay: day, funtix: u.funtix + amt };
-  await supabase.from('users').update(updatedUser).eq('name', u.name);
-  return amt;
+  const { data: updated, error } = await supabase.from('users').update({ tixDay: day, funtix: (Number(u.funtix) || 0) + amt }).eq('name', u.name).select().single();
+  if (error) throw new Error(error.message);
+  Object.assign(u, updated);
+  return { amount: amt, user: updated };
 }
 
 app.get('/api/me', auth, async (req, res) => {
   const u = req.user;
+  u.inventory = list(u, 'inventory'); u.requests = list(u, 'requests'); u.friends = list(u, 'friends'); u.favorites = list(u, 'favorites'); u.recent = list(u, 'recent');
   if (isClub(u)) { 
-    const miss = CATALOG.filter(it => it.club && !u.inventory.includes(it.id)); 
+    const entitledItems = isAdmin(u) ? CATALOG : CATALOG.filter(it => it.club);
+    const miss = entitledItems.filter(it => !u.inventory.includes(it.id)); 
     if (miss.length) { 
       const updatedInv = [...u.inventory, ...miss.map(it => it.id)];
       await supabase.from('users').update({ inventory: updatedInv }).eq('name', u.name);
       u.inventory = updatedInv;
     } 
   }
-  const daily = await dailyTix(u);
+  const { amount: daily } = await dailyTix(u);
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever });
 });
 
 app.post('/api/ping', auth, async (req, res) => { 
   touch(req.user.name, null); 
-  res.json({ funtix: req.user.funtix, daily: await dailyTix(req.user), requests: req.user.requests.length }); 
+  const { amount: daily } = await dailyTix(req.user);
+  res.json({ funtix: req.user.funtix, daily, requests: list(req.user, 'requests').length }); 
 });
 
 app.put('/api/me/avatar', auth, async (req, res) => {
@@ -223,9 +228,10 @@ app.post('/api/buy/:item', auth, async (req, res) => {
   const price = it.free ? 0 : it.price;
   if (req.user.funtix < price) return res.status(400).json({ error: 'Not enough FunTix' });
   
-  const updatedInv = [...req.user.inventory, it.id];
-  await supabase.from('users').update({ funtix: req.user.funtix - price, inventory: updatedInv }).eq('name', req.user.name);
-  res.json({ funtix: req.user.funtix - price, inventory: updatedInv });
+  const updatedInv = [...list(req.user, 'inventory'), it.id];
+  const { data: updated, error } = await supabase.from('users').update({ funtix: req.user.funtix - price, inventory: updatedInv }).eq('name', req.user.name).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ funtix: updated.funtix, inventory: updated.inventory });
 });
 
 app.post('/api/club/join', auth, async (req, res) => {
@@ -234,10 +240,11 @@ app.post('/api/club/join', auth, async (req, res) => {
   if (u.funtix < ECON.CLUB_PRICE) return res.status(400).json({ error: 'Not enough FunTix' });
   
   const clubUntil = Math.max(Date.now(), u.clubUntil || 0) + ECON.CLUB_DAYS * 86400000;
-  const updatedInv = [...u.inventory, ...CATALOG.filter(it => it.club && !u.inventory.includes(it.id)).map(it => it.id)];
+  const updatedInv = [...list(u, 'inventory'), ...CATALOG.filter(it => it.club && !list(u, 'inventory').includes(it.id)).map(it => it.id)];
   
-  await supabase.from('users').update({ funtix: u.funtix - ECON.CLUB_PRICE, clubUntil, inventory: updatedInv }).eq('name', u.name);
-  res.json({ funtix: u.funtix - ECON.CLUB_PRICE, club: true, clubUntil, inventory: updatedInv });
+  const { data: updated, error } = await supabase.from('users').update({ funtix: u.funtix - ECON.CLUB_PRICE, clubUntil, inventory: updatedInv }).eq('name', u.name).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ funtix: updated.funtix, club: true, clubUntil, inventory: updated.inventory });
 });
 
 app.get('/api/leaderboard', auth, async (req, res) => {
@@ -245,10 +252,10 @@ app.get('/api/leaderboard', auth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   const userIndex = all.findIndex(u => u.name === req.user.name);
   res.json({
-    top: all.slice(0, 50).map(u => ({ 
+    top: await Promise.all(all.slice(0, 50).map(async u => ({ 
       name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), badge: badgeOf(u), 
-      ...statusOf(u.name) 
-    })),
+      ...await statusOf(u.name) 
+    }))),
     rank: userIndex + 1, total: all.length, funtix: req.user.funtix,
   });
 });
@@ -282,21 +289,25 @@ function adminOnly(req, res, next) {
 
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
-  const { data: users } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
-  res.json(await Promise.all(users.map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
+  const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   const { data: u, error: uErr } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
   if (uErr || !u) return res.status(400).json({ error: 'User not found' });
   if (isAdmin(u)) return res.status(400).json({ error: 'Admins always have FriendClub' });
+  let changes;
   if (req.body?.on) {
     const updatedInv = [...(u.inventory || []), ...CATALOG.filter(it => it.club && !u.inventory?.includes(it.id)).map(it => it.id)];
-    await supabase.from('users').update({ clubForever: true, inventory: updatedInv }).eq('name', u.name);
+    changes = { clubForever: true, inventory: updatedInv };
   } else { 
-    await supabase.from('users').update({ clubForever: false, clubUntil: 0 }).eq('name', u.name); 
+    changes = { clubForever: false, clubUntil: 0 };
   }
-  res.json({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix });
+  const { data: updated, error } = await supabase.from('users').update(changes).eq('name', u.name).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ...await publicUser(updated), clubForever: isAdmin(updated) || !!updated.clubForever, clubUntil: updated.clubUntil || 0, funtix: updated.funtix });
 });
 
 app.get('/api/friends', auth, async (req, res) => {
@@ -354,13 +365,12 @@ app.get('/api/games/:id', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const vote = g.votes?.[key(req.user.name)] || 0;
-  res.json({ ...gameSummary(g), description: g.description, max_players: g.max_players, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favorite_count || 0 });
+  res.json({ ...gameSummary(g), description: g.description, max_players: g.max_players || 30, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favorite_count || 0 });
 });
 
 app.post('/api/games', auth, async (req, res) => {
   const { name, description, world, thumbnail, publish } = req.body || {};
-  const { count } = await supabase.from('games').select('*', { count: 'exact', head: true });
-  const id = 'g' + (count + 1);
+  const id = `g_${crypto.randomUUID()}`;
   const game = {
     id, name: filter(name || 'Untitled Game').slice(0, 50), creator: req.user.name, description: filter(description || '').slice(0, 1000), world: sanitizeWorld(world), visits: 0, likes: 0, dislikes: 0, max_players: 30, created: Date.now(), updated: Date.now(), thumbnail: validThumb(thumbnail), unpublished: !publish
   };
@@ -381,7 +391,8 @@ app.put('/api/games/:id', auth, async (req, res) => {
   if (thumbnail) updates.thumbnail = validThumb(thumbnail);
   if (publish !== undefined) updates.unpublished = !publish;
   updates.updated = Date.now();
-  await supabase.from('games').update(updates).eq('id', req.params.id);
+  const { error } = await supabase.from('games').update(updates).eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
 });
 
@@ -463,7 +474,6 @@ wss.on('connection', (ws) => {
   ws.on('message', async (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
     if (m.t === 'join' && !player) {
-      // SPEED UP: Parallelize initial lookups
       const { data: session } = await supabase.from('sessions').select('username').eq('token', m.token).single();
       if (!session) return send(ws, { t: 'error', error: 'Could not join' });
       
@@ -479,11 +489,11 @@ wss.on('connection', (ws) => {
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
       if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map() });
       room = rooms.get(g.id);
-      if (room.players.size >= g.max_players) return send(ws, { t: 'error', error: 'Server is full' });
+      if (room.players.size >= (g.max_players || 30)) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       
-      // SPEED UP: Background updates (don't await)
+      // SPEED UP: Background updates (no await)
       supabase.from('games').update({ visits: (g.visits || 0) + 1 }).eq('id', g.id).then(res => {
         if (res.error) console.error('Visit update failed:', res.error);
       });
@@ -502,13 +512,7 @@ wss.on('connection', (ws) => {
     }
     if (!player) return;
     if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
-      const now = Date.now();
-      if (now - player.lastTix >= ECON.PLAY_TIX_EVERY) {
-        const amt = ECON.PLAY_TIX * (isClub(player.user) ? ECON.CLUB_PLAY_MULT : 1);
-        player.lastTix = now; 
-        await supabase.from('users').update({ funtix: player.user.funtix + amt }).eq('name', player.user.name);
-        send(ws, { t: 'money', ...money(player.user), reason: 'play', amount: amt });
-      }
+      // REMOVED: Repetitive FunTix add (playtime reward)
     }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const text = filter(m.text.trim());
@@ -519,13 +523,18 @@ wss.on('connection', (ws) => {
       if (player.coins.has(m.part) || now - player.lastCoin < 150) return;
       const coinId = m.part;
       player.coins.add(coinId); player.lastCoin = now;
-      await supabase.from('users').update({ funtix: player.user.funtix + ECON.COIN_TIX }).eq('name', player.user.name);
-      send(ws, { t: 'money', ...money(player.user) });
+      const earned = ECON.COIN_TIX + (isClub(player.user) ? ECON.CLUB_COIN_BONUS : 0);
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + earned }).eq('name', player.user.name).select().single();
+      if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
+      player.user = updated;
+      send(ws, { t: 'money', ...money(updated), earned });
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
-      await supabase.from('users').update({ funtix: player.user.funtix + ECON.WIN_TIX, champ: true }).eq('name', player.user.name);
-      send(ws, { t: 'money', ...money(player.user) });
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true }).eq('name', player.user.name).select().single();
+      if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
+      player.user = updated;
+      send(ws, { t: 'money', ...money(updated), earned: ECON.WIN_TIX });
       broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
