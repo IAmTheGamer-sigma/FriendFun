@@ -30,6 +30,7 @@ const icons = {
   home: '<svg viewBox="0 0 24 24"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg>',
   profile: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.5"/><path d="M3 21c0-5 4-8 9-8s9 3 9 8z"/></svg>',
   friends: '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5"/><circle cx="17" cy="9" r="3"/><path d="M1 20c0-4 3-7 7-7s7 3 7 7zM14 20c0-2-.6-4-2-5.5 1.5-1 3-1.5 5-1.5 3.5 0 6 2.5 6 7z"/></svg>',
+  groups: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M15 14c3 0 5 2 5 6"/></svg>',
   avatar: '<svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="6" rx="1"/><rect x="7" y="9" width="10" height="7"/><rect x="3" y="9" width="3.5" height="7"/><rect x="17.5" y="9" width="3.5" height="7"/><rect x="7" y="16.5" width="4.5" height="6"/><rect x="12.5" y="16.5" width="4.5" height="6"/></svg>',
   shop: '<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.5 13h-13zM8 7a4 4 0 0 1 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   create: '<svg viewBox="0 0 24 24"><path d="M3 17l11-11 4 4-11 11H3zM15 5l2-2 4 4-2 2z"/></svg>',
@@ -87,7 +88,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
   </aside>
   <main class="content">${content}</main>`;
@@ -330,6 +331,75 @@ async function friendsPage() {
   });
 }
 
+async function groupsPage() {
+  const load = async () => {
+    const groups = await api('GET', '/api/groups');
+    const q = String(app.querySelector('.groups-search')?.value || '').trim().toLowerCase();
+    const filtered = q ? groups.filter(g => g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)) : groups;
+    const list = app.querySelector('.group-grid');
+    if (!list) return;
+    list.innerHTML = filtered.length ? filtered.map(g => `
+      <article class="group-card">
+        <div class="group-icon">${esc(g.name.slice(0, 1).toUpperCase())}</div>
+        <div class="group-card-body">
+          <h3>${esc(g.name)}</h3>
+          <p>${esc(g.description || 'No description yet.')}</p>
+          <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>Owner: ${esc(g.owner)}</span></div>
+          <button class="${g.joined ? 'btn-secondary' : 'btn-primary'} group-action" data-id="${esc(g.id)}" data-action="${g.joined ? 'leave' : 'join'}" ${g.isOwner ? 'disabled title="The owner cannot leave their group"' : ''}>
+            ${g.joined ? 'Leave Group' : 'Join Group'}
+          </button>
+        </div>
+      </article>`).join('') : '<p class="muted">No groups found. Create the first one!</p>';
+    list.querySelectorAll('.group-action').forEach(btn => btn.onclick = async () => {
+      try {
+        await api('POST', `/api/groups/${encodeURIComponent(btn.dataset.id)}/${btn.dataset.action}`);
+        toast(btn.dataset.action === 'join' ? 'Joined group!' : 'Left group.');
+        await load();
+      } catch (e) { toast(e.message, true); }
+    });
+  };
+
+  mount('groups', `
+    <div class="groups-head">
+      <div><h1>Groups</h1><p class="muted">Find people who like the same games and create communities on FriendFun.</p></div>
+      <button class="btn-primary" id="create-group">Create Group</button>
+    </div>
+    <form class="groups-search-row">
+      <input class="groups-search" placeholder="Search groups..." autocomplete="off">
+      <button class="btn-secondary" type="submit">Search</button>
+    </form>
+    <div class="group-grid"></div>
+  `, () => {
+    app.querySelector('#create-group').onclick = () => {
+      const d = document.createElement('div');
+      d.className = 'modal-bg';
+      d.innerHTML = `<div class="modal">
+        <h2>Create a Group</h2>
+        <form class="group-create-form">
+          <label>Group name<input name="name" maxlength="40" minlength="3" placeholder="e.g. Obby Masters" required></label>
+          <label>Description<textarea name="description" maxlength="240" rows="4" placeholder="What is your group about?"></textarea></label>
+          <div class="modal-actions"><button type="button" class="btn-secondary cancel">Cancel</button><button class="btn-primary">Create</button></div>
+        </form>
+      </div>`;
+      document.body.appendChild(d);
+      d.querySelector('.cancel').onclick = () => d.remove();
+      d.querySelector('.group-create-form').onsubmit = async e => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        try {
+          await api('POST', '/api/groups', { name: form.name.value.trim(), description: form.description.value.trim() });
+          d.remove();
+          toast('Group created!');
+          await load();
+        } catch (err) { toast(err.message, true); }
+      };
+    };
+    app.querySelector('.groups-search-row').onsubmit = e => { e.preventDefault(); load(); };
+    app.querySelector('.groups-search').oninput = () => load();
+    load();
+  });
+}
+
 async function profilePage(name) {
   const u = await api('GET', '/api/users/' + encodeURIComponent(name));
   const isMe = u.name.toLowerCase() === me.name.toLowerCase();
@@ -499,6 +569,7 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
+      case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
