@@ -295,9 +295,9 @@ app.get('/api/users/:name', auth, async (req, res) => {
   const u = await User.findOne({ name: key(req.params.name) });
   if (!u) return res.status(404).json({ error: 'User not found' });
   const games = await Game.find({ creator: key(u.name) }).then(list => list.map(gameSummary));
-  const friends = await User.find({ name: { $in: u.friends } }).then(list => list.map(publicUser));
+  const friends = await User.find({ name: { $in: u.friends } }).then(list => Promise.all(list.map(publicUser)));
   res.json({ 
-    ...await publicUser(u), games, friendsList: await Promise.all(friends), 
+    ...await publicUser(u), games, friendsList: await friends, 
     isFriend: req.user.friends.includes(key(u.name)), requested: u.requests.includes(key(req.user.name)) 
   });
 });
@@ -316,7 +316,7 @@ function adminOnly(req, res, next) {
 app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const users = await User.find({ name: { $regex: q, $options: 'i' } }).sort({ name: 1 }).limit(100);
-  res.json(users.map(u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix })));
+  res.json(await Promise.all(users.map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
