@@ -27,8 +27,8 @@ const key = n => n.toLowerCase();
 
 async function seed() {
   const now = Date.now();
-  const g = (id, name, creator, desc, tpl, visits, likes, dislikes, maxPlayers = 30) =>
-    ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, maxPlayers, created: now, updated: now, thumbnail: null });
+  const g = (id, name, creator, desc, tpl, visits, likes, dislikes, max_players = 30) =>
+    ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, max_players, created: now, updated: now, thumbnail: null });
   
   const games = [
     g('g1', 'Mega Fun Obby', 'FriendFun', 'Jump, dodge and bounce through 10 stages of obstacles!', 'obby', 1543210, 8912, 412),
@@ -353,7 +353,7 @@ app.get('/api/games/:id', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const vote = g.votes?.[key(req.user.name)] || 0;
-  res.json({ ...gameSummary(g), description: g.description, maxPlayers: g.maxPlayers, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favoriteCount || 0 });
+  res.json({ ...gameSummary(g), description: g.description, max_players: g.max_players, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favorite_count || 0 });
 });
 
 app.post('/api/games', auth, async (req, res) => {
@@ -361,7 +361,7 @@ app.post('/api/games', auth, async (req, res) => {
   const { count } = await supabase.from('games').select('*', { count: 'exact', head: true });
   const id = 'g' + (count + 1);
   const game = {
-    id, name: filter(name || 'Untitled Game').slice(0, 50), creator: req.user.name, description: filter(description || '').slice(0, 1000), world: sanitizeWorld(world), visits: 0, likes: 0, dislikes: 0, maxPlayers: 30, created: Date.now(), updated: Date.now(), thumbnail: validThumb(thumbnail), unpublished: !publish
+    id, name: filter(name || 'Untitled Game').slice(0, 50), creator: req.user.name, description: filter(description || '').slice(0, 1000), world: sanitizeWorld(world), visits: 0, likes: 0, dislikes: 0, max_players: 30, created: Date.now(), updated: Date.now(), thumbnail: validThumb(thumbnail), unpublished: !publish
   };
   const { data, error } = await supabase.from('games').insert(game).select().single();
   if (error) return res.status(500).json({ error: error.message });
@@ -408,7 +408,7 @@ app.post('/api/games/:id/favorite', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const f = req.user.favorites || [];
-  let favoriteCount = g.favoriteCount || 0;
+  let favoriteCount = g.favorite_count || 0;
   if (f.includes(g.id)) { 
     const updatedF = f.filter(x => x !== g.id);
     await supabase.from('users').update({ favorites: updatedF }).eq('name', req.user.name);
@@ -418,7 +418,7 @@ app.post('/api/games/:id/favorite', auth, async (req, res) => {
     await supabase.from('users').update({ favorites: updatedF }).eq('name', req.user.name);
     favoriteCount++;
   }
-  await supabase.from('games').update({ favoriteCount }).eq('id', g.id);
+  await supabase.from('games').update({ favorite_count: favoriteCount }).eq('id', g.id);
   res.json({ favorited: !f.includes(g.id), favorites: favoriteCount });
 });
 
@@ -469,7 +469,7 @@ wss.on('connection', (ws) => {
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
       if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map() });
       room = rooms.get(g.id);
-      if (room.players.size >= g.maxPlayers) return send(ws, { t: 'error', error: 'Server is full' });
+      if (room.players.size >= g.max_players) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       
