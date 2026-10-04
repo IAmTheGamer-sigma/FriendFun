@@ -343,7 +343,7 @@ function groupView(group, username) {
     created: group.created,
     members: members.length,
     joined: members.includes(username),
-    isOwner: creator === username,
+    isCreator: creator === username,
   };
 }
 
