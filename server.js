@@ -101,6 +101,7 @@ const app = express();
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/three', express.static(path.join(__dirname, 'node_modules/three')));
+app.get('/health', (req, res) => res.json({ ok: true }));
 
 function auth(req, res, next) {
   const tok = (req.headers.authorization || '').replace('Bearer ', '');
@@ -336,10 +337,13 @@ function sanitizeWorld(w) {
 app.get('/api/catalog', (req, res) => res.json(CATALOG));
 
 // ---------- realtime ----------
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
 const rooms = new Map(); // gameId -> { players: Map<id, player> }
 let nextPid = 1;
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+const server = isDirectRun ? http.createServer(app) : null;
+const wss = server ? new WebSocketServer({ server, path: '/ws' }) : null;
+
+if (wss) {
 
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (const p of room.players.values()) if (p.ws !== except && p.ws.readyState === 1) p.ws.send(s); }
@@ -402,13 +406,16 @@ wss.on('connection', (ws) => {
   });
 });
 
-setInterval(() => {
-  for (const room of rooms.values()) {
-    if (!room.players.size) continue;
-    const states = [];
-    for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
-    broadcast(room, { t: 'S', p: states });
-  }
-}, 66);
+  setInterval(() => {
+    for (const room of rooms.values()) {
+      if (!room.players.size) continue;
+      const states = [];
+      for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
+      broadcast(room, { t: 'S', p: states });
+    }
+  }, 66);
+}
 
-server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
+if (server) server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
+
+export default app;
