@@ -48,6 +48,10 @@ export class Studio {
         </div><div class="rb-label">Insert</div></div>
         <div class="rb-group"><div class="rb-row">
           <button class="rb-btn" data-a="stairs" title="Insert a staircase"><span class="rb-ico">▰</span>Stairs</button>
+          <button class="rb-btn" data-a="platform" title="Insert a large platform"><span class="rb-ico">▰</span>Platform</button>
+          <button class="rb-btn" data-a="wall" title="Insert a wall"><span class="rb-ico">▤</span>Wall</button>
+          <button class="rb-btn" data-a="tower" title="Build a tower"><span class="rb-ico">▥</span>Tower</button>
+          <button class="rb-btn" data-a="tree" title="Build a tree"><span class="rb-ico">♣</span>Tree</button>
           <button class="rb-btn" data-a="coinLine" title="Insert five coins"><span class="rb-ico">●</span>Coin Line</button>
           <button class="rb-btn" data-a="mirror" title="Mirror selected part across the center"><span class="rb-ico">↔</span>Mirror</button>
         </div><div class="rb-label">Quick Build</div></div>
@@ -63,7 +67,13 @@ export class Studio {
           <button class="rb-btn" data-a="redo" title="Redo (Ctrl+Y)"><span class="rb-ico">&#x21B7;</span>Redo</button>
         </div><div class="rb-label">Edit</div></div>
         <div class="rb-group"><div class="rb-row">
+          <button class="rb-btn" data-a="export" title="Export the current world as JSON"><span class="rb-ico">⇩</span>Export</button>
+          <button class="rb-btn" data-a="import" title="Import a world JSON file"><span class="rb-ico">⇧</span>Import</button>
+        </div><div class="rb-label">Project</div></div>
+        <div class="rb-group"><div class="rb-row">
           <button class="rb-btn play" data-a="play" title="Play test (F5)"><span class="rb-ico">&#x25B6;</span>Play</button>
+          <button class="rb-btn" data-a="focusSpawn" title="Focus the camera on the spawn"><span class="rb-ico">⌖</span>Spawn</button>
+          <button class="rb-btn" data-a="topView" title="Switch to a top-down view"><span class="rb-ico">⬇</span>Top View</button>
           <label class="rb-btn" title="Sky color"><input type="color" class="rb-sky" value="${toHex(this.world.sky || '#8fc8ff')}">Sky</label>
         </div><div class="rb-label">Test</div></div>
       </div>
@@ -78,18 +88,21 @@ export class Studio {
     </div>`;
     const q = s => this.c.querySelector(s);
     this.canvas = q('.st-canvas'); this.explorer = q('.st-explorer'); this.props = q('.st-props');
+    this.importInput = document.createElement('input'); this.importInput.type = 'file'; this.importInput.accept = '.json,application/json'; this.importInput.hidden = true; this.c.appendChild(this.importInput);
     this.c.querySelector('.studio').addEventListener('click', e => {
       const t = e.target.closest('[data-tool]'); if (t) this.setTool(t.dataset.tool);
       const i = e.target.closest('[data-insert]'); if (i) this.insert(i.dataset.insert);
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'dup') this.duplicate(); if (a === 'del') this.remove(); if (a === 'undo') this.undo(); if (a === 'redo') this.redo();
-      if (a === 'stairs') this.insertStairs(); if (a === 'coinLine') this.insertCoinLine(); if (a === 'mirror') this.mirror();
+      if (a === 'stairs') this.insertStairs(); if (a === 'platform') this.insertPlatform(); if (a === 'wall') this.insertWall(); if (a === 'tower') this.insertTower(); if (a === 'tree') this.insertTree(); if (a === 'coinLine') this.insertCoinLine(); if (a === 'mirror') this.mirror();
+      if (a === 'focusSpawn') this.focusSpawn(); if (a === 'topView') this.topView(); if (a === 'export') this.exportWorld(); if (a === 'import') this.importInput.click();
       if (a === 'play') this.play(); if (a === 'save') this.save(); if (a === 'publish') this.publishDialog(); if (a === 'exit') this.exit();
     });
     q('.rb-color').oninput = e => { if (this.sel) { this.pushUndo(); this.sel.c = e.target.value; this.refresh(this.sel); } };
     q('.rb-mat').onchange = e => { if (this.sel) { this.pushUndo(); this.sel.m = e.target.value; this.refresh(this.sel); } };
     q('.rb-snap').onchange = e => { this.snap = e.target.checked; this.applySnap(); };
     q('.rb-sky').oninput = e => { this.world.sky = e.target.value; this.scene.background.set(e.target.value); this.scene.fog.color.set(e.target.value); this.markDirty(); };
+    this.importInput.onchange = e => this.importWorld(e.target.files?.[0]);
   }
 
   three() {
@@ -199,6 +212,24 @@ export class Studio {
     const p = { ...structuredClone(this.sel), id: this.newId() }; p.p[1] += p.s[1];
     this.world.parts.push(p); this.addMesh(p); this.renderExplorer(); this.select(p); this.markDirty();
   }
+  buildPart(name, p, s, c = '#a3a2a5', k = 'part', m = 'plastic') {
+    return { id: this.newId(), name, p: p.map(v => +v.toFixed(2)), s: s.map(v => +v.toFixed(2)), c, k, m };
+  }
+  addBuild(parts) {
+    this.pushUndo();
+    const existing = new Set(this.world.parts.map(p => p.id));
+    for (const p of parts) { while (existing.has(p.id)) p.id = this.newId(); existing.add(p.id); this.world.parts.push(p); this.addMesh(p); }
+    this.renderExplorer(); this.select(parts.at(-1) || null); this.markDirty();
+  }
+  buildOrigin() { return this.sel ? new THREE.Vector3(...this.sel.p) : this.camPos.clone().addScaledVector(this.forward(), 14); }
+  insertPlatform() { const b = this.buildOrigin(); this.addBuild([this.buildPart('Platform', [Math.round(b.x), Math.max(0.5, Math.round(b.y)), Math.round(b.z)], [16, 1, 16], '#4aa3ff')]); }
+  insertWall() { const b = this.buildOrigin(); this.addBuild([this.buildPart('Wall', [Math.round(b.x), Math.max(2, Math.round(b.y) + 3), Math.round(b.z)], [16, 6, 1])]); }
+  insertTower() { const b = this.buildOrigin(), parts = []; for (let i = 0; i < 5; i++) parts.push(this.buildPart('Tower Floor ' + (i + 1), [Math.round(b.x), Math.round(b.y) + i * 5, Math.round(b.z)], [12, 1, 12], i % 2 ? '#7d8794' : '#a3a2a5')); this.addBuild(parts); }
+  insertTree() { const b = this.buildOrigin(); this.addBuild([this.buildPart('Tree Trunk', [Math.round(b.x), Math.round(b.y) + 3, Math.round(b.z)], [2, 6, 2], '#7a4b24', 'part', 'wood'), this.buildPart('Tree Crown', [Math.round(b.x), Math.round(b.y) + 7, Math.round(b.z)], [7, 5, 7], '#35a854', 'part', 'grass')]); }
+  focusSpawn() { const sp = findSpawn(this.world); this.camPos.set(sp.x + 18, sp.y + 12, sp.z + 18); this.yaw = Math.PI * 1.25; this.pitch = -0.45; }
+  topView() { const p = this.sel ? new THREE.Vector3(...this.sel.p) : findSpawn(this.world); this.camPos.set(p.x, p.y + 80, p.z + 0.01); this.yaw = 0; this.pitch = -Math.PI / 2 + 0.001; }
+  exportWorld() { const payload = JSON.stringify({ format: 'FriendFun Studio World', version: 1, name: this.name, description: this.description, world: this.world }, null, 2); const blob = new Blob([payload], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (this.name || 'friendfun-game').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase() + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); this.o.toast('World exported'); }
+  async importWorld(file) { if (!file) return; try { const data = JSON.parse(await file.text()); const world = data.world || data; if (!Array.isArray(world.parts)) throw new Error('Invalid world file'); this.pushUndo(); this.world = { sky: /^#[0-9a-fA-F]{6}$/.test(world.sky) ? world.sky : '#8fc8ff', parts: world.parts }; this.rebuildAll(); this.markDirty(); this.o.toast('World imported'); } catch (e) { this.o.toast('Could not import that world file', true); } this.importInput.value = ''; }
   insertStairs() {
     this.pushUndo();
     const base = this.sel ? new THREE.Vector3(...this.sel.p) : this.camPos.clone().addScaledVector(this.forward(), 10);
@@ -279,6 +310,8 @@ export class Studio {
       else if (e.code === 'Digit3') this.setTool('scale');
       else if (e.code === 'KeyF' && this.sel) { const p = new THREE.Vector3(...this.sel.p); const d = Math.max(...this.sel.s) * 1.5 + 8; this.camPos.copy(p).addScaledVector(this.forward(), -d); }
       else if (e.code === 'F5') { e.preventDefault(); this.play(); }
+      else if (e.code === 'KeyB') this.insertPlatform();
+      else if (e.code === 'KeyT') this.insertTree();
     };
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
     this.onResize = () => this.resize(); addEventListener('resize', this.onResize);
