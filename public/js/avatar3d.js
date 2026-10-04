@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM } from './catalog.js';
+import { ITEM, BADGES } from './catalog.js';
 import { renderToDataURL } from './three-util.js';
 
 const faceCache = {}, shirtCache = {};
@@ -108,17 +108,18 @@ export function animateCharacter(ch, state, t, dt) {
 }
 
 export const CLUB_PATH = 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z';
-export function makeNameTag(name, club) {
+export function makeNameTag(name, badge) {
+  const b = BADGES[badge];
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
   const g = c.getContext('2d');
   g.font = 'bold 48px "Source Sans Pro", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const x = club ? 278 : 256;
+  const x = b ? 278 : 256;
   g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.strokeText(name, x, 48);
   g.fillStyle = '#fff'; g.fillText(name, x, 48);
-  if (club) {
-    const p = new Path2D(CLUB_PATH);
+  if (b) {
+    const p = new Path2D(b.path);
     g.save(); g.translate(x - g.measureText(name).width / 2 - 54, 22); g.scale(2, 2);
-    g.lineWidth = 3; g.stroke(p); g.fillStyle = '#ffd400'; g.fill(p); g.restore();
+    g.lineWidth = 3; g.stroke(p); g.fillStyle = b.color; g.fill(p); g.restore();
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));

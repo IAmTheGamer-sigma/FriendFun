@@ -1,8 +1,8 @@
-import { Game, nameColor, tix, LOGO, CLUB } from './game.js';
+import { Game, nameColor, tix, LOGO, CLUB, badgeIcon } from './game.js';
 import { Studio } from './studio.js';
 import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
-import { CATALOG, ITEM, ECON } from './catalog.js';
+import { CATALOG, ITEM, ECON, BADGES } from './catalog.js';
 import { templates } from './worlds.js';
 import * as THREE from 'three';
 
@@ -336,12 +336,17 @@ async function profilePage(name) {
   mount('users', `
     <div class="profile-head">
       <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}"><img src="${avatarImage(u.avatar)}"></div>
-      <div class="ph-info"><h1>${esc(u.name)}${u.club ? CLUB : ''}${u.admin ? ADMIN : ''}</h1><div class="muted">@${esc(u.name)}</div>
+      <div class="ph-info"><h1>${esc(u.name)}${badgeIcon(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
       <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
     </div>
     <section><div class="sec-h"><h2>About</h2>${isMe ? '<button class="link edit-bio">Edit</button>' : ''}</div><p class="bio">${esc(u.bio || (isMe ? 'Tell people about yourself!' : 'This user has no bio.'))}</p></section>
+    <section><div class="sec-h"><h2>Badges (${u.badges.length})</h2></div>
+      ${isMe && u.badges.length ? '<p class="muted small">Click a badge to show it next to your name.</p>' : ''}
+      <div class="badge-grid">${u.badges.map(id => `<${isMe ? 'button' : 'div'} class="badge-card ${u.badge === id ? 'on' : ''}" data-badge="${id}">${badgeIcon(id, 44)}<b>${BADGES[id].name}</b><span class="muted small">${BADGES[id].desc}</span>${u.badge === id ? '<span class="badge-feat">Shown</span>' : ''}</${isMe ? 'button' : 'div'}>`).join('')}
+        ${isMe && u.badges.length ? `<button class="badge-card none ${u.badge ? '' : 'on'}" data-badge="none"><b>None</b><span class="muted small">Don't show a badge</span>${u.badge ? '' : '<span class="badge-feat">Shown</span>'}</button>` : ''}</div>
+      ${u.badges.length ? '' : '<p class="muted">No badges yet.</p>'}</section>
     <section class="profile-grid">
       <div class="profile-avatar"><h2>Currently Wearing</h2><img src="${avatarImage(u.avatar, 'full')}"></div>
       <div><h2>Friends (${u.friendsList.length})</h2><div class="friends-row wrap">${u.friendsList.map(userTile).join('') || '<p class="muted">No friends yet.</p>'}</div></div>
@@ -349,6 +354,10 @@ async function profilePage(name) {
     <section><div class="sec-h"><h2>Creations</h2></div><div class="game-row">${u.games.map(gameCard).join('') || '<p class="muted">No creations yet.</p>'}</div></section>`, () => {
     app.querySelector('.add-friend')?.addEventListener('click', async () => { const r = await api('POST', '/api/friends/' + encodeURIComponent(u.name)); toast(r.status === 'friends' ? 'You are now friends!' : 'Friend request sent'); profilePage(name); });
     app.querySelector('.unfriend')?.addEventListener('click', () => confirmModal('Unfriend', `Unfriend ${esc(u.name)}?`, 'Unfriend', async () => { await api('DELETE', '/api/friends/' + encodeURIComponent(u.name)); profilePage(name); }));
+    app.querySelectorAll('button[data-badge]').forEach(b => b.onclick = async () => {
+      try { await api('PUT', '/api/me/badge', { badge: b.dataset.badge }); toast('Badge updated'); profilePage(name); }
+      catch (e) { toast(e.message, true); }
+    });
     app.querySelector('.edit-bio')?.addEventListener('click', () => {
       const p = app.querySelector('.bio'); p.outerHTML = `<div class="bio-edit"><textarea maxlength="300" rows="3">${esc(u.bio)}</textarea><button class="btn-primary">Save</button></div>`;
       app.querySelector('.bio-edit button').onclick = async () => { await api('PUT', '/api/me/bio', { bio: app.querySelector('.bio-edit textarea').value }); profilePage(name); };
@@ -398,7 +407,7 @@ async function leaderboardPage() {
     <div class="lbp">${lb.top.map((u, i) => `
       <a class="lbp-row${u.name === me.name ? ' me' : ''}${i < 3 ? ' top' + (i + 1) : ''}" href="#/users/${encodeURIComponent(u.name)}">
         <span class="lbp-rank">${i + 1}</span><img src="${avatarImage(u.avatar)}">
-        <span class="lbp-name">${u.club ? CLUB : ''}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
+        <span class="lbp-name">${badgeIcon(u.badge)}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
 }
 async function adminPage(q = '') {

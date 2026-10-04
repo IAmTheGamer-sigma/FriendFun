@@ -6,7 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { templates } from './public/js/worlds.js';
-import { ITEM, CATALOG, DEFAULT_AVATAR, ECON } from './public/js/catalog.js';
+import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, 'data');
@@ -71,8 +71,20 @@ function statusOf(name) {
 // ---------- helpers ----------
 function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()); }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
+function badgesOf(u) {
+  const has = {
+    admin: isAdmin(u), club: isClub(u), champ: !!u.champ,
+    creator: Object.values(db.games).some(g => !g.unpublished && key(g.creator) === key(u.name)),
+  };
+  return Object.keys(BADGES).filter(b => has[b]);
+}
+function badgeOf(u) {
+  if (u.badge === 'none') return null;
+  const list = badgesOf(u);
+  return list.includes(u.badge) ? u.badge : list[0] || null;
+}
 function publicUser(u) {
-  return { name: u.name, club: isClub(u), admin: isAdmin(u), avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
+  return { name: u.name, club: isClub(u), admin: isAdmin(u), badges: badgesOf(u), badge: badgeOf(u), avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
 }
 function gameSummary(g) {
   return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world.sky };
@@ -150,6 +162,11 @@ app.put('/api/me/avatar', auth, (req, res) => {
   req.user.avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head };
   save(); res.json(req.user.avatar);
 });
+app.put('/api/me/badge', auth, (req, res) => {
+  const b = String(req.body?.badge || '');
+  if (b !== 'none' && !badgesOf(req.user).includes(b)) return res.status(400).json({ error: "You don't have that badge" });
+  req.user.badge = b; save(); res.json({ badge: badgeOf(req.user) });
+});
 app.put('/api/me/bio', auth, (req, res) => { req.user.bio = filter(req.body?.bio || '').slice(0, 300); save(); res.json({ ok: true }); });
 app.post('/api/buy/:item', auth, (req, res) => {
   const it = ITEM[req.params.item];
@@ -176,7 +193,7 @@ app.post('/api/club/join', auth, (req, res) => {
 app.get('/api/leaderboard', auth, (req, res) => {
   const all = Object.values(db.users).sort((a, b) => b.funtix - a.funtix || a.created - b.created);
   res.json({
-    top: all.slice(0, 50).map(u => ({ name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), ...statusOf(u.name) })),
+    top: all.slice(0, 50).map(u => ({ name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), badge: badgeOf(u), ...statusOf(u.name) })),
     rank: all.indexOf(req.user) + 1, total: all.length, funtix: req.user.funtix,
   });
 });
@@ -342,9 +359,9 @@ wss.on('connection', (ws) => {
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       g.visits++; u.recent = [g.id, ...u.recent.filter(x => x !== g.id)].slice(0, 12); save();
       touch(u.name, g.id);
-      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user) })), ...money(u), club: isClub(u) });
+      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
-      broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u) }, ws);
+      broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
       broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
       return;
     }
@@ -359,7 +376,7 @@ wss.on('connection', (ws) => {
     }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const text = filter(m.text.trim());
-      broadcast(room, { t: 'chat', id: player.id, name: player.name, text, club: isClub(player.user) });
+      broadcast(room, { t: 'chat', id: player.id, name: player.name, text, club: isClub(player.user), badge: badgeOf(player.user) });
     }
     else if (m.t === 'coin' && typeof m.part === 'string') {
       const now = Date.now();
@@ -370,7 +387,7 @@ wss.on('connection', (ws) => {
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
-      player.user.funtix += ECON.WIN_TIX; save();
+      player.user.funtix += ECON.WIN_TIX; player.user.champ = true; save();
       send(ws, { t: 'money', ...money(player.user) });
       broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
     }

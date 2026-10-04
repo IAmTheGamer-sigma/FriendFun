@@ -8,6 +8,7 @@ A Roblox-style game platform that runs in the browser. It's built with Node.js, 
 - **Avatar editor**: a blocky 3D avatar with body colors, head shapes, hats, faces, and shirts
 - **FriendClub**: a membership bought with FunTix (300 for 30 days) that gives +25 daily FunTix, double playtime FunTix, a gold member badge, and an exclusive hard hat
 - **Admin**: the `fun` account (or any names in the `FF_ADMINS` env var, comma-separated) is an admin with free FriendClub and an Admin panel to give or remove FriendClub for any player
+- **Badges**: Admin, FriendClub, Creator (publish a game) and Obby Champ (beat an obby). Pick which badge shows next to your name from your profile
 - **FunTix Leaderboard**: the top 50 players ranked by FunTix, plus your own rank
 - **Marketplace**: buy avatar items with FunTix
 - **Friends and profiles**: friend requests, bios, online/in-game status, and creations

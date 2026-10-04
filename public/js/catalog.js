@@ -34,3 +34,10 @@ export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
   hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic',
 };
+
+export const BADGES = {
+  admin: { name: 'Admin', desc: 'Helps run FriendFun.', color: '#e2231a', path: 'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z' },
+  club: { name: 'FriendClub', desc: 'A FriendClub member.', color: '#ffd400', path: 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z' },
+  creator: { name: 'Creator', desc: 'Published a game.', color: '#00b06f', path: 'M3 17.25V21h3.75L17.8 9.94l-3.75-3.75zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z' },
+  champ: { name: 'Obby Champ', desc: 'Beat an obby.', color: '#4aa3ff', path: 'M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3zM6 7v1a2 2 0 0 0 2 2V7zm10 0v3a2 2 0 0 0 2-2V7z' },
+};

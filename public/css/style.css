@@ -265,3 +265,10 @@ section { margin-bottom: 34px; }
 .admin-badge { display: inline-block; background: var(--red); color: #fff; font-size: 11px; font-weight: 900; letter-spacing: .5px; padding: 2px 7px; border-radius: 5px; margin-left: 8px; vertical-align: middle; } h1 .admin-badge { font-size: 14px; padding: 3px 9px; }
 .admin-search { display: flex; gap: 8px; margin: 14px 0 18px; max-width: 480px; } .admin-search input { flex: 1; background: #393b3d; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 15px; }
 .admin-status { margin-left: auto; color: var(--muted); font-weight: 600; } .lbp-row .club-toggle { padding: 8px 14px; min-width: 170px; }
+
+/* ---------- badges ---------- */
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.badge-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; background: #2c2e31; border: 2px solid transparent; border-radius: 12px; padding: 16px 12px; color: var(--text); font: inherit; }
+button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #ffffff33; }
+.badge-card.on { border-color: #335fff; } .badge-card .club-badge { margin: 0; }
+.badge-feat { font-size: 11px; font-weight: 800; color: #fff; background: #335fff; border-radius: 5px; padding: 2px 8px; }
