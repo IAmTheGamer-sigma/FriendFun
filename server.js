@@ -337,7 +337,7 @@ app.delete('/api/friends/:name', auth, async (req, res) => {
 app.get('/api/games', auth, async (req, res) => {
   const q = key(String(req.query.q || ''));
   let query = supabase.from('games').select('*').eq('unpublished', false);
-  if (q) query = query.or(\`name.ilike.%\${q}%,creator.ilike.%\${q}%\`);
+  if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
   const { data: games } = await query;
   const list = (games || []).map(gameSummary);
   list.sort((a, b) => (b.playing - a.playing) || (b.visits - a.visits));
@@ -481,7 +481,7 @@ wss.on('connection', (ws) => {
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
-      broadcast(room, { t: 'chat', system: true, text: \`${player.name} has joined the game.\` });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
       return;
     }
     if (!player) return;
@@ -510,7 +510,7 @@ wss.on('connection', (ws) => {
       if (player.won) return; player.won = true;
       await supabase.from('users').update({ funtix: player.user.funtix + ECON.WIN_TIX, champ: true }).eq('name', player.user.name);
       send(ws, { t: 'money', ...money(player.user) });
-      broadcast(room, { t: 'chat', system: true, text: \`${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)\` });
+      broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix)` });
     }
     else if (m.t === 'emote') broadcast(room, { t: 'emote', id: player.id, e: String(m.e).slice(0, 10) }, ws);
   });
@@ -518,7 +518,7 @@ wss.on('connection', (ws) => {
     if (!player || !room) return;
     room.players.delete(player.id);
     broadcast(room, { t: 'left', id: player.id });
-    broadcast(room, { t: 'chat', system: true, text: \`${player.name} has left the game.\` });
+    broadcast(room, { t: 'chat', system: true, text: `${player.name} has left the game.` });
     touch(player.name, null);
   });
 });
@@ -532,6 +532,6 @@ setInterval(() => {
   }
 }, 66);
 
-server.listen(PORT, () => console.log(\`FriendFun running on http://localhost:\${PORT}\`));
+server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
