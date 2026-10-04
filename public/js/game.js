@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage } from './avatar3d.js';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js';
 import { sfx } from './sound.js';
 import { ECON } from './catalog.js';
 
@@ -89,11 +89,11 @@ export class Game {
   }
   renderEscPlayers() {
     const list = [this.me, ...this.players.values()];
-    this.c.querySelector('.esc-players').innerHTML = list.map(p => `<div class="esc-player"><img src="${avatarImage(p.avatar)}"><span>${esc(p.name)}</span></div>`).join('');
+    this.c.querySelector('.esc-players').innerHTML = list.map(p => `<div class="esc-player"><img src="${avatarImage(p.avatar)}"><span>${p.club ? CLUB : ''}${esc(p.name)}</span></div>`).join('');
   }
   updateLeaderboard() {
-    const names = [this.me.name, ...[...this.players.values()].map(p => p.name)];
-    this.lbList.innerHTML = names.map((n, i) => `<div class="lb-row ${i === 0 ? 'me' : ''}">${esc(n)}</div>`).join('');
+    const list = [this.me, ...this.players.values()];
+    this.lbList.innerHTML = list.map((p, i) => `<div class="lb-row ${i === 0 ? 'me' : ''}">${p.club ? CLUB : ''}${esc(p.name)}</div>`).join('');
   }
   addChat(html) {
     const d = document.createElement('div'); d.className = 'chat-line'; d.innerHTML = html;
@@ -110,13 +110,13 @@ export class Game {
     text = text.trim(); if (!text) return;
     const em = text.match(/^\/e\s+(\w+)/i);
     if (em) { const e = em[1].toLowerCase(); if (['wave', 'dance'].includes(e)) { this.emote = e; this.emoteT = e === 'wave' ? 2.5 : 999; this.send({ t: 'emote', e }); } return; }
-    if (this.o.test || !this.ws) { this.onChat({ id: 0, name: this.me.name, text }); return; }
+    if (this.o.test || !this.ws) { this.onChat({ id: 0, name: this.me.name, text, club: this.me.club }); return; }
     this.send({ t: 'chat', text });
   }
   onChat(m) {
     if (m.system) return this.sys(m.text);
     const color = nameColor(m.name);
-    this.addChat(`<b style="color:${color}">${esc(m.name)}:</b> ${esc(m.text)}`);
+    this.addChat(`<b style="color:${color}">${m.club ? CLUB : ''}${esc(m.name)}:</b> ${esc(m.text)}`);
     sfx.chat();
     const ch = m.id === this.myId || m.id === 0 ? this.char : this.players.get(m.id)?.char;
     if (ch) this.bubble(ch, m.text);
@@ -268,7 +268,7 @@ export class Game {
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.t === 'welcome') {
-        this.myId = m.id; this.hideLoading(); this.setMoney(m);
+        this.myId = m.id; this.me.club = !!m.club; this.hideLoading(); this.setMoney(m);
         for (const p of m.players) this.addPlayer(p);
         this.updateLeaderboard();
       } else if (m.t === 'joined') { this.addPlayer(m); this.updateLeaderboard(); }
@@ -290,9 +290,9 @@ export class Game {
   hideLoading() { const l = this.c.querySelector('.loading'); if (l) { l.classList.add('fade'); setTimeout(() => l.remove(), 500); } }
   addPlayer(p) {
     if (this.players.has(p.id)) return;
-    const char = buildCharacter(p.avatar); char.add(makeNameTag(p.name));
+    const char = buildCharacter(p.avatar); char.add(makeNameTag(p.name, p.club));
     this.scene.add(char);
-    const pl = { id: p.id, name: p.name, avatar: p.avatar, char, target: p.s ? [p.id, ...p.s] : null, emote: null };
+    const pl = { id: p.id, name: p.name, avatar: p.avatar, club: p.club, char, target: p.s ? [p.id, ...p.s] : null, emote: null };
     if (pl.target) char.position.set(pl.target[1], pl.target[2], pl.target[3]);
     this.players.set(p.id, pl);
   }
@@ -473,4 +473,5 @@ function confetti(root) {
 }
 const chatIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>';
 export const LOGO = '<svg class="ff-logo" viewBox="0 0 40 32" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-10 12 15)"><rect x="3" y="6" width="18" height="18" rx="4" fill="#fff"/><circle cx="9" cy="13" r="1.7" fill="#1b1d1f"/><circle cx="15" cy="13" r="1.7" fill="#1b1d1f"/><path d="M8 17.5q4 4 8 0" fill="none" stroke="#1b1d1f" stroke-width="1.8" stroke-linecap="round"/></g><g transform="rotate(10 28 17)"><rect x="19" y="8" width="18" height="18" rx="4" fill="#ffd400" stroke="#1b1d1f" stroke-width="1.5"/><circle cx="25" cy="15" r="1.7" fill="#1b1d1f"/><circle cx="31" cy="15" r="1.7" fill="#1b1d1f"/><path d="M24 19.5q4 4 8 0" fill="none" stroke="#1b1d1f" stroke-width="1.8" stroke-linecap="round"/></g></svg>';
+export const CLUB = `<svg class="club-badge" viewBox="0 0 24 24" width="18" height="18"><title>FriendClub member</title><path fill="#ffd400" d="${CLUB_PATH}"/></svg>`;
 export const tix = '<svg class="tix" viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="#1b1d1f" stroke-width="1.4" opacity=".35"/><path fill="#1b1d1f" d="M7.5 7h9v2.6h-3.2V18h-2.6V9.6H7.5z"/></svg>';

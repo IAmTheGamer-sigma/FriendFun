@@ -49,6 +49,7 @@ function buildHat(id) {
     case 'hat_horns': { const l = add(new THREE.ConeGeometry(0.14, 0.6, 12), it.color, -0.38, 0.22); l.rotation.z = 0.4; const r = add(new THREE.ConeGeometry(0.14, 0.6, 12), it.color, 0.38, 0.22); r.rotation.z = -0.4; break; }
     case 'hat_halo': { const h = add(new THREE.TorusGeometry(0.5, 0.07, 8, 32), it.color, 0, 0.55); h.rotation.x = Math.PI / 2; h.material.emissive = new THREE.Color('#fff176'); break; }
     case 'hat_headphones': { const b = add(new THREE.TorusGeometry(0.7, 0.07, 8, 24, Math.PI), it.color, 0, -0.45); add(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16).rotateZ(Math.PI / 2), '#222', -0.68, -0.6); add(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16).rotateZ(Math.PI / 2), '#222', 0.68, -0.6); break; }
+    case 'hat_clubhat': { add(new THREE.SphereGeometry(0.7, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), it.color); add(new THREE.CylinderGeometry(0.95, 0.95, 0.07, 28), it.color, 0, 0.03); const r = add(new THREE.TorusGeometry(0.66, 0.07, 6, 24, Math.PI), '#f2c200'); r.rotation.y = Math.PI / 2; break; }
     case 'hat_cone': add(new THREE.ConeGeometry(0.6, 1.4, 20), it.color, 0, 0.65); add(new THREE.CylinderGeometry(0.36, 0.44, 0.22, 20), '#ffffff', 0, 0.75); add(new THREE.BoxGeometry(1.3, 0.1, 1.3), it.color, 0, 0); break;
     case 'hat_beanie': add(new THREE.SphereGeometry(0.68, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), it.color, 0, -0.05); add(new THREE.CylinderGeometry(0.69, 0.69, 0.22, 20), '#004d40', 0, 0); add(new THREE.SphereGeometry(0.18), '#ffffff', 0, 0.68); break;
   }
@@ -106,12 +107,19 @@ export function animateCharacter(ch, state, t, dt) {
   L.rleg.rotation.x += (rl - L.rleg.rotation.x) * k;
 }
 
-export function makeNameTag(name) {
+export const CLUB_PATH = 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z';
+export function makeNameTag(name, club) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 96;
   const g = c.getContext('2d');
   g.font = 'bold 48px "Source Sans Pro", Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.strokeText(name, 256, 48);
-  g.fillStyle = '#fff'; g.fillText(name, 256, 48);
+  const x = club ? 278 : 256;
+  g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.strokeText(name, x, 48);
+  g.fillStyle = '#fff'; g.fillText(name, x, 48);
+  if (club) {
+    const p = new Path2D(CLUB_PATH);
+    g.save(); g.translate(x - g.measureText(name).width / 2 - 54, 22); g.scale(2, 2);
+    g.lineWidth = 3; g.stroke(p); g.fillStyle = '#ffd400'; g.fill(p); g.restore();
+  }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
   s.scale.set(6, 1.125, 1); s.position.y = 6.6; s.renderOrder = 999;

@@ -1,4 +1,4 @@
-import { Game, nameColor, tix, LOGO } from './game.js';
+import { Game, nameColor, tix, LOGO, CLUB } from './game.js';
 import { Studio } from './studio.js';
 import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
@@ -34,6 +34,7 @@ const icons = {
   shop: '<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.5 13h-13zM8 7a4 4 0 0 1 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   create: '<svg viewBox="0 0 24 24"><path d="M3 17l11-11 4 4-11 11H3zM15 5l2-2 4 4-2 2z"/></svg>',
   discover: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
+  club: '<svg viewBox="0 0 24 24"><path d="M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z"/></svg>',
   trophy: '<svg viewBox="0 0 24 24"><path d="M6 3h12v2h3v3a5 5 0 0 1-4.6 5A6 6 0 0 1 13 16.9V19h4v2H7v-2h4v-2.1A6 6 0 0 1 7.6 13 5 5 0 0 1 3 8V5h3zM5 7v1a3 3 0 0 0 1.3 2.5C6.1 9.7 6 8.9 6 8V7zm13 0v1c0 .9-.1 1.7-.3 2.5A3 3 0 0 0 19 8V7z"/></svg>',
   thumb: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2 10h4v11H2zM8 21V10l5-8c1.5 0 2.5 1 2.2 2.6L14.5 9H21c1 0 2 1 1.7 2.2l-2 8.3c-.2.9-1 1.5-2 1.5z"/></svg>',
   people: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM0 20c0-4 3.5-7 8-7s8 3 8 7zm17 0c0-2-.7-4-2-5.3 4.5-.8 9 1 9 5.3z"/></svg>',
@@ -74,7 +75,7 @@ function shell(active, content) {
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
     <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">FriendFun</span></a>
-    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a></nav>
+    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
       <a class="tb-user" href="#/users/${encodeURIComponent(me.name)}"><img src="${avatarImage(me.avatar)}"><span>${esc(me.name)}</span></a>
@@ -83,7 +84,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create]]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create]]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
   </aside>
   <main class="content">${content}</main>`;
@@ -271,13 +272,14 @@ async function catalogPage(filter = 'all') {
     <div class="cat-grid">${CATALOG.filter(i => filter === 'all' || i.type === filter).map(i => `
       <div class="cat-item"><div class="cat-img"><img src="${itemImage(i)}"></div><div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
-        ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
+        ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
     app.querySelectorAll('.btn-buy').forEach(b => b.onclick = () => {
       buyModal(ITEM[b.dataset.id], () => catalogPage(filter));
     });
   });
 }
 function priceHtml(i) {
+  if (i.club) return `<span class="club-price">${CLUB} FriendClub</span>`;
   return i.free ? '<span class="free">Free</span>' : `<span class="pc">${tix} ${i.price}</span>`;
 }
 function buyModal(it, onDone) {
@@ -331,7 +333,7 @@ async function profilePage(name) {
   mount('users', `
     <div class="profile-head">
       <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}"><img src="${avatarImage(u.avatar)}"></div>
-      <div class="ph-info"><h1>${esc(u.name)}</h1><div class="muted">@${esc(u.name)}</div>
+      <div class="ph-info"><h1>${esc(u.name)}${u.club ? CLUB : ''}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
       <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
@@ -393,8 +395,37 @@ async function leaderboardPage() {
     <div class="lbp">${lb.top.map((u, i) => `
       <a class="lbp-row${u.name === me.name ? ' me' : ''}${i < 3 ? ' top' + (i + 1) : ''}" href="#/users/${encodeURIComponent(u.name)}">
         <span class="lbp-rank">${i + 1}</span><img src="${avatarImage(u.avatar)}">
-        <span class="lbp-name">${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
+        <span class="lbp-name">${u.club ? CLUB : ''}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
+}
+function clubPage() {
+  const bal = me.funtix ?? 0, active = me.club, short = ECON.CLUB_PRICE - bal;
+  const days = Math.ceil(((me.clubUntil || 0) - Date.now()) / 86400000);
+  mount('club', `
+    <div class="club-hero">
+      <div class="club-logo">${LOGO}${CLUB}</div>
+      <div class="club-info"><h1>FriendClub</h1><p class="muted">The membership for true FriendFun fans.</p>
+        <div class="club-status ${active ? 'on' : ''}">${active ? `${CLUB} You're a member! ${days} day${days === 1 ? '' : 's'} left` : 'You are not a member yet.'}</div>
+        <button class="btn-primary club-join" ${short > 0 ? 'disabled' : ''}>${active ? 'Renew' : 'Join'} for ${tix} ${ECON.CLUB_PRICE} &middot; ${ECON.CLUB_DAYS} days</button>
+        ${short > 0 ? `<div class="muted small">You need ${short} more FunTix. <a href="#/funtix">How to earn</a></div>` : ''}
+      </div>
+    </div>
+    <h2>Member Benefits</h2>
+    <div class="bux-ways">
+      <div class="bux-way"><h3>${tix} +${ECON.CLUB_DAILY} Daily FunTix</h3><p>Get ${ECON.DAILY_TIX + ECON.CLUB_DAILY} FunTix every day instead of ${ECON.DAILY_TIX}.</p></div>
+      <div class="bux-way"><h3>${tix} Double Playtime FunTix</h3><p>Earn ${ECON.PLAY_TIX * ECON.CLUB_PLAY_MULT} FunTix per minute of play instead of ${ECON.PLAY_TIX}.</p></div>
+      <div class="bux-way"><h3>${CLUB} Member Badge</h3><p>A gold hard hat next to your name on your profile, the leaderboard, in chat and above your head in games.</p></div>
+      <div class="bux-way"><h3>Exclusive Hard Hat</h3><p>The FriendClub Hard Hat goes straight into your inventory. Only members can get it.</p></div>
+    </div>`, () => {
+    app.querySelector('.club-join').onclick = () => confirmModal(active ? 'Renew FriendClub' : 'Join FriendClub',
+      `Spend ${tix} ${ECON.CLUB_PRICE} FunTix for ${ECON.CLUB_DAYS} days of FriendClub?`, active ? 'Renew' : 'Join', async () => {
+        try {
+          const r = await api('POST', '/api/club/join');
+          Object.assign(me, { club: true, clubUntil: r.clubUntil, inventory: r.inventory }); setMoney(r);
+          toast(active ? 'FriendClub renewed!' : 'Welcome to FriendClub!'); clubPage();
+        } catch (e) { toast(e.message, true); }
+      });
+  });
 }
 function funtixPage() {
   mount('funtix', `<h1>FunTix</h1>
@@ -405,6 +436,7 @@ function funtixPage() {
       <div class="bux-way"><h3>${tix} Play Games</h3><p>Earn ${ECON.PLAY_TIX} FunTix for every minute you spend playing.</p></div>
       <div class="bux-way"><h3>${tix} Collect Coins</h3><p>Every gold coin you pick up in a game gives you ${ECON.COIN_TIX} FunTix.</p></div>
       <div class="bux-way"><h3>${tix} Beat Obbies</h3><p>Touch a Win Pad at the end of an obby for ${ECON.WIN_TIX} FunTix (once per visit).</p></div>
+      <div class="bux-way"><h3>${CLUB} FriendClub</h3><p>Members get ${ECON.CLUB_DAILY} extra FunTix every day and double playtime FunTix. <a href="#/club">Learn more</a></p></div>
       <div class="bux-way"><h3>Spend Them</h3><p>Visit the <a href="#/catalog">Marketplace</a> to buy hats, faces and shirts for your avatar.</p></div>
     </div>`);
 }
@@ -433,6 +465,7 @@ async function route() {
       case 'create': return await createPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
       case 'leaderboard': return await leaderboardPage();
+      case 'club': return clubPage();
       case 'funtix': case 'funbux': return funtixPage();
       default: return await homePage();
     }

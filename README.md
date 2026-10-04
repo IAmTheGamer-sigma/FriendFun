@@ -6,6 +6,7 @@ A Roblox-style game platform that runs in the browser. It's built with Node.js, 
 - **Accounts**: sign up, log in, and earn FunTix (the in-game currency: daily rewards, playtime, coins, and wins)
 - **Home / Discover**: browse and search experiences, rate them, add favorites, and see visit and player counts
 - **Avatar editor**: a blocky 3D avatar with body colors, head shapes, hats, faces, and shirts
+- **FriendClub**: a membership bought with FunTix (300 for 30 days) that gives +25 daily FunTix, double playtime FunTix, a gold member badge, and an exclusive hard hat
 - **FunTix Leaderboard**: the top 50 players ranked by FunTix, plus your own rank
 - **Marketplace**: buy avatar items with FunTix
 - **Friends and profiles**: friend requests, bios, online/in-game status, and creations

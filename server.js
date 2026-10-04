@@ -67,8 +67,9 @@ function statusOf(name) {
 }
 
 // ---------- helpers ----------
+function isClub(u) { return (u.clubUntil || 0) > Date.now(); }
 function publicUser(u) {
-  return { name: u.name, avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
+  return { name: u.name, club: isClub(u), avatar: u.avatar, created: u.created, bio: u.bio || '', friends: u.friends.length, ...statusOf(u.name) };
 }
 function gameSummary(g) {
   return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world.sky };
@@ -124,14 +125,15 @@ app.post('/api/logout', auth, (req, res) => {
 function dailyTix(u) {
   const day = new Date().toISOString().slice(0, 10);
   if (u.tixDay === day) return 0;
-  u.tixDay = day; u.funtix += ECON.DAILY_TIX; save();
-  return ECON.DAILY_TIX;
+  const amt = ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0);
+  u.tixDay = day; u.funtix += amt; save();
+  return amt;
 }
 const money = u => ({ funtix: u.funtix });
 app.get('/api/me', auth, (req, res) => {
   const u = req.user;
   const daily = dailyTix(u);
-  res.json({ ...publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent });
+  res.json({ ...publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0 });
 });
 app.post('/api/ping', auth, (req, res) => { touch(req.user.name, null); res.json({ ...money(req.user), daily: dailyTix(req.user), requests: req.user.requests.length }); });
 
@@ -149,16 +151,27 @@ app.post('/api/buy/:item', auth, (req, res) => {
   const it = ITEM[req.params.item];
   if (!it) return res.status(404).json({ error: 'No such item' });
   if (req.user.inventory.includes(it.id)) return res.status(400).json({ error: 'You already own this' });
+  if (it.club && !isClub(req.user)) return res.status(403).json({ error: 'FriendClub members only' });
   const price = it.free ? 0 : it.price;
   if (req.user.funtix < price) return res.status(400).json({ error: 'Not enough FunTix' });
   req.user.funtix -= price; req.user.inventory.push(it.id); save();
   res.json({ ...money(req.user), inventory: req.user.inventory });
 });
 
+app.post('/api/club/join', auth, (req, res) => {
+  const u = req.user;
+  if (u.funtix < ECON.CLUB_PRICE) return res.status(400).json({ error: 'Not enough FunTix' });
+  u.funtix -= ECON.CLUB_PRICE;
+  u.clubUntil = Math.max(Date.now(), u.clubUntil || 0) + ECON.CLUB_DAYS * 86400000;
+  for (const it of CATALOG) if (it.club && !u.inventory.includes(it.id)) u.inventory.push(it.id);
+  save();
+  res.json({ ...money(u), club: true, clubUntil: u.clubUntil, inventory: u.inventory });
+});
+
 app.get('/api/leaderboard', auth, (req, res) => {
   const all = Object.values(db.users).sort((a, b) => b.funtix - a.funtix || a.created - b.created);
   res.json({
-    top: all.slice(0, 50).map(u => ({ name: u.name, avatar: u.avatar, funtix: u.funtix, ...statusOf(u.name) })),
+    top: all.slice(0, 50).map(u => ({ name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), ...statusOf(u.name) })),
     rank: all.indexOf(req.user) + 1, total: all.length, funtix: req.user.funtix,
   });
 });
@@ -305,9 +318,9 @@ wss.on('connection', (ws) => {
       player = { id: nextPid++, gameId: g.id, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
       g.visits++; u.recent = [g.id, ...u.recent.filter(x => x !== g.id)].slice(0, 12); save();
       touch(u.name, g.id);
-      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s })), ...money(u) });
+      send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user) })), ...money(u), club: isClub(u) });
       room.players.set(player.id, player);
-      broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar }, ws);
+      broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u) }, ws);
       broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
       return;
     }
@@ -315,13 +328,14 @@ wss.on('connection', (ws) => {
     if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
       const now = Date.now();
       if (now - player.lastTix >= ECON.PLAY_TIX_EVERY) {
-        player.lastTix = now; player.user.funtix += ECON.PLAY_TIX; save();
-        send(ws, { t: 'money', ...money(player.user), reason: 'play', amount: ECON.PLAY_TIX });
+        const amt = ECON.PLAY_TIX * (isClub(player.user) ? ECON.CLUB_PLAY_MULT : 1);
+        player.lastTix = now; player.user.funtix += amt; save();
+        send(ws, { t: 'money', ...money(player.user), reason: 'play', amount: amt });
       }
     }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const text = filter(m.text.trim());
-      broadcast(room, { t: 'chat', id: player.id, name: player.name, text });
+      broadcast(room, { t: 'chat', id: player.id, name: player.name, text, club: isClub(player.user) });
     }
     else if (m.t === 'coin' && typeof m.part === 'string') {
       const now = Date.now();

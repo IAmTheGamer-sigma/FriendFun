@@ -247,3 +247,16 @@ section { margin-bottom: 34px; }
 .lbp-row img { width: 44px; height: 44px; border-radius: 50%; background: #393b3d; }
 .lbp-name { display: flex; align-items: center; gap: 6px; } .lbp-name .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
 .lbp-tix { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 17px; }
+
+/* ---------- FriendClub ---------- */
+.club-badge { vertical-align: -3px; margin-right: 4px; flex: none; } h1 .club-badge { width: 30px; height: 30px; margin: 0 0 0 10px; vertical-align: -2px; }
+.club-hero { display: flex; align-items: center; gap: 32px; background: linear-gradient(120deg, #3a2f00, #2c2e31 55%); border: 2px solid #ffd40055; border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; }
+.club-logo { position: relative; width: 150px; height: 120px; flex: none; } .club-logo .ff-logo { width: 100%; height: 100%; }
+.club-logo .club-badge { position: absolute; top: -26px; left: 38px; width: 74px; height: 74px; transform: rotate(-8deg); filter: drop-shadow(0 3px 2px rgba(0,0,0,.4)); }
+.club-info h1 { margin: 0; font-size: 40px; color: var(--gold); } .club-info p { margin: 4px 0 14px; }
+.club-status { font-weight: 700; margin-bottom: 14px; } .club-status.on { color: var(--gold); }
+.club-join { background: var(--gold); color: #1b1d1f; font-size: 17px; padding: 12px 22px; display: inline-flex; align-items: center; gap: 6px; } .club-join .tix { color: #fff; } .club-join:disabled { opacity: .5; }
+.club-info a { color: #6ea8ff; }
+.club-price { color: var(--gold); display: flex; align-items: center; }
+.btn-club { display: block; text-align: center; background: #3a2f00; color: var(--gold); border: 1px solid #ffd40077; border-radius: 8px; padding: 9px; font-weight: 700; }
+@media (max-width: 700px) { .club-hero { flex-direction: column; text-align: center; } }

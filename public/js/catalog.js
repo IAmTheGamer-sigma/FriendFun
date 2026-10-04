@@ -1,6 +1,7 @@
 export const CATALOG = [
   { id: 'hat_none', type: 'hat', name: 'No Hat', price: 0, free: true },
   { id: 'hat_cap', type: 'hat', name: 'Red Cap', price: 0, free: true, color: '#e53935' },
+  { id: 'hat_clubhat', type: 'hat', name: 'FriendClub Hard Hat', price: 0, club: true, color: '#ffd400' },
   { id: 'hat_tophat', type: 'hat', name: 'Fancy Top Hat', price: 150, color: '#212121' },
   { id: 'hat_crown', type: 'hat', name: 'Golden Crown', price: 750, color: '#ffd400' },
   { id: 'hat_horns', type: 'hat', name: 'Devil Horns', price: 350, color: '#c62828' },
@@ -26,7 +27,8 @@ export const CATALOG = [
   { id: 'head_wide', type: 'head', name: 'Wide Head', price: 60 },
   { id: 'shirt_suit', type: 'shirt', name: 'Business Suit', price: 300, color: '#263238' },
 ];
-export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25 };
+export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
+  CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2 };
 export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
 export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
