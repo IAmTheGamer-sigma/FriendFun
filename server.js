@@ -546,15 +546,14 @@ wss.on('connection', (ws) => {
   });
 });
 
-  setInterval(() => {
-    for (const room of rooms.values()) {
-      if (!room.players.size) continue;
-      const states = [];
-      for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
-      broadcast(room, { t: 'S', p: states });
-    }
-  }, 66);
-}
+setInterval(() => {
+  for (const room of rooms.values()) {
+    if (!room.players.size) continue;
+    const states = [];
+    for (const p of room.players.values()) if (p.s) states.push([p.id, ...p.s]);
+    broadcast(room, { t: 'S', p: states });
+  }
+}, 66);
 
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
