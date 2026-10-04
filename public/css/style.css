@@ -272,3 +272,24 @@ section { margin-bottom: 34px; }
 button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #ffffff33; }
 .badge-card.on { border-color: #335fff; } .badge-card .club-badge { margin: 0; }
 .badge-feat { font-size: 11px; font-weight: 800; color: #fff; background: #335fff; border-radius: 5px; padding: 2px 8px; }
+
+/* ---------- groups ---------- */
+.groups-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:18px; }
+.groups-head h1 { margin-bottom:4px; }
+.groups-search-row { display:flex; gap:10px; max-width:720px; margin-bottom:22px; }
+.groups-search-row input { flex:1; margin:0; }
+.group-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.group-card { display:flex; gap:14px; background:#2c2e31; border:1px solid var(--line); border-radius:14px; padding:16px; min-height:170px; }
+.group-icon { width:58px; height:58px; flex:none; display:grid; place-items:center; border-radius:14px; background:linear-gradient(135deg,#335fff,#6ea8ff); color:#fff; font-size:25px; font-weight:900; }
+.group-card-body { min-width:0; flex:1; }
+.group-card h3 { margin:0 0 5px; font-size:19px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.group-card p { margin:0 0 12px; color:var(--muted); min-height:38px; line-height:1.35; }
+.group-meta { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:12px; margin-bottom:12px; }
+.group-action { width:100%; }
+.group-create-form { display:flex; flex-direction:column; gap:12px; }
+.group-create-form textarea { resize:vertical; min-height:90px; }
+@media (max-width:700px) {
+  .groups-head { flex-direction:column; }
+  .groups-head .btn-primary { width:100%; }
+  .group-grid { grid-template-columns:1fr; }
+}
