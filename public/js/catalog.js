@@ -19,11 +19,16 @@ export const CATALOG = [
   { id: 'shirt_heart', type: 'shirt', name: 'Heart Tee', price: 30, color: '#ff4081' },
   { id: 'shirt_ff', type: 'shirt', name: 'FriendFun Logo Tee', price: 0, free: true, color: '#ffffff' },
   { id: 'shirt_stripes', type: 'shirt', name: 'Striped Sweater', price: 120, color: '#ffffff' },
+  { id: 'head_classic', type: 'head', name: 'Classic Head', price: 0, free: true },
+  { id: 'head_block', type: 'head', name: 'Block Head', price: 0, free: true },
+  { id: 'head_round', type: 'head', name: 'Round Head', price: 40 },
+  { id: 'head_tall', type: 'head', name: 'Tall Head', price: 60 },
+  { id: 'head_wide', type: 'head', name: 'Wide Head', price: 60 },
   { id: 'shirt_suit', type: 'shirt', name: 'Business Suit', price: 300, color: '#263238' },
 ];
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25 };
 export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
 export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
-  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none',
+  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic',
 };

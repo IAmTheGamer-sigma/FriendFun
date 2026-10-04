@@ -18,7 +18,7 @@ let db;
 function seed() {
   const now = Date.now();
   const g = (id, name, creator, desc, tpl, visits, likes, dislikes, maxPlayers = 30) =>
-    ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, maxPlayers, created: now, updated: now, thumbnail: null });
+    ({ id, name, creator, description: desc, world: templates[tpl](), visits: 0, likes: 0, dislikes: 0, maxPlayers, created: now, updated: now, thumbnail: null });
   const games = [
     g('g1', 'Mega Fun Obby', 'FriendFun', 'Jump, dodge and bounce through 10 stages of obstacles! Touch the blue checkpoints to save your progress. Reach the golden platform to win!', 'obby', 1543210, 8912, 412),
     g('g2', 'Hangout Town', 'FriendFun', 'Chill with friends in a little town. Explore houses, sit on benches, collect coins and chat with everyone.', 'hangout', 987654, 5321, 210),
@@ -31,7 +31,16 @@ function seed() {
 function load() {
   try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); }
   catch { db = seed(); save(true); }
-  for (const u of Object.values(db.users)) { u.funtix ??= ECON.START_TIX; delete u.funbux; }
+  if (!db.statsReset) {
+    for (const g of Object.values(db.games)) { g.visits = 0; g.likes = 0; g.dislikes = 0; g.votes = {}; }
+    db.statsReset = true; save();
+  }
+  const free = CATALOG.filter(i => i.free).map(i => i.id);
+  for (const u of Object.values(db.users)) {
+    u.funtix ??= ECON.START_TIX; delete u.funbux;
+    for (const id of free) if (!u.inventory.includes(id)) u.inventory.push(id);
+    u.avatar.head ??= DEFAULT_AVATAR.head;
+  }
 }
 let saveTimer = null;
 function save(now = false) {
@@ -132,7 +141,7 @@ app.put('/api/me/avatar', auth, (req, res) => {
   const colors = {};
   for (const k of Object.keys(DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
   const pick = (slot) => (a[slot] && req.user.inventory.includes(a[slot]) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
-  req.user.avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt') };
+  req.user.avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head };
   save(); res.json(req.user.avatar);
 });
 app.put('/api/me/bio', auth, (req, res) => { req.user.bio = filter(req.body?.bio || '').slice(0, 300); save(); res.json({ ok: true }); });
@@ -146,6 +155,13 @@ app.post('/api/buy/:item', auth, (req, res) => {
   res.json({ ...money(req.user), inventory: req.user.inventory });
 });
 
+app.get('/api/leaderboard', auth, (req, res) => {
+  const all = Object.values(db.users).sort((a, b) => b.funtix - a.funtix || a.created - b.created);
+  res.json({
+    top: all.slice(0, 50).map(u => ({ name: u.name, avatar: u.avatar, funtix: u.funtix, ...statusOf(u.name) })),
+    rank: all.indexOf(req.user) + 1, total: all.length, funtix: req.user.funtix,
+  });
+});
 app.get('/api/users/:name', auth, (req, res) => {
   const u = db.users[key(req.params.name)];
   if (!u) return res.status(404).json({ error: 'User not found' });

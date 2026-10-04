@@ -1,4 +1,4 @@
-import { Game, nameColor, tix } from './game.js';
+import { Game, nameColor, tix, LOGO } from './game.js';
 import { Studio } from './studio.js';
 import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
@@ -34,6 +34,7 @@ const icons = {
   shop: '<svg viewBox="0 0 24 24"><path d="M4 7h16l-1.5 13h-13zM8 7a4 4 0 0 1 8 0" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   create: '<svg viewBox="0 0 24 24"><path d="M3 17l11-11 4 4-11 11H3zM15 5l2-2 4 4-2 2z"/></svg>',
   discover: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24"><path d="M6 3h12v2h3v3a5 5 0 0 1-4.6 5A6 6 0 0 1 13 16.9V19h4v2H7v-2h4v-2.1A6 6 0 0 1 7.6 13 5 5 0 0 1 3 8V5h3zM5 7v1a3 3 0 0 0 1.3 2.5C6.1 9.7 6 8.9 6 8V7zm13 0v1c0 .9-.1 1.7-.3 2.5A3 3 0 0 0 19 8V7z"/></svg>',
   thumb: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2 10h4v11H2zM8 21V10l5-8c1.5 0 2.5 1 2.2 2.6L14.5 9H21c1 0 2 1 1.7 2.2l-2 8.3c-.2.9-1 1.5-2 1.5z"/></svg>',
   people: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM0 20c0-4 3.5-7 8-7s8 3 8 7zm17 0c0-2-.7-4-2-5.3 4.5-.8 9 1 9 5.3z"/></svg>',
 };
@@ -72,7 +73,7 @@ function shell(active, content) {
   return `
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
-    <a class="logo" href="#/home"><span class="logo-icon"></span><span class="logo-text">FriendFun</span></a>
+    <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">FriendFun</span></a>
     <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
@@ -82,7 +83,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create]]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create]]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
   </aside>
   <main class="content">${content}</main>`;
@@ -104,7 +105,7 @@ function loginPage() {
   app.innerHTML = `
   <div class="landing-bg"></div>
   <div class="landing-inner">
-    <div class="landing-hero"><div class="logo big"><span class="logo-icon"></span><span class="logo-text">FriendFun</span></div>
+    <div class="landing-hero"><div class="logo big"><span class="logo-icon">${LOGO}</span><span class="logo-text">FriendFun</span></div>
       <h1>Play, build and hang out with friends.</h1><p>Join millions of blocky adventurers. Jump into games, customize your avatar, and build your own worlds in FriendFun Studio.</p></div>
     <div class="auth-card">
       <div class="auth-tabs"><button data-m="signup" class="active">Sign Up</button><button data-m="login">Log In</button></div>
@@ -208,14 +209,14 @@ async function playPage(id) {
 // ---------- avatar editor ----------
 const SKIN = ['#f5cd30', '#ffcc99', '#e8b98a', '#c68e5b', '#8d5524', '#5c3a1e', '#ffffff', '#a3a2a5', '#1b2a35', '#0d69ac', '#6e99ca', '#2f8cff', '#a4bd47', '#4b974b', '#287f47', '#c4281c', '#ff66cc', '#8a4bd8', '#da8541', '#ffd400', '#000000', '#7c5c46'];
 function avatarPage(tab = 'body') {
-  const av = structuredClone(me.avatar);
+  const av = structuredClone(me.avatar); av.head ??= 'head_classic';
   let part = 'all';
   mount('avatar', `
     <h1>Avatar Editor</h1>
     <div class="av-wrap">
       <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Drag to rotate</div></div>
       <div class="av-panel">
-        <div class="av-tabs">${['body', 'hat', 'face', 'shirt'].map(t => `<button data-tab="${t}" class="${t === tab ? 'active' : ''}">${{ body: 'Body Colors', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[t]}</button>`).join('')}</div>
+        <div class="av-tabs">${['body', 'head', 'hat', 'face', 'shirt'].map(t => `<button data-tab="${t}" class="${t === tab ? 'active' : ''}">${{ body: 'Body Colors', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[t]}</button>`).join('')}</div>
         <div class="av-body"></div>
       </div>
     </div>`, () => {
@@ -266,7 +267,7 @@ function itemImage(item) {
 async function catalogPage(filter = 'all') {
   mount('catalog', `
     <h1>Marketplace</h1>
-    <div class="cat-filters">${['all', 'hat', 'face', 'shirt'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[f]}</a>`).join('')}</div>
+    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[f]}</a>`).join('')}</div>
     <div class="cat-grid">${CATALOG.filter(i => filter === 'all' || i.type === filter).map(i => `
       <div class="cat-item"><div class="cat-img"><img src="${itemImage(i)}"></div><div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
@@ -384,6 +385,17 @@ async function studioPage(id, tpl) {
   cleanup = () => { game?.destroy(); studio.destroy(); };
 }
 
+async function leaderboardPage() {
+  const lb = await api('GET', '/api/leaderboard');
+  setMoney(lb);
+  mount('leaderboard', `<h1>FunTix Leaderboard</h1>
+    <div class="lb-me">${tix}<span>You have <b>${fmt(lb.funtix)}</b> FunTix</span><span class="lb-rank">Your rank <b>#${lb.rank}</b> of ${lb.total}</span></div>
+    <div class="lbp">${lb.top.map((u, i) => `
+      <a class="lbp-row${u.name === me.name ? ' me' : ''}${i < 3 ? ' top' + (i + 1) : ''}" href="#/users/${encodeURIComponent(u.name)}">
+        <span class="lbp-rank">${i + 1}</span><img src="${avatarImage(u.avatar)}">
+        <span class="lbp-name">${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
+        <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
+}
 function funtixPage() {
   mount('funtix', `<h1>FunTix</h1>
     <div class="bux-hero">${tix}<div><div class="bux-big me-tix">${fmt(me.funtix ?? 0)}</div><div class="muted">Your balance</div></div></div>
@@ -420,6 +432,7 @@ async function route() {
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
+      case 'leaderboard': return await leaderboardPage();
       case 'funtix': case 'funbux': return funtixPage();
       default: return await homePage();
     }

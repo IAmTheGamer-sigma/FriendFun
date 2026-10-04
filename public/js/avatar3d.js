@@ -55,6 +55,14 @@ function buildHat(id) {
   return g;
 }
 
+const HEADS = {
+  head_classic: { h: 1.2, fz: 0.63, fw: 1, geo: () => new THREE.CylinderGeometry(0.62, 0.62, 1.2, 24) },
+  head_block: { h: 1.2, fz: 0.611, fw: 1.05, geo: () => new THREE.BoxGeometry(1.2, 1.2, 1.2) },
+  head_round: { h: 1.36, r: 0.68, round: true, geo: () => new THREE.SphereGeometry(0.68, 28, 20) },
+  head_tall: { h: 1.6, fz: 0.56, fw: 0.95, hs: 0.9, geo: () => new THREE.CylinderGeometry(0.55, 0.55, 1.6, 24) },
+  head_wide: { h: 1.05, fz: 0.63, fw: 1.1, hs: 1.15, geo: () => new THREE.CylinderGeometry(0.62, 0.62, 1.05, 24).scale(1.4, 1, 1) },
+};
+
 // Returns a THREE.Group; feet at y=0, facing +z. userData.limbs = { larm, rarm, lleg, rleg, head, torso }
 export function buildCharacter(avatar) {
   const C = avatar.colors;
@@ -66,10 +74,14 @@ export function buildCharacter(avatar) {
     d.position.z = 0.501; torso.add(d);
   }
   const headPivot = new THREE.Group(); headPivot.position.y = 4; root.add(headPivot);
-  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.2, 24), mat(C.head)); head.position.y = 0.6; head.castShadow = true; headPivot.add(head);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: faceTexture(avatar.face), transparent: true }));
-  face.position.set(0, 0.6, 0.63); headPivot.add(face);
-  const hat = buildHat(avatar.hat); if (hat) { hat.position.y = 1.2; headPivot.add(hat); }
+  const H = HEADS[avatar.head] || HEADS.head_classic;
+  const head = new THREE.Mesh(H.geo(), mat(C.head)); head.position.y = H.h / 2; head.castShadow = true; headPivot.add(head);
+  const faceMat = new THREE.MeshBasicMaterial({ map: faceTexture(avatar.face), transparent: true });
+  const face = H.round
+    ? new THREE.Mesh(new THREE.SphereGeometry(H.r + 0.01, 24, 16, Math.PI / 2 - 0.75, 1.5, Math.PI / 2 - 0.75, 1.5), faceMat)
+    : new THREE.Mesh(new THREE.PlaneGeometry(H.fw, H.fw), faceMat);
+  face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
+  const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); }
   const limb = (x, y, color) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(1, 2, 1, color); m.position.y = -1; p.add(m); root.add(p); return p; };
   const larm = limb(-1.5, 4, suit ? '#263238' : C.larm), rarm = limb(1.5, 4, suit ? '#263238' : C.rarm);
   const lleg = limb(-0.5, 2, C.lleg), rleg = limb(0.5, 2, C.rleg);

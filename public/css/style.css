@@ -20,10 +20,9 @@ h2 { font-size: 20px; font-weight: 700; margin: 0; }
 
 /* ---------- logo ---------- */
 .logo { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 22px; letter-spacing: -0.5px; }
-.logo-icon { width: 26px; height: 26px; background: var(--text); transform: rotate(12deg); border-radius: 4px; position: relative; }
-.logo-icon::after { content: ''; position: absolute; inset: 8px; background: var(--bg2); }
-.logo.big { font-size: 54px; } .logo.big .logo-icon { width: 54px; height: 54px; border-radius: 8px; } .logo.big .logo-icon::after { inset: 17px; }
-.ff-mini { display: inline-grid; place-items: center; width: 22px; height: 22px; background: #fff; color: #111; font-weight: 900; font-size: 11px; border-radius: 4px; transform: rotate(12deg); }
+.logo-icon { width: 34px; height: 28px; display: inline-flex; flex: none; } .logo-icon svg, .ff-mini svg { width: 100%; height: 100%; }
+.logo.big { font-size: 54px; } .logo.big .logo-icon { width: 72px; height: 58px; }
+.ff-mini { display: inline-flex; width: 30px; height: 24px; }
 
 /* ---------- topbar & sidebar ---------- */
 .topbar { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: var(--bg2); display: flex; align-items: center; gap: 22px; padding: 0 16px; z-index: 50; border-bottom: 1px solid #000; }
@@ -171,7 +170,7 @@ section { margin-bottom: 34px; }
 .esc-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; } .esc-actions button { padding: 14px; flex-direction: column; } kbd { font-size: 11px; opacity: .7; font-family: inherit; }
 .esc-opt { margin-right: 18px; font-weight: 600; } .esc-help { margin-top: 12px; color: var(--muted); font-size: 13px; }
 .loading { position: absolute; inset: 0; background: #1b1d1f; display: grid; place-items: center; z-index: 30; transition: opacity .5s; } .loading.fade { opacity: 0; }
-.loading-card { text-align: center; } .ff-logo-big { font-size: 46px; font-weight: 900; } .loading-name { font-size: 22px; margin-top: 8px; font-weight: 700; } .loading-sub { color: var(--muted); margin-top: 6px; }
+.loading-card { text-align: center; } .ff-logo-big { font-size: 46px; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 12px; } .ff-logo-big svg { width: 62px; height: 50px; } .loading-name { font-size: 22px; margin-top: 8px; font-weight: 700; } .loading-sub { color: var(--muted); margin-top: 6px; }
 .spinner { width: 40px; height: 40px; margin: 22px auto; border: 4px solid #444; border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
 .confetti { position: absolute; inset: 0; pointer-events: none; z-index: 7; overflow: hidden; } .confetti i { position: absolute; top: -20px; width: 10px; height: 16px; animation: fall linear forwards; }
 @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
@@ -236,3 +235,15 @@ section { margin-bottom: 34px; }
   .jump-btn { right: 24px; bottom: 30px; width: 80px; height: 80px; }
   .esc-actions { grid-template-columns: 1fr; }
 }
+
+/* ---------- leaderboard ---------- */
+.lb-me { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 12px; padding: 16px 20px; margin-bottom: 18px; font-size: 17px; } .lb-me .tix { width: 28px; height: 28px; }
+.lb-rank { margin-left: auto; color: var(--muted); } .lb-rank b { color: var(--text); font-size: 20px; }
+.lbp { display: flex; flex-direction: column; gap: 6px; }
+.lbp-row { display: flex; align-items: center; gap: 14px; background: var(--card); border-radius: 10px; padding: 8px 18px 8px 10px; font-weight: 700; border: 2px solid transparent; } .lbp-row:hover { background: #33363a; }
+.lbp-row.me { border-color: #335fff; }
+.lbp-rank { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #393b3d; font-weight: 900; flex: none; }
+.lbp-row.top1 .lbp-rank { background: #ffd400; color: #1b1d1f; } .lbp-row.top2 .lbp-rank { background: #c0c4cc; color: #1b1d1f; } .lbp-row.top3 .lbp-rank { background: #cd7f32; color: #1b1d1f; }
+.lbp-row img { width: 44px; height: 44px; border-radius: 50%; background: #393b3d; }
+.lbp-name { display: flex; align-items: center; gap: 6px; } .lbp-name .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+.lbp-tix { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 17px; }
