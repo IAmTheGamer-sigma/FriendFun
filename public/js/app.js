@@ -344,7 +344,7 @@ async function groupsPage() {
         <div class="group-card-body">
           <h3>${esc(g.name)}</h3>
           <p>${esc(g.description || 'No description yet.')}</p>
-          <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>Owner: ${esc(g.owner)}</span></div>
+          <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>Creator: ${esc(g.owner || 'Unknown')}</span></div>
           <button class="${g.joined ? 'btn-secondary' : 'btn-primary'} group-action" data-id="${esc(g.id)}" data-action="${g.joined ? 'leave' : 'join'}" ${g.isOwner ? 'disabled title="The owner cannot leave their group"' : ''}>
             ${g.joined ? 'Leave Group' : 'Join Group'}
           </button>
