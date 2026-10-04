@@ -334,7 +334,10 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
 
 function groupView(group, username) {
   const members = Array.isArray(group.members) ? group.members : [];
-  return { id: group.id, name: group.name, description: group.description || '', owner: group.owner, created: group.created, members: members.length, joined: members.includes(username), isOwner: group.owner === username };
+  // Older group rows may have used `creator` instead of `owner`, or may have a null owner.
+  // Normalize that here so the frontend never displays NULL for the creator/owner.
+  const owner = group.owner || group.creator || username || 'Unknown';
+  return { id: group.id, name: group.name, description: group.description || '', owner, created: group.created, members: members.length, joined: members.includes(username), isOwner: owner === username };
 }
 
 app.get('/api/groups', auth, async (req, res) => {
