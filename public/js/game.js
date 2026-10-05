@@ -252,10 +252,52 @@ export class Game {
     };
     const names = Object.keys(api);
     for (const s of scripts) {
+      if (s.kind === 'visual') {
+        try { this.runVisualScript(s, api); } catch (e) { console.warn('Visual script error in ' + s.name + ':', e); }
+        continue;
+      }
       try {
         const fn = new Function(...names, s.code || '');
         fn(...names.map(k => api[k]));
       } catch (e) { console.warn('Script error in ' + s.name + ':', e); }
+    }
+  }
+  // Visual (no-code) scripts built with the Studio HTML builder
+  runVisualScript(s, api) {
+    const t = s.trigger || {};
+    const run = () => {
+      for (const a of (s.actions || [])) {
+        try { this.runVisualAction(a, api); } catch (e) { console.warn('Visual action error:', e); }
+      }
+    };
+    if (t.type === 'touch') api.onTouch(t.part || '', run);
+    else if (t.type === 'death') api.onDeath(run);
+    else if (t.type === 'chat') api.onChat((name, text) => {
+      if (!t.word || String(text).toLowerCase().includes(String(t.word).toLowerCase())) run();
+    });
+    else if (t.type === 'tick') api.onTick(run);
+    else api.onStart(run);
+  }
+  runVisualAction(a, api) {
+    const P = a.params || {};
+    const N = (v, d) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+    const T = v => String(v ?? '');
+    switch (a.type) {
+      case 'giveTix': api.giveTix(null, Math.max(1, Math.min(100, Math.floor(N(P.amount, 5))))); break;
+      case 'say': api.say(null, T(P.text).slice(0, 120)); break;
+      case 'sayAll': api.sayAll(T(P.text).slice(0, 200)); break;
+      case 'teleport': api.teleport(null, N(P.x, 0), N(P.y, 10), N(P.z, 0)); break;
+      case 'kill': api.kill(); break;
+      case 'heal': api.heal(null, N(P.amount, 25)); break;
+      case 'damage': api.damage(null, N(P.amount, 10)); break;
+      case 'setCheckpoint': api.setCheckpoint(N(P.x, 0), N(P.y, 10), N(P.z, 0)); break;
+      case 'movePart': api.movePart(T(P.part), N(P.x, 0), N(P.y, 0), N(P.z, 0)); break;
+      case 'hidePart': api.hidePart(T(P.part)); break;
+      case 'showPart': api.showPart(T(P.part)); break;
+      case 'spawnPart': api.spawnPart({ name: T(P.name) || 'Part', size: [N(P.sx, 4), N(P.sy, 1), N(P.sz, 4)], color: T(P.color) || '#a3a2a5', x: N(P.x, 0), y: N(P.y, 10), z: N(P.z, 0) }); break;
+      case 'playSound': api.playSound(T(P.sound) || 'coin'); break;
+      case 'setScore': api.setScore(N(P.n, 0)); break;
+      case 'addScore': api.addScore(N(P.n, 1)); break;
     }
   }
   syncPartBoxes(p) {
