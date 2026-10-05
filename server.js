@@ -1426,59 +1426,153 @@ const LOONEY_EVENT = {
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_EVENT.starts && n <= LOONEY_EVENT.ends; };
 
 const LOONEY_GAMES = [
-  { name: "Bugs' Burrow Dash", desc: "What's up, doc? Hop through Bugs' burrow!", sky: '#9fd6ff', cols: ['#8ac926', '#ffca3a', '#ff924c'] },
-  { name: "Daffy's Duck Season", desc: "You're despicable! Dodge through duck season.", sky: '#ffb74d', cols: ['#ff9800', '#212121', '#ffca3a'] },
-  { name: "Porky's Perilous Path", desc: "Th-th-that's all it takes, folks!", sky: '#f8bbd0', cols: ['#f48fb1', '#ce93d8', '#ffffff'] },
-  { name: "Tweety's Cage Escape", desc: "I tawt I taw a way out!", sky: '#fff9c4', cols: ['#ffee58', '#29b6f6', '#ffffff'] },
-  { name: "Sylvester's Alley Chase", desc: "Sufferin' succotash! Chase that bird!", sky: '#b0bec5', cols: ['#78909c', '#ef5350', '#37474f'] },
-  { name: "Road Runner's Canyon Run", desc: "Beep beep! Zoom through the canyon!", sky: '#ffcc80', cols: ['#e65100', '#ffb74d', '#a1887f'] },
-  { name: "Wile E.'s Rocket Ride", desc: "Acme rockets: what could go wrong?", sky: '#90caf9', cols: ['#78909c', '#e53935', '#eceff1'] },
-  { name: "Taz's Tornado Spin", desc: "Hold on tight through the tornado!", sky: '#d7ccc8', cols: ['#8d6e63', '#a1887f', '#ffca3a'] },
-  { name: "Elmer's Forest Frolic", desc: "Shhh! Be vewy, vewy careful.", sky: '#a5d6a7', cols: ['#2e7d32', '#66bb6a', '#8d6e63'] },
-  { name: "Marvin's Martian Maze", desc: "Where's the kaboom? On Mars!", sky: '#1a237e', cols: ['#00e676', '#212121', '#76ff03'] },
-  { name: "Foghorn's Farmyard Frenzy", desc: "I say, I say, watch your step, boy!", sky: '#fff59d', cols: ['#e53935', '#ffffff', '#8d6e63'] },
-  { name: "Pepe's Parisian Promenade", desc: "Come with me, mon ami.", sky: '#ce93d8', cols: ['#7b1fa2', '#f48fb1', '#212121'] },
-  { name: "Speedy Gonzales Sprint", desc: "Arriba! The fastest race in Mexico!", sky: '#ffe082', cols: ['#d32f2f', '#ffca3a', '#ffffff'] },
-  { name: "Yosemite Sam's Showdown", desc: "Great horny toads! The rootin'est course!", sky: '#ffab91', cols: ['#b71c1c', '#0d47a1', '#ffca3a'] },
-  { name: "Granny's House Hijinks", desc: "Mind the knitting needles!", sky: '#d1c4e9', cols: ['#7e57c2', '#ffb74d', '#ffffff'] },
-  { name: "Acme Factory Floor", desc: "Fresh off the Acme assembly line!", sky: '#b0bec5', cols: ['#546e7a', '#ffc107', '#37474f'] },
-  { name: "Looney Tower Climb", desc: "Climb to the top of the Looney Tower!", sky: '#9fd6ff', cols: ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'] },
-  { name: "Carrot Patch Capers", desc: "So many carrots, so little time!", sky: '#c5e1a5', cols: ['#ff9800', '#33691e', '#8ac926'] },
-  { name: "Duck Dodgers' Space Station", desc: "In the 24th and a half century!", sky: '#0d1b2a', cols: ['#00e5ff', '#3a506b', '#ffffff'] },
-  { name: "That's All, Folks! Finale", desc: "The grand finale! Earn that last coin!", sky: '#ffd54f', cols: ['#ffd700', '#e53935', '#ffffff'] },
+  { name: "Bugs' Burrow Dash", desc: "Find all 12 hidden carrots in Bugs' burrow!", sky: '#9fd6ff', cols: ['#8ac926', '#ffca3a', '#ff924c'] },
+  { name: "Daffy's Duck Season", desc: "Tag 8 runaway ducks in the autumn forest!", sky: '#ffb74d', cols: ['#ff9800', '#212121', '#ffca3a'] },
+  { name: "Porky's Perilous Path", desc: "Escape the pigpen maze!", sky: '#f8bbd0', cols: ['#f48fb1', '#ce93d8', '#ffffff'] },
+  { name: "Tweety's Cage Escape", desc: "A golden key is hidden in the giant birdcage... follow the hints!", sky: '#fff9c4', cols: ['#ffee58', '#29b6f6', '#ffffff'] },
+  { name: "Sylvester's Alley Chase", desc: "Dodge the alley cats for 45 seconds!", sky: '#b0bec5', cols: ['#78909c', '#ef5350', '#37474f'] },
+  { name: "Road Runner's Canyon Run", desc: "Sprint the canyon in under 60 seconds!", sky: '#ffcc80', cols: ['#e65100', '#ffb74d', '#a1887f'] },
+  { name: "Wile E.'s Rocket Ride", desc: "Dodge falling anvils for 60 seconds!", sky: '#90caf9', cols: ['#78909c', '#e53935', '#eceff1'] },
+  { name: "Taz's Tornado Spin", desc: "Bonk Taz 5 times... if you dare!", sky: '#d7ccc8', cols: ['#8d6e63', '#a1887f', '#ffca3a'] },
+  { name: "Elmer's Forest Frolic", desc: "Find your way out of Elmer's forest maze!", sky: '#a5d6a7', cols: ['#2e7d32', '#66bb6a', '#8d6e63'] },
+  { name: "Marvin's Martian Maze", desc: "Find the hidden Illudium Q-36 on Mars!", sky: '#1a237e', cols: ['#00e676', '#212121', '#76ff03'] },
+  { name: "Foghorn's Farmyard Frenzy", desc: "Tag 10 runaway chickens in the farmyard!", sky: '#fff59d', cols: ['#e53935', '#ffffff', '#8d6e63'] },
+  { name: "Pepe's Parisian Promenade", desc: "Find 10 hidden flowers on the streets of Paris!", sky: '#ce93d8', cols: ['#7b1fa2', '#f48fb1', '#212121'] },
+  { name: "Speedy Gonzales Sprint", desc: "Sprint to the fiesta in under 45 seconds!", sky: '#ffe082', cols: ['#d32f2f', '#ffca3a', '#ffffff'] },
+  { name: "Yosemite Sam's Showdown", desc: "Bonk Yosemite Sam 5 times in a rootin' tootin' showdown!", sky: '#ffab91', cols: ['#b71c1c', '#0d47a1', '#ffca3a'] },
+  { name: "Granny's House Hijinks", desc: "Find 8 hidden cookies in Granny's house!", sky: '#d1c4e9', cols: ['#7e57c2', '#ffb74d', '#ffffff'] },
+  { name: "Acme Factory Floor", desc: "Dodge the Acme crushers for 60 seconds!", sky: '#b0bec5', cols: ['#546e7a', '#ffc107', '#37474f'] },
+  { name: "Looney Star Summit", desc: "Hold the golden summit for 30 seconds!", sky: '#9fd6ff', cols: ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'] },
+  { name: "Carrot Patch Capers", desc: "Find 12 golden carrots hidden in the patch!", sky: '#c5e1a5', cols: ['#ff9800', '#33691e', '#8ac926'] },
+  { name: "Duck Dodgers' Space Station", desc: "Navigate the space station maze to the bridge!", sky: '#0d1b2a', cols: ['#00e5ff', '#3a506b', '#ffffff'] },
+  { name: "That's All, Folks! Finale", desc: "Pop 12 golden stars on the big stage!", sky: '#ffd54f', cols: ['#ffd700', '#e53935', '#ffffff'] },
 ];
+
+// ---------- Looney Tunes event: real mini-games (not obbies) ----------
+// Each game is a distinct genre, driven by world scripts:
+// hunt (treasure hunt), blitz (tag moving targets), maze, survival,
+// anvil rain, hot/cold seeker, boss battle, sprint time trial, king of the hill.
+function scrHunt(n, item) {
+  return "onStart(()=>{hidePart('WinPad');setScore(0);say('Find all " + n + " " + item + "!');});"
+    + "onTouch('Coin',()=>{var c=addScore(1);if(c>=" + n + "){showPart('WinPad');say('All found! Touch the golden pad!');playSound('win');}else{say(c+' / " + n + " " + item + " found!');}});";
+}
+function scrBlitz(targets, label) {
+  var code = "onStart(()=>{hidePart('WinPad');setScore(0);say('Tag all " + targets.length + " " + label + "! They move!');});";
+  targets.forEach(function (t) {
+    code += "onTouch('" + t.name + "',()=>{var c=addScore(1);playSound('coin');if(c>=" + targets.length + "){showPart('WinPad');say('All tagged! Touch the golden pad!');playSound('win');}else{say('Tagged! '+c+' / " + targets.length + "');}});";
+  });
+  code += "onTick((dt,t)=>{";
+  targets.forEach(function (t) {
+    code += "movePart('" + t.name + "'," + t.x + "+Math.sin(t*" + t.sp + "+" + t.ph + ")*" + t.rg + "," + t.y + "," + t.z + "+Math.cos(t*" + t.sp + "*0.7+" + t.ph + ")*" + t.rg + ");";
+  });
+  return code + "});";
+}
+function scrSurvival(secs, hazards) {
+  var code = "onStart(()=>{hidePart('WinPad');say('Survive " + secs + " seconds!');});"
+    + "var survT=0,survDone=false,wA=false,wB=false;"
+    + "onTick((dt,t)=>{";
+  hazards.forEach(function (h) {
+    code += "movePart('" + h.name + "'," + h.x + "+Math.sin(t*" + h.sp + ")*" + h.ax + "," + h.y + "," + h.z + "+Math.cos(t*" + h.sp + ")*" + h.az + ");";
+  });
+  code += "if(!survDone&&!game.won){survT+=dt;var left=Math.ceil(" + secs + "-survT);"
+    + "if(left<=30&&!wA){wA=true;say('30 seconds left!');}"
+    + "if(left<=10&&!wB){wB=true;say('10 seconds left!');}"
+    + "if(survT>=" + secs + "){survDone=true;showPart('WinPad');say('You survived! Touch the golden pad!');playSound('win');}}});";
+  return code;
+}
+function scrAnvilRain(secs, n, cx, cz, w, topY, spd) {
+  return "onStart(()=>{hidePart('WinPad');say('Dodge the falling anvils for " + secs + " seconds!');});"
+    + "var survT=0,survDone=false,wB=false;var ax=[],ay=[];"
+    + "for(var i=0;i<" + n + ";i++){ax.push(" + cx + "+(Math.random()-0.5)*" + w + ");ay.push(" + topY + "+Math.random()*25);}"
+    + "onTick((dt,t)=>{"
+    + "for(var i=0;i<" + n + ";i++){ay[i]-=" + spd + "*dt;if(ay[i]<1){ay[i]=" + topY + ";ax[i]=" + cx + "+(Math.random()-0.5)*" + w + ";}movePart('Anvil'+i,ax[i],ay[i]," + cz + ");}"
+    + "if(!survDone&&!game.won){survT+=dt;var left=Math.ceil(" + secs + "-survT);"
+    + "if(left<=10&&!wB){wB=true;say('10 seconds left!');}"
+    + "if(survT>=" + secs + "){survDone=true;showPart('WinPad');say('You survived! Touch the golden pad!');playSound('win');}}});";
+}
+function scrHotCold(tx, tz, label) {
+  return "onStart(()=>{hidePart('WinPad');hidePart('HiddenItem');say('A " + label + " is hidden nearby... follow the hints!');});"
+    + "var lastHint=0,lastD=99999,found=false;"
+    + "onTick((dt,t)=>{if(found||game.won)return;var p=getPos();"
+    + "var d=Math.sqrt((p.x-(" + tx + "))*(p.x-(" + tx + "))+(p.z-(" + tz + "))*(p.z-(" + tz + ")));"
+    + "if(t-lastHint>2.5){lastHint=t;"
+    + "if(d<14){found=true;showPart('HiddenItem');say('You found it! Touch it!');playSound('win');}"
+    + "else if(d<lastD-2){say('Warmer!');}else if(d>lastD+2){say('Colder...');}"
+    + "lastD=d;}});"
+    + "onTouch('HiddenItem',()=>{showPart('WinPad');say('Touch the golden pad to win!');});";
+}
+function scrBoss(label, hits, dmg, cx, cz, range, by) {
+  return "onStart(()=>{hidePart('WinPad');say('Bonk " + label + " " + hits + " times! Careful, it fights back!');});"
+    + "var hp=" + hits + ",bx=" + cx + ",bz=" + cz + ",lastBonk=-9,bossDone=false;"
+    + "onTouch('Boss',()=>{var now=Date.now()/1000;if(now-lastBonk<1.5||bossDone||game.won)return;lastBonk=now;"
+    + "hp--;damage(null," + dmg + ");playSound('coin');"
+    + "bx=" + cx + "+(Math.random()-0.5)*" + range + ";bz=" + cz + "+(Math.random()-0.5)*" + range + ";movePart('Boss',bx," + by + ",bz);"
+    + "if(hp<=0){bossDone=true;showPart('WinPad');say('" + label + " defeated! Touch the golden pad!');playSound('win');}"
+    + "else{say('" + label + ": '+hp+' bonks left!');}});"
+    + "onTick((dt,t)=>{if(!bossDone&&!game.won)movePart('Boss',bx+Math.sin(t*1.3)*6," + by + ",bz+Math.cos(t)*6);});";
+}
+function scrSprint(secs) {
+  return "onStart(()=>{say('Reach the finish arch in " + secs + " seconds! Green pads = speed!');});"
+    + "var raceT=0,raceDone=false,wB=false;"
+    + "onTick((dt)=>{if(raceDone||game.won)return;raceT+=dt;var left=Math.ceil(" + secs + "-raceT);"
+    + "if(left<=10&&!wB){wB=true;say('10 seconds left!');}"
+    + "if(raceT>=" + secs + "){raceDone=true;say('Too slow! Try again!');kill();}});"
+    + "onDeath(()=>{raceT=0;raceDone=false;wB=false;say('Go!');});";
+}
+function scrKoth(cx, cy, cz, rad, secs) {
+  return "onStart(()=>{hidePart('WinPad');say('Hold the golden summit for " + secs + " seconds!');});"
+    + "var holdT=0,holdDone=false,lastSay=-9;"
+    + "onTick((dt,t)=>{if(holdDone||game.won)return;var p=getPos();"
+    + "var d=Math.sqrt((p.x-(" + cx + "))*(p.x-(" + cx + "))+(p.z-(" + cz + "))*(p.z-(" + cz + ")));"
+    + "if(d<" + rad + "&&Math.abs(p.y-(" + cy + "))<5){holdT+=dt;"
+    + "if(t-lastSay>5){lastSay=t;say('Holding... '+Math.floor(holdT)+' / " + secs + "s');}"
+    + "if(holdT>=" + secs + "){holdDone=true;showPart('WinPad');say('Summit held! Touch the golden pad!');playSound('win');}}});";
+}
+function scrMaze(sx, sz, label) {
+  return "onStart(()=>{teleport(null," + sx + ",3," + sz + ");say('" + label + "');});";
+}
 
 function looneyHelpers(P, r) {
   const H = {};
-  H.plat = (x, y, z, w, col, coin) => {
-    P([x, y, z], [w, 1, w], col);
-    if (coin) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+  H.finish = (x, y, z) => {
+    P([x, y, z], [20, 1, 20], '#ffd700', { name: 'WinPlatform', m: 'neon' });
+    P([x, y + 0.75, z], [8, 0.5, 8], '#ffffff', { name: 'WinPad', k: 'win', m: 'neon' });
+    return [x, y, z];
   };
-  H.jumps = (x, y, z, n, col, gap = 9, spread = 6) => {
-    for (let i = 0; i < n; i++) {
-      z -= gap + r() * 3; x += (r() - 0.5) * spread;
-      H.plat(x, y, z, 5, col, r() < 0.45);
+  H.speedPad = (x, y, z) => P([x, y, z], [5, 0.5, 5], '#22ff88', { name: 'SpeedPad', k: 'speed', m: 'neon' });
+  H.coinAt = (x, y, z, name, col, s) => P([x, y, z], s || [1.2, 1.2, 1.2], col || '#ffd400', { name: name || 'Coin', k: 'coin' });
+  H.maze = (ox, oz, n, cell, h, col, floorCol) => {
+    const vis = Array.from({ length: n }, () => Array(n).fill(false));
+    const W = Array.from({ length: n }, () => Array.from({ length: n }, () => [true, true, true, true]));
+    const stack = [[0, 0]]; vis[0][0] = true;
+    const dirs = [[0, -1, 0, 2], [1, 0, 1, 3], [0, 1, 2, 0], [-1, 0, 3, 1]];
+    while (stack.length) {
+      const top = stack[stack.length - 1], cx = top[0], cz = top[1];
+      const opts = [];
+      for (const d of dirs) {
+        const nx = cx + d[0], nz = cz + d[1];
+        if (nx >= 0 && nz >= 0 && nx < n && nz < n && !vis[nz][nx]) opts.push([nx, nz, d[2], d[3]]);
+      }
+      if (!opts.length) { stack.pop(); continue; }
+      const o = opts[Math.floor(r() * opts.length)];
+      W[cz][cx][o[2]] = false; W[o[1]][o[0]][o[3]] = false; vis[o[1]][o[0]] = true; stack.push([o[0], o[1]]);
     }
-    return [x, y, z];
-  };
-  H.stairs = (x, y, z, n, col) => {
-    for (let i = 0; i < n; i++) { z -= 5; y += 2.2; P([x, y, z], [6, 1, 3], col, { name: 'Step' }); }
-    return [x, y, z];
-  };
-  H.checkpoint = (x, y, z) => {
-    P([x, y, z], [12, 1, 12], '#efefef', { name: 'Stage' });
-    P([x, y + 0.75, z], [5, 0.5, 5], '#2ec4ff', { name: 'Checkpoint', k: 'checkpoint', m: 'neon' });
-  };
-  H.bounceUp = (x, y, z, col, height = 12) => {
-    P([x, y, z], [6, 1, 6], '#22ff88', { name: 'BouncePad', k: 'bounce', m: 'neon' });
-    z -= 14; y += height;
-    P([x, y, z], [8, 1, 8], col);
-    return [x, y, z];
-  };
-  H.killWalk = (x, y, z, col, len = 30, kb = 5) => {
-    P([x, y, z], [8, 1, len], col, { name: 'Walkway' });
-    for (let i = 0; i < kb; i++) P([x + (i % 2 ? 2 : -2), y + 0.75, z - len / 2 + 4 + i * ((len - 8) / kb)], [4, 0.5, 1.5], '#ff2020', { name: 'KillBrick', k: 'kill', m: 'neon' });
-    return [x, y, z - len];
+    W[0][0][3] = false; W[n - 1][n - 1][1] = false;
+    const x0 = ox - (n * cell) / 2, z0 = oz - (n * cell) / 2;
+    P([ox, -0.5, oz], [n * cell + 8, 1, n * cell + 8], floorCol, { name: 'MazeFloor' });
+    const wall = (x, z, w, d) => P([x, h / 2, z], [w, h, d], col, { name: 'MazeWall' });
+    for (let cz = 0; cz < n; cz++) for (let cx = 0; cx < n; cx++) {
+      const x = x0 + cx * cell, z = z0 + cz * cell;
+      if (W[cz][cx][0]) wall(x + cell / 2, z, cell + 1.5, 1.5);
+      if (W[cz][cx][3]) wall(x, z + cell / 2, 1.5, cell + 1.5);
+      if (cz === n - 1 && W[cz][cx][2]) wall(x + cell / 2, z + cell, cell + 1.5, 1.5);
+      if (cx === n - 1 && W[cz][cx][1]) wall(x + cell, z + cell / 2, 1.5, cell + 1.5);
+    }
+    return {
+      sx: x0 - 4, sz: z0 + cell / 2,
+      ex: x0 + n * cell + 4, ez: z0 + (n - 1) * cell + cell / 2,
+      x0: x0, z0: z0, n: n, cell: cell,
+    };
   };
   H.carrot = (x, y, z) => { P([x, y + 0.6, z], [0.7, 1.2, 0.7], '#ff9800', { name: 'Carrot' }); P([x, y + 1.5, z], [0.5, 0.6, 0.5], '#33691e', { name: 'CarrotTop' }); };
   H.carrotPatch = (x, y, z) => { P([x, y - 0.4, z], [10, 0.8, 10], '#5d4037', { name: 'Dirt' }); for (let i = 0; i < 5; i++) H.carrot(x + (r() - 0.5) * 8, y, z + (r() - 0.5) * 8); };
@@ -1503,220 +1597,259 @@ function looneyHelpers(P, r) {
 }
 
 const LOONEY_BUILDERS = [
-  (P, r, H, x, y, z) => { // 1. Bugs' Burrow Dash
-    H.carrotPatch(x + 10, 0, z - 6); H.carrotPatch(x - 10, 0, z - 24);
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#8d6e63', 9, 5);
-      if (s % 2 === 0) H.carrotPatch(x + 9, y, z);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 1. Bugs' Burrow Dash — TREASURE HUNT (12 carrots)
+    P([0, -0.5, -50], [100, 1, 100], '#7a5c3e', { name: 'BurrowFloor' });
+    for (let i = 0; i < 6; i++) P([-35 + r() * 70, 2, -15 - r() * 70], [14 + r() * 10, 4, 2], '#5d4037', { name: 'TunnelWall' });
+    H.carrotPatch(-25, 0, -30); H.carrotPatch(25, 0, -45); H.carrotPatch(-20, 0, -70); H.carrotPatch(20, 0, -80);
+    for (let i = 0; i < 12; i++) H.coinAt(-40 + r() * 80, 1.2, -15 - r() * 70, 'Coin', '#ff9800', [1.2, 1.6, 1.2]);
+    S('Burrow Hunt', scrHunt(12, 'carrots'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 2. Daffy's Duck Season
-    for (let s = 0; s < 7; s++) {
-      H.tree(x + 10, y, z - 4, ['#ef6c00', '#e65100', '#f9a825'][s % 3]);
-      H.tree(x - 10, y, z - 12, '#c62828');
-      [x, y, z] = H.jumps(x, y, z, 4, '#a1887f', 10, 8);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
+  (P, r, H, S, x, y, z) => { // 2. Daffy's Duck Season — TARGET BLITZ (8 ducks)
+    P([0, -0.5, -45], [90, 1, 90], '#3e5c2e', { name: 'ForestFloor' });
+    for (let i = 0; i < 10; i++) H.tree(-38 + r() * 76, 0, -10 - r() * 70, ['#ef6c00', '#e65100', '#f9a825'][i % 3]);
+    const targets = [];
+    for (let i = 0; i < 8; i++) {
+      const tx = -30 + r() * 60, tz = -15 - r() * 60, nm = 'Duck' + i;
+      P([tx, 1.5, tz], [3, 2.5, 3], i % 2 ? '#212121' : '#ff9800', { name: nm, k: 'coin' });
+      targets.push({ name: nm, x: tx.toFixed(1), y: 1.5, z: tz.toFixed(1), sp: (0.5 + r() * 0.5).toFixed(2), rg: (5 + r() * 4).toFixed(1), ph: (r() * 6).toFixed(2) });
     }
+    S('Duck Tag', scrBlitz(targets, 'ducks'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 3. Porky's Perilous Path
-    H.barn(x + 16, 0, z - 10); H.fence(x - 8, 0, z - 14, 24); H.haybale(x + 8, 0, z - 26); H.haybale(x - 6, 0, z - 44);
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#f48fb1', 9, 5);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 3. Porky's Perilous Path — MAZE
+    const mz = H.maze(0, -60, 7, 10, 5, '#8d6e63', '#f8bbd0');
+    H.barn(mz.ex + 20, 0, mz.ez);
+    for (let i = 0; i < 4; i++) H.coinAt(mz.x0 + Math.floor(r() * 7) * 10 + 5, 1.2, mz.z0 + Math.floor(r() * 7) * 10 + 5, 'Coin', '#ffd400');
+    S('Pigpen Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Find your way out of the pigpen!'));
+    H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 4. Tweety's Cage Escape
-    for (let i = 0; i < 8; i++) P([x + 18, i * 6, z - 20 - i * 12], [1, 6, 1], '#29b6f6', { name: 'CageBar', m: 'metal' });
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.stairs(x, y, z, 5, '#ffee58');
-      [x, y, z] = H.jumps(x, y, z, 4, '#ffee58', 10, 6);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
+  (P, r, H, S, x, y, z) => { // 4. Tweety's Cage Escape — HOT/COLD SEEKER
+    P([0, -0.5, -45], [80, 1, 80], '#90caf9', { name: 'CageFloor' });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      P([Math.cos(a) * 38, 10, -45 + Math.sin(a) * 38], [1.5, 20, 1.5], '#fdd835', { name: 'CageBar', m: 'metal' });
     }
+    P([0, 21, -45], [78, 2, 78], '#fdd835', { name: 'CageTop', m: 'metal' });
+    P([-20, 3, -30], [8, 6, 8], '#8d6e63', { name: 'Birdhouse', m: 'wood' });
+    P([20, 1, -60], [6, 2, 6], '#a1887f', { name: 'Perch', m: 'wood' });
+    const hx = 12 + r() * 16, hz = -58 - r() * 12;
+    P([hx, 1.5, hz], [3, 3, 1], '#ffd400', { name: 'HiddenItem', k: 'coin', m: 'neon' });
+    S('Hidden Key', scrHotCold(hx.toFixed(1), hz.toFixed(1), 'golden key'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 5. Sylvester's Alley Chase
-    for (let s = 0; s < 7; s++) {
-      P([x + 9, y + 4, z - 6], [2, 8, 20], '#6d4c41', { name: 'BrickWall', m: 'brick' });
-      P([x - 9, y + 4, z - 6], [2, 8, 20], '#6d4c41', { name: 'BrickWall', m: 'brick' });
-      P([x + 5, y + 1, z - 10], [2, 2, 2], '#78909c', { name: 'TrashCan', m: 'metal' });
-      [x, y, z] = H.jumps(x, y, z, 5, '#78909c', 9, 4);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
+  (P, r, H, S, x, y, z) => { // 5. Sylvester's Alley Chase — SURVIVAL (45s)
+    P([0, -0.5, -55], [36, 1, 110], '#616161', { name: 'AlleyFloor' });
+    for (let s = 0; s < 5; s++) {
+      P([19, 4, -20 - s * 20], [2, 8, 24], '#6d4c41', { name: 'BrickWall', m: 'brick' });
+      P([-19, 4, -20 - s * 20], [2, 8, 24], '#6d4c41', { name: 'BrickWall', m: 'brick' });
     }
+    for (let i = 0; i < 5; i++) P([-12 + (i % 2) * 24, 1, -25 - i * 15], [2, 2, 2], '#78909c', { name: 'TrashCan', m: 'metal' });
+    const hazards = [];
+    for (let i = 0; i < 4; i++) {
+      const nm = 'Cat' + i, hz = -25 - i * 18;
+      P([0, 1.5, hz], [3, 3, 3], '#212121', { name: nm, k: 'kill' });
+      hazards.push({ name: nm, x: 0, y: 1.5, z: hz, ax: 13, az: 0, sp: (0.6 + i * 0.15).toFixed(2) });
+    }
+    S('Alley Survival', scrSurvival(45, hazards));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 6. Road Runner's Canyon Run
-    H.mesa(x + 25, -2, z - 30, 20, 14); H.mesa(x - 28, -2, z - 70, 24, 18);
-    H.cactus(x + 8, 0, z - 20); H.cactus(x - 9, 0, z - 45, 1.4); H.cactus(x + 10, 0, z - 80);
-    for (let s = 0; s < 8; s++) {
-      z -= 16; P([x, y, z], [7, 1, 14], '#e65100', { name: 'Sprint' });
-      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      if (s % 2 === 0) z -= 12;
-      if (s === 7) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
-    }
+  (P, r, H, S, x, y, z) => { // 6. Road Runner's Canyon Run — SPRINT TIME TRIAL (60s)
+    const len = 220, cx = 0, cz = -12 - len / 2;
+    P([cx, -0.5, cz], [18, 1, len], '#e65100', { name: 'Track' });
+    for (let d = 30; d < len; d += 30) H.speedPad(cx + (d % 60 ? -4 : 4), 0.25, -12 - d);
+    H.mesa(cx + 25, -2, -60, 20, 14); H.mesa(cx - 28, -2, -120, 24, 18); H.mesa(cx + 26, -2, -170, 18, 12);
+    H.cactus(cx + 14, 0, -40); H.cactus(cx - 14, 0, -90, 1.4); H.cactus(cx + 14, 0, -140); H.cactus(cx - 13, 0, -190);
+    P([cx - 8, 4, -12 - len], [2, 8, 2], '#ffffff', { name: 'Arch' });
+    P([cx + 8, 4, -12 - len], [2, 8, 2], '#ffffff', { name: 'Arch' });
+    P([cx, 8.5, -12 - len], [18, 2, 2], '#ffffff', { name: 'Arch' });
+    S('Canyon Sprint', scrSprint(60));
+    H.finish(cx, 0, -12 - len - 16);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 7. Wile E.'s Rocket Ride
-    H.rocket(x + 10, 0, z - 8); H.acmeCrate(x - 8, 0, z - 16); H.anvil(x + 9, 0, z - 30); H.tnt(x - 9, 0, z - 44);
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.bounceUp(x, y, z, '#78909c', 12);
-      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      H.acmeCrate(x + 10, y, z - 4);
-      z -= 6; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 7. Wile E.'s Rocket Ride — ANVIL RAIN SURVIVAL (60s)
+    P([0, -0.5, -45], [70, 1, 70], '#d98e4a', { name: 'DesertFloor' });
+    H.rocket(12, 0, -20); H.acmeCrate(-10, 0, -25); H.acmeCrate(8, 0, -60); H.tnt(-12, 0, -55);
+    H.cactus(20, 0, -40); H.cactus(-22, 0, -65, 1.3);
+    for (let i = 0; i < 8; i++) P([0, 55, -45], [3, 2, 2], '#37474f', { name: 'Anvil' + i, k: 'kill', m: 'metal' });
+    S('Anvil Rain', scrAnvilRain(60, 8, 0, -45, 56, 55, 26));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 8. Taz's Tornado Spin
-    const cx = x; let a = 0;
-    for (let s = 0; s < 24; s++) {
-      a += 0.55; y += 2.4;
-      x = cx + Math.cos(a) * 12; z -= 4;
-      P([x, y, z], [6, 1, 6], s % 2 ? '#8d6e63' : '#a1887f', { name: 'TornadoStep' });
-      if (s % 4 === 2) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      if (s % 6 === 5) H.checkpoint(x, y, z);
-    }
+  (P, r, H, S, x, y, z) => { // 8. Taz's Tornado Spin — BOSS BATTLE
+    P([0, -0.5, -50], [70, 1, 70], '#8d6e63', { name: 'ArenaFloor' });
+    for (let i = 0; i < 6; i++) P([-24, 2 + i * 3, -30], [10 - i * 1.2, 3, 10 - i * 1.2], '#a1887f', { name: 'Tornado' });
+    for (let i = 0; i < 6; i++) P([24, 2 + i * 3, -70], [10 - i * 1.2, 3, 10 - i * 1.2], '#a1887f', { name: 'Tornado' });
+    P([0, 3, -50], [6, 6, 6], '#6d4c41', { name: 'Boss' });
+    S('Taz Battle', scrBoss('Taz', 5, 10, 0, -50, 40, 3));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 9. Elmer's Forest Frolic
-    for (let s = 0; s < 7; s++) {
-      H.tree(x + 11, y, z - 2); H.tree(x - 11, y, z - 12, '#1b5e20'); H.tree(x + 9, y, z - 22);
-      [x, y, z] = H.jumps(x, y, z, 5, '#2e7d32', 9, 7);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 9. Elmer's Forest Frolic — MAZE
+    const mz = H.maze(0, -60, 7, 10, 6, '#1b5e20', '#2e7d32');
+    for (let i = 0; i < 12; i++) H.tree(-45 + r() * 90, 0, -105 - r() * 15, '#1b5e20');
+    for (let i = 0; i < 4; i++) H.coinAt(mz.x0 + Math.floor(r() * 7) * 10 + 5, 1.2, mz.z0 + Math.floor(r() * 7) * 10 + 5, 'Coin', '#ffd400');
+    S('Forest Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Find your way out of the forest!'));
+    H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 10. Marvin's Martian Maze
-    for (let i = 0; i < 40; i++) H.star(x + (r() - 0.5) * 120, 20 + r() * 40, z - r() * 160);
-    for (let s = 0; s < 6; s++) {
-      for (const dx of [-8, 0, 8]) P([x + dx, y, z - 12], [5, 1, 5], dx === 0 ? '#00e676' : '#212121', { name: 'MarsPad' });
-      z -= 12;
-      [x, y, z] = H.jumps(x, y, z, 3, '#00e676', 10, 4);
-      H.rock(x + 9, y, z, 3);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 10. Marvin's Martian Maze — HOT/COLD SEEKER
+    P([0, -0.5, -50], [90, 1, 90], '#b3402a', { name: 'MarsFloor' });
+    for (let i = 0; i < 50; i++) H.star((r() - 0.5) * 160, 25 + r() * 50, -10 - r() * 120);
+    for (let i = 0; i < 8; i++) P([-35 + r() * 70, 0.1, -15 - r() * 70], [8 + r() * 6, 0.4, 8 + r() * 6], '#7a2a1a', { name: 'Crater' });
+    P([-20, 4, -30], [6, 8, 6], '#00e676', { name: 'Martian' });
+    const hx = -30 + r() * 60, hz = -20 - r() * 55;
+    P([hx, 1.5, hz], [3, 3, 3], '#00e676', { name: 'HiddenItem', k: 'coin', m: 'neon' });
+    S('Hidden Orb', scrHotCold(hx.toFixed(1), hz.toFixed(1), 'Illudium Q-36'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 11. Foghorn's Farmyard Frenzy
-    H.barn(x - 18, 0, z - 16); H.fence(x + 6, 0, z - 10, 30); H.haybale(x - 8, 0, z - 34); H.haybale(x + 10, 0, z - 52);
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#e53935', 9, 5);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
+  (P, r, H, S, x, y, z) => { // 11. Foghorn's Farmyard Frenzy — TARGET BLITZ (10 chickens)
+    P([0, -0.5, -45], [80, 1, 80], '#7ec850', { name: 'FarmFloor' });
+    H.barn(-22, 0, -25); H.fence(15, 0, -20, 30); H.haybale(10, 0, -60); H.haybale(-12, 0, -70);
+    const targets = [];
+    for (let i = 0; i < 10; i++) {
+      const tx = -30 + r() * 60, tz = -15 - r() * 60, nm = 'Chicken' + i;
+      P([tx, 1.25, tz], [2.5, 2.5, 2.5], '#ffffff', { name: nm, k: 'coin' });
+      targets.push({ name: nm, x: tx.toFixed(1), y: 1.25, z: tz.toFixed(1), sp: (0.6 + r() * 0.6).toFixed(2), rg: (4 + r() * 4).toFixed(1), ph: (r() * 6).toFixed(2) });
     }
+    S('Chicken Roundup', scrBlitz(targets, 'chickens'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 12. Pepe's Parisian Promenade
-    H.eiffel(x + 20, 0, z - 30); H.lamppost(x - 10, 0, z - 12); H.lamppost(x + 10, 0, z - 40); H.lamppost(x - 10, 0, z - 68);
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#7b1fa2', 9, 6);
-      [x, y, z] = H.stairs(x, y, z, 4, '#7b1fa2');
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 12. Pepe's Parisian Promenade — TREASURE HUNT (10 flowers)
+    P([0, -0.5, -50], [90, 1, 90], '#b0a89f', { name: 'ParisStreet' });
+    H.eiffel(24, 0, -60);
+    H.lamppost(-14, 0, -25); H.lamppost(14, 0, -45); H.lamppost(-14, 0, -65); H.lamppost(14, 0, -85);
+    for (let i = 0; i < 10; i++) H.coinAt(-35 + r() * 70, 1.4, -15 - r() * 70, 'Coin', '#f48fb1', [1.4, 1.4, 1.4]);
+    S('Flower Hunt', scrHunt(10, 'flowers'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 13. Speedy Gonzales Sprint
-    H.sombrero(x + 10, 0, z - 10); H.cactus(x - 10, 0, z - 30); H.sombrero(x - 12, 0, z - 55); H.cactus(x + 11, 0, z - 75, 1.3);
-    for (let s = 0; s < 9; s++) {
-      z -= 18; P([x, y, z], [8, 1, 16], '#d32f2f', { name: 'Sprint' });
-      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      z -= 10;
-      if (s === 8) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
-    }
+  (P, r, H, S, x, y, z) => { // 13. Speedy Gonzales Sprint — SPRINT TIME TRIAL (45s)
+    const len = 180, cx = 0, cz = -12 - len / 2;
+    P([cx, -0.5, cz], [16, 1, len], '#d32f2f', { name: 'Track' });
+    for (let d = 25; d < len; d += 25) H.speedPad(cx + (d % 50 ? -3.5 : 3.5), 0.25, -12 - d);
+    H.sombrero(cx + 12, 0, -30); H.cactus(cx - 12, 0, -55); H.sombrero(cx - 12, 0, -95); H.cactus(cx + 12, 0, -130, 1.3);
+    P([cx - 7, 4, -12 - len], [2, 8, 2], '#ffca3a', { name: 'Arch' });
+    P([cx + 7, 4, -12 - len], [2, 8, 2], '#ffca3a', { name: 'Arch' });
+    P([cx, 8.5, -12 - len], [16, 2, 2], '#ffca3a', { name: 'Arch' });
+    S('Fiesta Sprint', scrSprint(45));
+    H.finish(cx, 0, -12 - len - 16);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 14. Yosemite Sam's Showdown
-    H.house(x + 18, 0, z - 20, '#8d6e63'); H.house(x - 18, 0, z - 45, '#a1887f');
-    P([x + 14, 7, z - 60], [3, 14, 3], '#6d4c41', { name: 'WaterLeg' });
-    P([x + 14, 15, z - 60], [8, 5, 8], '#8d6e63', { name: 'WaterTank' });
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#8d6e63', 9, 5);
-      [x, y, z] = H.killWalk(x, y, z - 4, '#8d6e63', 30, 5); z -= 4;
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 14. Yosemite Sam's Showdown — BOSS BATTLE
+    P([0, -0.5, -50], [64, 1, 64], '#c49a6c', { name: 'StreetFloor' });
+    H.house(20, 0, -35, '#8d6e63'); H.house(-20, 0, -60, '#a1887f');
+    P([14, 7, -75], [3, 14, 3], '#6d4c41', { name: 'WaterLeg' });
+    P([14, 15, -75], [8, 5, 8], '#8d6e63', { name: 'WaterTank' });
+    P([0, 3.5, -50], [5, 7, 5], '#b71c1c', { name: 'Boss' });
+    S('Showdown', scrBoss('Yosemite Sam', 5, 15, 0, -50, 36, 3.5));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 15. Granny's House Hijinks
-    H.house(x + 16, 0, z - 14, '#b39ddb'); H.tree(x - 12, 0, z - 8); H.tree(x + 12, 0, z - 40, '#66bb6a');
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#7e57c2', 9, 5);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 15. Granny's House Hijinks — TREASURE HUNT (8 cookies)
+    P([0, -0.5, -45], [56, 1, 46], '#a1887f', { name: 'HouseFloor' });
+    const W = (wx, wz, ww, wd) => P([wx, 3, wz], [ww, 6, wd], '#8d6e63', { name: 'Wall', m: 'wood' });
+    W(-16, -23, 24, 2); W(16, -23, 24, 2);
+    W(0, -67, 56, 2); W(-28, -45, 2, 46); W(28, -45, 2, 46);
+    W(-14, -45, 2, 18); W(14, -52, 2, 20);
+    P([-18, 1.5, -32], [8, 3, 4], '#6d4c41', { name: 'Sofa', m: 'wood' });
+    P([18, 2, -58], [6, 4, 6], '#5d4037', { name: 'Table', m: 'wood' });
+    P([0, 1, -40], [10, 2, 6], '#d7ccc8', { name: 'Rug' });
+    const spots = [[-20, -30], [-8, -38], [8, -30], [20, -38], [-20, -55], [-5, -60], [12, -52], [22, -62]];
+    for (const sp of spots) H.coinAt(sp[0], 1.2, sp[1], 'Coin', '#d2a679', [1.6, 0.7, 1.6]);
+    S('Cookie Hunt', scrHunt(8, 'cookies'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 16. Acme Factory Floor
-    for (let s = 0; s < 7; s++) {
-      H.crate(x + 10, y, z - 4); H.crate(x - 10, y, z - 16, 3); H.anvil(x + 9, y, z - 28);
-      P([x, y - 0.6, z - 8], [10, 0.2, 3], '#ffc107', { name: 'Hazard', m: 'neon' });
-      [x, y, z] = H.jumps(x, y, z, 4, '#546e7a', 10, 5);
-      [x, y, z] = H.killWalk(x, y, z - 4, '#546e7a', 30, 6); z -= 4;
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
+  (P, r, H, S, x, y, z) => { // 16. Acme Factory Floor — SURVIVAL (60s)
+    P([0, -0.5, -50], [64, 1, 64], '#78909c', { name: 'FactoryFloor' });
+    for (let i = 0; i < 6; i++) H.crate(-20 + (i % 3) * 20, 0, -25 - Math.floor(i / 3) * 40);
+    H.anvil(15, 0, -40); H.tnt(-15, 0, -60);
+    P([0, -0.4, -50], [20, 0.2, 4], '#ffc107', { name: 'Hazard', m: 'neon' });
+    const hazards = [];
+    for (let i = 0; i < 5; i++) {
+      const nm = 'Crusher' + i, hz = -25 - i * 12;
+      P([0, 2, hz], [6, 4, 2], '#e53935', { name: nm, k: 'kill', m: 'metal' });
+      hazards.push({ name: nm, x: 0, y: 2, z: hz, ax: 24, az: 0, sp: (0.5 + i * 0.12).toFixed(2) });
     }
+    S('Factory Survival', scrSurvival(60, hazards));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 17. Looney Tower Climb
-    const cols = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'];
-    const cx = x; let a = 0;
-    for (let s = 0; s < 30; s++) {
-      a += 0.5; y += 2.2; x = cx + Math.cos(a) * 10; z -= 3.2;
-      P([x, y, z], [6, 1, 6], cols[s % cols.length], { name: 'TowerStep' });
-      if (s % 5 === 2) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      if (s % 7 === 6) H.checkpoint(x, y, z);
-    }
+  (P, r, H, S, x, y, z) => { // 17. Looney Star Summit — KING OF THE HILL (30s)
+    P([0, -0.5, -50], [80, 1, 80], '#4a7c59', { name: 'HillFloor' });
+    P([0, 1, -50], [30, 2, 30], '#5d8a66', { name: 'Hill1' });
+    P([0, 3, -50], [22, 2, 22], '#6b9a76', { name: 'Hill2' });
+    P([0, 5, -50], [14, 2, 14], '#ffd700', { name: 'Summit', m: 'neon' });
+    H.tree(-25, 0, -30); H.tree(25, 0, -70); H.rock(-20, 0, -65, 3); H.rock(22, 0, -35, 2);
+    P([0, 1.5, -50], [3, 3, 3], '#e53935', { name: 'Guard', k: 'kill' });
+    S('Summit Hold', scrKoth(0, 6, -50, 8, 30)
+      + "onTick((dt,t)=>{if(!game.won)movePart('Guard',Math.sin(t*0.8)*28,1.5,-50+Math.cos(t*0.5)*28);});");
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 18. Carrot Patch Capers
-    H.house(x - 18, 0, z - 12, '#d7ccc8');
-    for (let s = 0; s < 6; s++) {
-      H.carrotPatch(x + 11, y, z - 6); H.carrotPatch(x - 11, y, z - 18);
-      [x, y, z] = H.jumps(x, y, z, 5, '#33691e', 9, 5);
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 18. Carrot Patch Capers — TREASURE HUNT (12 golden carrots)
+    P([0, -0.5, -50], [90, 1, 90], '#6a9a4e', { name: 'FieldFloor' });
+    H.house(-28, 0, -25, '#d7ccc8');
+    for (let i = 0; i < 8; i++) H.carrotPatch(-35 + r() * 70, 0, -20 - r() * 60);
+    for (let i = 0; i < 12; i++) H.coinAt(-38 + r() * 76, 1.2, -15 - r() * 70, 'Coin', '#ffd400', [1.2, 1.6, 1.2]);
+    S('Golden Carrot Hunt', scrHunt(12, 'golden carrots'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 19. Duck Dodgers' Space Station
-    for (let i = 0; i < 50; i++) H.star(x + (r() - 0.5) * 140, 15 + r() * 50, z - r() * 180);
-    P([x + 30, 40, z - 60], [10, 10, 1], '#0d47a1', { name: 'Earth', m: 'neon' });
-    for (let s = 0; s < 6; s++) {
-      [x, y, z] = H.jumps(x, y, z, 5, '#3a506b', 10, 6);
-      P([x, y + 3.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      z -= 8; H.checkpoint(x, y, z); z -= 4;
-    }
+  (P, r, H, S, x, y, z) => { // 19. Duck Dodgers' Space Station — MAZE
+    const mz = H.maze(0, -60, 7, 10, 6, '#3a506b', '#1a2b3c');
+    for (let i = 0; i < 30; i++) H.star((r() - 0.5) * 160, 25 + r() * 45, -20 - r() * 110);
+    P([mz.ex + 24, 25, mz.ez], [12, 12, 1], '#0d47a1', { name: 'Earth', m: 'neon' });
+    P([mz.ex + 12, 1, mz.ez + 12], [6, 2, 8], '#546e7a', { name: 'Bridge', m: 'metal' });
+    S('Station Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Navigate to the bridge!'));
+    H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
-  (P, r, H, x, y, z) => { // 20. That's All, Folks! Finale
-    for (let s = 0; s < 8; s++) {
-      z -= 16; P([x, y, z], [10, 1, 16], '#b71c1c', { name: 'RedCarpet' });
-      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-      P([x - 6, y + 3, z], [1, 6, 1], '#212121', { name: 'SpotPole' });
-      P([x - 6, y + 6.5, z], [1.6, 1, 1.6], '#fff59d', { name: 'Spotlight', m: 'neon' });
-      P([x + 6, y + 3, z], [1, 6, 1], '#212121', { name: 'SpotPole' });
-      P([x + 6, y + 6.5, z], [1.6, 1, 1.6], '#fff59d', { name: 'Spotlight', m: 'neon' });
-      z -= 10;
-      if (s === 7) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
+  (P, r, H, S, x, y, z) => { // 20. That's All, Folks! Finale — TARGET BLITZ (12 stars)
+    P([0, -0.5, -50], [76, 1, 76], '#4e342e', { name: 'StageFloor' });
+    P([-30, 8, -80], [12, 16, 2], '#b71c1c', { name: 'Curtain' });
+    P([30, 8, -80], [12, 16, 2], '#b71c1c', { name: 'Curtain' });
+    P([0, 15, -80], [72, 4, 2], '#7f0000', { name: 'Valance' });
+    for (const sx of [-18, 18]) {
+      P([sx, 3, -30], [1, 6, 1], '#212121', { name: 'SpotPole' });
+      P([sx, 6.5, -30], [1.6, 1, 1.6], '#fff59d', { name: 'Spotlight', m: 'neon' });
     }
+    const targets = [];
+    for (let i = 0; i < 12; i++) {
+      const tx = -28 + r() * 56, tz = -20 - r() * 50, nm = 'Star' + i;
+      P([tx, 1.5, tz], [2.5, 2.5, 2.5], '#ffd400', { name: nm, k: 'coin', m: 'neon' });
+      targets.push({ name: nm, x: tx.toFixed(1), y: 1.5, z: tz.toFixed(1), sp: (0.3 + r() * 0.3).toFixed(2), rg: (3 + r() * 3).toFixed(1), ph: (r() * 6).toFixed(2) });
+    }
+    S('Star Pop', scrBlitz(targets, 'stars'));
+    H.finish(0, 0, 26);
     return [x, y, z];
   },
 ];
 
 function looneyWorld(idx) {
   const cfg = LOONEY_GAMES[idx];
-  const w = { sky: cfg.sky, parts: [] };
+  const w = { sky: cfg.sky, parts: [], scripts: [] };
   let pid = 1;
   const P = (p, s, c, extra = {}) => w.parts.push({ id: 'p' + (pid++), name: extra.name || 'Part', p, s, c, k: 'part', m: 'plastic', ...extra });
   let sd = 1234 + idx * 999;
   const r = () => ((sd = (sd * 1664525 + 1013904223) >>> 0) / 4294967296);
   const H = looneyHelpers(P, r);
+  const S = (name, code) => w.scripts.push({ id: 's' + (w.scripts.length + 1), name, code });
   P([0, -40, 0], [2000, 1, 2000], '#ff3b1f', { name: 'Lava', k: 'kill', m: 'neon' });
   P([0, 0, 0], [24, 2, 24], '#d9d9d9', { name: 'StartPlatform' });
   P([0, 1.25, 0], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' });
-  let [x, y, z] = LOONEY_BUILDERS[idx](P, r, H, 0, 0, -12);
-  z -= 14;
-  P([x, y, z], [20, 1, 20], '#ffd700', { name: 'WinPlatform', m: 'neon' });
-  P([x, y + 0.75, z], [8, 0.5, 8], '#ffffff', { name: 'WinPad', k: 'win', m: 'neon' });
+  LOONEY_BUILDERS[idx](P, r, H, S, 0, 0, -12);
   return w;
 }
+
 async function seedLooneyGames() {
   try {
     const { data: existing } = await supabase.from('games').select('id').eq('event', 'looney');
@@ -1725,7 +1858,7 @@ async function seedLooneyGames() {
     let isThemed = false;
     if (have.size >= LOONEY_GAMES.length) {
       const { data: sample } = await supabase.from('games').select('world').eq('id', 'g_looney01').maybeSingle();
-      isThemed = (sample?.world?.parts || []).some(p => p.name === 'Carrot');
+      isThemed = (sample?.world?.scripts || []).length > 0;
     }
     if (have.size >= LOONEY_GAMES.length && isThemed && !process.env.LOONEY_RESEED) return { created: 0 };
     await supabase.from('games').delete().eq('event', 'looney');
