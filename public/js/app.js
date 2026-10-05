@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES } from './catalog.js';
+import { CATALOG, ITEM, ECON, BADGES } from './catalog.js?v=44a7e31';
 import { templates } from './worlds.js';
 
 const app = document.getElementById('app');
