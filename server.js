@@ -1421,7 +1421,7 @@ const LOONEY_EVENT = {
   ends: Date.parse('2026-10-27T00:00:00Z'),
   need: 20,
   badge: 'looney',
-  items: ['hat_bunnyears', 'face_buckteeth', 'hat_ducktuft', 'face_beak'],
+  items: ['hat_bunnyears', 'face_buckteeth', 'hat_ducktuft', 'face_beak', 'head_bugs', 'head_daffy'],
 };
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_EVENT.starts && n <= LOONEY_EVENT.ends; };
 
