@@ -173,6 +173,7 @@ function shell(active, content) {
   <main class="content">${content}</main>`;
 }
 function mount(active, html, after) {
+  document.body.classList.toggle('looney', looneyActive());
   app.className = ''; app.innerHTML = shell(active, html);
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
