@@ -78,18 +78,6 @@ export class Studio {
             <button class="rb-btn ai-gen">Generate</button>
             <div class="ai-result"></div>
           </div></div>
-          <div class="st-panel"><div class="st-panel-h">HTML Scripts</div><div class="st-html">
-            <div class="html-list"></div>
-            <button class="rb-btn html-new">+ New Script</button>
-            <div class="html-editor" style="display:none">
-              <input class="html-name" placeholder="Script name" maxlength="40">
-              <textarea class="html-code" placeholder="Write HTML + JavaScript here...&#10;&#10;Example:&#10;<div id='my-ui'>Hello!</div>&#10;<script>console.log('hi')</script>" rows="8"></textarea>
-              <div style="display:flex;gap:8px">
-                <button class="rb-btn html-save">Save</button>
-                <button class="rb-btn html-cancel">Cancel</button>
-              </div>
-            </div>
-          </div></div>
         </div>
       </div>
       <div class="st-play hidden"></div>
@@ -147,66 +135,9 @@ export class Studio {
           try { await navigator.clipboard.writeText(this._aiHtml); copyBtn.textContent = 'Copied!'; }
           catch { copyBtn.textContent = 'Copy failed'; }
         };
-    }
       } catch (e) {
         resultEl.innerHTML = '<div class="st-empty">Error: ' + promptEl.value.replace(/[<>&]/g, '') + ' - ' + String(e.message).replace(/[<>&]/g, '') + '</div>';
       }
-    };
-    // ---------- HTML Scripts ----------
-    this.world.htmlScripts = this.world.htmlScripts || [];
-    this._editingHtmlId = null;
-    const renderHtmlList = () => {
-      const listEl = q('.html-list');
-      if (!listEl) return;
-      const scripts = this.world.htmlScripts || [];
-      const escN = s => String(s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-      listEl.innerHTML = scripts.length
-        ? scripts.map(s => `<div class="html-item" data-id="${s.id}"><span class="html-item-name">${escN(s.name)}</span><button class="rb-btn html-edit" data-id="${s.id}">Edit</button><button class="rb-btn html-del" data-id="${s.id}">Delete</button></div>`).join('')
-        : '<div class="st-empty">No scripts yet. Create one!</div>';
-      listEl.querySelectorAll('.html-edit').forEach(b => b.onclick = () => {
-        const s = this.world.htmlScripts.find(x => x.id === b.dataset.id);
-        if (!s) return;
-        this._editingHtmlId = s.id;
-        q('.html-name').value = s.name;
-        q('.html-code').value = s.code;
-        q('.html-editor').style.display = 'block';
-      });
-      listEl.querySelectorAll('.html-del').forEach(b => b.onclick = () => {
-        this.pushUndo();
-        this.world.htmlScripts = this.world.htmlScripts.filter(x => x.id !== b.dataset.id);
-        this.markDirty();
-        renderHtmlList();
-      });
-    };
-    renderHtmlList();
-    const htmlNew = q('.html-new');
-    if (htmlNew) htmlNew.onclick = () => {
-      this._editingHtmlId = null;
-      q('.html-name').value = '';
-      q('.html-code').value = '';
-      q('.html-editor').style.display = 'block';
-    };
-    const htmlCancel = q('.html-cancel');
-    if (htmlCancel) htmlCancel.onclick = () => {
-      q('.html-editor').style.display = 'none';
-      this._editingHtmlId = null;
-    };
-    const htmlSave = q('.html-save');
-    if (htmlSave) htmlSave.onclick = () => {
-      const name = (q('.html-name').value || 'Script').slice(0, 40);
-      const code = (q('.html-code').value || '').slice(0, 20000);
-      if (!code.trim()) return;
-      this.pushUndo();
-      if (this._editingHtmlId) {
-        const s = this.world.htmlScripts.find(x => x.id === this._editingHtmlId);
-        if (s) { s.name = name; s.code = code; }
-      } else {
-        this.world.htmlScripts.push({ id: 'hs' + Date.now().toString(36), name, code });
-      }
-      this.markDirty();
-      q('.html-editor').style.display = 'none';
-      this._editingHtmlId = null;
-      renderHtmlList();
     };
   }
 
