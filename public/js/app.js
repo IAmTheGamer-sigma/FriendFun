@@ -173,7 +173,7 @@ function shell(active, content) {
   <main class="content">${content}</main>`;
 }
 function mount(active, html, after) {
-  document.body.classList.toggle('looney', looneyActive());
+  document.body.classList.toggle('looney', looneyThemeActive());
   app.className = ''; app.innerHTML = shell(active, html);
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
@@ -498,8 +498,10 @@ async function dmPage(name) {
   });
   refreshNotif();
 }
-const LOONEY_DATES = { starts: Date.parse('2026-10-05T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
+const LOONEY_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
+const LOONEY_THEME_DATES = { starts: Date.parse('2026-10-05T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_DATES.starts && n <= LOONEY_DATES.ends; };
+const looneyThemeActive = () => { const n = Date.now(); return n >= LOONEY_THEME_DATES.starts && n <= LOONEY_THEME_DATES.ends; };
 async function looneyPage() {
   const ev = await api('GET', '/api/event/looney');
   const pct = Math.min(100, Math.round(ev.coins / ev.need * 100));
