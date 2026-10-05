@@ -70,7 +70,7 @@ export class Studio {
     this.c.innerHTML = `
     <div class="studio">
       <div class="st-top">
-        <div class="st-title"><span class="ff-mini">FF</span> FriendFun Studio <span class="st-gname">${esc(this.name)}</span><span class="st-dirty"></span></div>
+        <div class="st-title"><span class="ff-mini">FF</span> Funtopia Studio <span class="st-gname">${esc(this.name)}</span><span class="st-dirty"></span></div>
         <div class="st-top-actions"><button class="st-act" data-a="save">Save</button><button class="st-act pub" data-a="publish">Publish</button><button class="st-act" data-a="exit">Exit</button></div>
       </div>
       <div class="st-ribbon">
@@ -628,7 +628,7 @@ export class Studio {
   }
   publishDialog() {
     const d = document.createElement('div'); d.className = 'modal-bg';
-    d.innerHTML = `<div class="modal"><h2>Publish to FriendFun</h2>
+    d.innerHTML = `<div class="modal"><h2>Publish to Funtopia</h2>
       <label>Name<input class="pd-name" maxlength="50" value="${esc(this.name)}"></label>
       <label>Description<textarea class="pd-desc" maxlength="1000" rows="4">${esc(this.description)}</textarea></label>
       <div class="modal-actions"><button class="btn-secondary pd-cancel">Cancel</button><button class="btn-primary pd-ok">Publish</button></div></div>`;
