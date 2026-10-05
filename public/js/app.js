@@ -1,4 +1,19 @@
 import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
+
+// ---- Badge definitions (built-in + admin-created custom) ----
+let BADGE_DEFS = {};
+async function loadBadgeDefs() {
+  try {
+    BADGE_DEFS = await api('GET', '/api/badges') || {};
+  } catch (e) { BADGE_DEFS = {}; }
+}
+const badgeDef = id => BADGE_DEFS[id] || (BADGES[id] ? { id, ...BADGES[id], custom: false } : null);
+const badgeIcon2 = (id, size = 18) => {
+  const b = badgeDef(id);
+  if (!b) return '';
+  if (b.custom || b.icon) return `<span style="font-size:${size}px" title="${esc(b.name)}">${b.icon || '🏅'}</span>`;
+  return badgeIcon(id, size);
+};
 import { worldThumbnail } from './three-util.js';
 import * as THREE from 'three';
 // avatar3d.js (with THREE) loads lazily after login - not needed for login page
@@ -628,7 +643,7 @@ async function profilePage(name) {
   mount('users', `
     <div class="profile-head">
       <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}">${avatarImgTag(u.avatar)}</div>
-      <div class="ph-info"><h1>${esc(u.name)}${badgeIcon(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
+      <div class="ph-info"><h1>${esc(u.name)}${badgeIcon2(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
       <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
@@ -636,7 +651,7 @@ async function profilePage(name) {
     <section><div class="sec-h"><h2>About</h2>${isMe ? '<button class="link edit-bio">Edit</button>' : ''}</div><p class="bio">${esc(u.bio || (isMe ? 'Tell people about yourself!' : 'This user has no bio.'))}</p></section>
     <section><div class="sec-h"><h2>Badges (${u.badges.length})</h2></div>
       ${isMe && u.badges.length ? '<p class="muted small">Click a badge to show it next to your name.</p>' : ''}
-      <div class="badge-grid">${u.badges.map(id => `<${isMe ? 'button' : 'div'} class="badge-card ${u.badge === id ? 'on' : ''}" data-badge="${id}">${badgeIcon(id, 44)}<b>${BADGES[id].name}</b><span class="muted small">${BADGES[id].desc}</span>${u.badge === id ? '<span class="badge-feat">Shown</span>' : ''}</${isMe ? 'button' : 'div'}>`).join('')}
+      <div class="badge-grid">${u.badges.map(id => { const bd = badgeDef(id); if (!bd) return ''; return `<${isMe ? 'button' : 'div'} class="badge-card ${u.badge === id ? 'on' : ''}" data-badge="${id}">${badgeIcon2(id, 44)}<b>${esc(bd.name)}</b><span class="muted small">${esc(bd.desc || '')}</span>${u.badge === id ? '<span class="badge-feat">Shown</span>' : ''}</${isMe ? 'button' : 'div'}>`; }).join('')}
         ${isMe && u.badges.length ? `<button class="badge-card none ${u.badge ? '' : 'on'}" data-badge="none"><b>None</b><span class="muted small">Don't show a badge</span>${u.badge ? '' : '<span class="badge-feat">Shown</span>'}</button>` : ''}</div>
       ${u.badges.length ? '' : '<p class="muted">No badges yet.</p>'}</section>
     <section class="profile-grid">
@@ -707,11 +722,24 @@ async function leaderboardPage() {
 async function adminPage(q = '') {
   if (!me.admin) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
-  const badgeOpts = Object.entries(BADGES).map(([id, b]) => `<option value="${esc(id)}">${esc(b.name)}</option>`).join('');
+  const badgeOpts = Object.values(BADGE_DEFS).map(b => `<option value="${esc(b.id)}">${esc(b.icon || '')} ${esc(b.name)}${b.custom ? ' (custom)' : ''}</option>`).join('');
   const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('admin', `<h1>Admin Panel</h1>
     <p class="muted">Manage players: FriendClub, FunTix, badges and quick actions.</p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
+    <section class="admin-section"><h3>Create Badge</h3>
+      <div class="badge-creator">
+        <input class="badge-name" placeholder="Badge name" maxlength="30">
+        <input class="badge-icon" placeholder="🏅" maxlength="4" title="Emoji icon">
+        <input type="color" class="badge-color" value="#888888" title="Color">
+        <input class="badge-desc" placeholder="Description" maxlength="100">
+        <button class="btn-primary badge-create">Create</button>
+      </div>
+      <div class="custom-badges">${Object.values(BADGE_DEFS).filter(b => b.custom).map(b => `
+        <span class="custom-badge-chip"><span style="font-size:20px">${b.icon}</span> ${esc(b.name)}
+        <button class="btn-danger btn-small badge-delete" data-id="${esc(b.id)}" title="Delete badge">×</button></span>`).join('') || '<span class="muted small">No custom badges yet</span>'}
+      </div>
+    </section>
     <div class="lbp">${users.map(u => `
       <div class="lbp-row admin-row-wrap">
         ${avatarImgTag(u.avatar)}<a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
@@ -771,6 +799,25 @@ async function adminPage(q = '') {
     });
     app.querySelectorAll('.items-give').forEach(b => b.onclick = () => cmd(b.dataset.name, 'give_all_items'));
     app.querySelectorAll('.daily-reset').forEach(b => b.onclick = () => cmd(b.dataset.name, 'reset_daily'));
+    const bcBtn = app.querySelector('.badge-create');
+    if (bcBtn) bcBtn.onclick = async () => {
+      const name = app.querySelector('.badge-name').value.trim();
+      const icon = app.querySelector('.badge-icon').value.trim() || '🏅';
+      const color = app.querySelector('.badge-color').value;
+      const desc = app.querySelector('.badge-desc').value.trim();
+      if (!name) { toast('Enter a badge name', true); return; }
+      try {
+        await api('POST', '/api/admin/badges', { name, icon, color, desc });
+        toast('Badge created'); await loadBadgeDefs(); adminPage(q);
+      } catch (e) { toast(e.message, true); }
+    };
+    app.querySelectorAll('.badge-delete').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this badge? It will be removed from all players.')) return;
+      try {
+        await api('DELETE', '/api/admin/badges/' + encodeURIComponent(b.dataset.id));
+        toast('Badge deleted'); await loadBadgeDefs(); adminPage(q);
+      } catch (e) { toast(e.message, true); }
+    });
     app.querySelectorAll('.badge-grant').forEach(b => b.onclick = () => {
       const sel = app.querySelector(`.badge-sel[data-name="${CSS.escape(b.dataset.name)}"]`);
       cmd(b.dataset.name, 'grant_badge', { badge: sel?.value });
@@ -886,6 +933,7 @@ async function route() {
   }
 }
 addEventListener('hashchange', route);
+loadBadgeDefs();
 setInterval(async () => {
   if (!token || !me) return;
   try { const r = await api('POST', '/api/ping'); setMoney(r); dailyToast(r); if (r.requests !== me.requests.length) { me = await api('GET', '/api/me'); } } catch {}
