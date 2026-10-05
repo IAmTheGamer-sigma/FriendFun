@@ -558,7 +558,12 @@ function sanitizeWorld(w) {
     ...(p.cc === false ? { cc: false } : {}), ...(p.tr ? { tr: Math.max(0, Math.min(1, num(p.tr))) } : {}),
     ...(sanitizeScript(p.script) ? { script: sanitizeScript(p.script) } : {}),
   }));
-  return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts };
+  const htmlScripts = Array.isArray(w?.htmlScripts) ? w.htmlScripts.slice(0, 20).map((s, i) => ({
+    id: String(s.id || 'hs' + i).slice(0, 20),
+    name: String(s.name || 'Script').slice(0, 40),
+    code: String(s.code || '').slice(0, 20000),
+  })) : [];
+  return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts, ...(htmlScripts.length ? { htmlScripts } : {}) };
 }
 
 function winBadges(game) {
