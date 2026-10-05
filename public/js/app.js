@@ -738,6 +738,11 @@ async function adminPage(q = '') {
               ? `<button class="btn-secondary ai-revoke" data-name="${esc(u.name)}" title="Remove AI coder access">Revoke AI</button>`
               : `<button class="btn-primary ai-grant" data-name="${esc(u.name)}" title="Grant AI coder access">Grant AI</button>`}
           </span>
+          <span class="admin-inline">
+            ${u.admin ? '' : u.banned
+              ? `<button class="btn-primary ban-revoke" data-name="${esc(u.name)}" title="Unban this user">Unban</button><span class="banned-tag" title="${esc(u.banReason || 'Banned')}">🚫 BANNED${u.bannedUntil ? ' until ' + new Date(u.bannedUntil).toLocaleDateString() : ''}</span>`
+              : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
+          </span>
         </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
@@ -771,6 +776,19 @@ async function adminPage(q = '') {
     });
     app.querySelectorAll('.ai-grant').forEach(b => b.onclick = () => cmd(b.dataset.name, 'grant_ai', {}));
     app.querySelectorAll('.ai-revoke').forEach(b => b.onclick = () => cmd(b.dataset.name, 'revoke_ai', {}));
+    app.querySelectorAll('.ban-btn').forEach(b => b.onclick = () => {
+      const reason = prompt(`Ban ${b.dataset.name}? Enter reason (optional):`) || '';
+      if (reason === null) return;
+      const daysStr = prompt('Ban duration in days (0 = permanent):', '0');
+      if (daysStr === null) return;
+      const days = Math.max(0, parseInt(daysStr) || 0);
+      if (!confirm(`Ban ${b.dataset.name}${days ? ` for ${days} days` : ' permanently'}?`)) return;
+      cmd(b.dataset.name, 'ban', { reason, days });
+    });
+    app.querySelectorAll('.ban-revoke').forEach(b => b.onclick = () => {
+      if (!confirm(`Unban ${b.dataset.name}?`)) return;
+      cmd(b.dataset.name, 'unban', {});
+    });
   });
 }
 
