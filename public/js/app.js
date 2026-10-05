@@ -293,6 +293,7 @@ async function homePage() {
   const favs = me.favorites.map(id => byId[id]).filter(Boolean);
   const friends = fr.friends.sort((a, b) => (b.online - a.online) || (!!b.gameId - !!a.gameId));
   mount('home', `
+    ${looneyActive() ? `<a class="looney-banner" href="#/looney">🥕 <b>Looney Tunes Event is live!</b> Earn 20 Looney Coins for Bugs Bunny, Daffy Duck & an exclusive badge &rsaquo;</a>` : ''}
     <div class="home-head">${avatarImgTag(me.avatar, "headshot", "home-avatar")}<h1>Hello, ${esc(me.name)}!</h1></div>
     <section><div class="sec-h"><h2>Friends (${friends.length})</h2><a href="#/friends">See All &rsaquo;</a></div>
       <div class="friends-row">${friends.length ? friends.map(userTile).join('') : `<a class="add-friends" href="#/friends"><span>+</span>Add Friends</a>`}</div></section>
@@ -421,7 +422,7 @@ async function catalogPage(filter = 'all') {
   mount('catalog', `
     <h1>Marketplace</h1>
     <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[f]}</a>`).join('')}</div>
-    <div class="cat-grid">${CATALOG.filter(i => filter === 'all' || i.type === filter).map(i => `
+    <div class="cat-grid">${CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter)).map(i => `
       <div class="cat-item"><div class="cat-img"><img src="${itemImage(i)}"></div><div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
         ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
@@ -495,6 +496,34 @@ async function dmPage(name) {
     };
   });
   refreshNotif();
+}
+const LOONEY_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
+const looneyActive = () => { const n = Date.now(); return n >= LOONEY_DATES.starts && n <= LOONEY_DATES.ends; };
+async function looneyPage() {
+  const ev = await api('GET', '/api/event/looney');
+  const pct = Math.min(100, Math.round(ev.coins / ev.need * 100));
+  const daysLeft = Math.max(0, Math.ceil((ev.ends - Date.now()) / 86400000));
+  mount('looney', `
+    <div class="looney-hero">
+      <h1>🥕 Looney Tunes Event</h1>
+      <p>Beat event games to earn <b>Looney Coins</b> \u2014 one per game. Collect all <b>20</b> for limited rewards!</p>
+      <div class="looney-progress"><div class="looney-bar" style="width:${pct}%"></div><span>${ev.coins} / ${ev.need} Looney Coins</span></div>
+      <p class="muted">${ev.active ? `Ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} \u2014 don't miss out!` : 'This event has ended.'}</p>
+      ${ev.claimed ? '<p class="looney-claimed">\U0001F389 You earned it all! Check your avatar editor and badges.</p>' : ''}
+    </div>
+    <section><div class="sec-h"><h2>Limited Rewards</h2></div>
+      <div class="looney-rewards">
+        <div class="looney-reward"><div class="lr-emoji">🐰</div><b>Bugs Bunny</b><span class="muted small">Ears + buck teeth set</span></div>
+        <div class="looney-reward"><div class="lr-emoji">🦆</div><b>Daffy Duck</b><span class="muted small">Feather tuft + bill set</span></div>
+        <div class="looney-reward"><div class="lr-emoji">🪙</div><b>Looney Tunes Badge</b><span class="muted small">Exclusive event badge</span></div>
+      </div></section>
+    <section><div class="sec-h"><h2>Event Games (${ev.games.length})</h2></div>
+      <div class="game-row">${ev.games.map(g => `
+        <a class="game-card" href="#/play/${g.id}">
+          <div class="gc-thumb">${g.thumbnail ? `<img src="${g.thumbnail}">` : `<img src="${PLACEHOLDER}">`}</div>
+          <b>${esc(g.name)}</b><span class="muted small">${fmt(g.visits)} plays</span>
+          ${ev.wins.includes(g.id) ? '<span class="looney-check" title="Looney Coin earned!">🪙</span>' : ''}
+        </a>`).join('') || '<p class="muted">Games are being prepared\u2026</p>'}</div></section>`);
 }
 async function friendsPage() {
   const fr = await api('GET', '/api/friends');
@@ -994,6 +1023,7 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
+      case 'looney': return await looneyPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
       case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
