@@ -1,10 +1,8 @@
-import { Game, nameColor, tix, LOGO, CLUB, badgeIcon } from './game.js';
-import { Studio } from './studio.js';
+import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
 import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
 import { CATALOG, ITEM, ECON, BADGES } from './catalog.js';
 import { templates } from './worlds.js';
-import * as THREE from 'three';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
