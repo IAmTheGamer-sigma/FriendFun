@@ -309,3 +309,24 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .tb-accounts { max-height: 200px; overflow-y: auto; }
 .sidebar-logout { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-weight: 600; font-size: 16px; color: #ff6b63; background: none; border: 0; cursor: pointer; margin-top: auto; width: 100%; text-align: left; }
 .sidebar-logout:hover { background: #2a2c2f; }
+
+/* ---------- studio explorer folders & scripts ---------- */
+.ex-toolbar { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #45474a; }
+.ex-tbtn { background: #3d3f42; border: 0; color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 14px; cursor: pointer; }
+.ex-tbtn:hover { background: #4d4f52; }
+.ex-folder { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; border-radius: 6px; font-weight: 600; font-size: 14px; color: #ffd400; }
+.ex-folder:hover { background: #2a2c2f; }
+.ex-toggle { font-size: 10px; color: #aaa; width: 12px; }
+.ex-fico { font-size: 14px; }
+.ex-fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-actions { display: none; gap: 2px; }
+.ex-folder:hover .ex-actions, .ex-script:hover .ex-actions { display: flex; }
+.ex-act { background: none; border: 0; color: #aaa; cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: 4px; }
+.ex-act:hover { background: #4d4f52; color: #fff; }
+.ex-script { display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 6px; font-size: 14px; color: #8ecae6; font-family: monospace; }
+.ex-script:hover { background: #2a2c2f; }
+.ex-sico { font-size: 13px; }
+.script-code { width: 100%; min-height: 320px; background: #1b1d1f; color: #e8e8e8; border: 1px solid #45474a; border-radius: 8px; padding: 12px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.5; resize: vertical; tab-size: 2; }
+.script-code:focus { outline: none; border-color: #ffd400; }
+.modal-wide { max-width: 700px; width: 90vw; }
+.modal code { background: #3d3f42; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
