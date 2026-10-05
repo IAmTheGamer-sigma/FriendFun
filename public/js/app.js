@@ -980,6 +980,28 @@ if (location.pathname.startsWith('/iknow')) {
     text-shadow:4px 0 #0ff, -4px 0 #ff0; animation:gflick .8s infinite; }`;
   document.head.appendChild(gs);
   document.body.classList.add('glitching');
+  // Flashing TV static overlay
+  const sc = document.createElement('canvas');
+  sc.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99998;pointer-events:none;opacity:0;mix-blend-mode:screen';
+  document.body.appendChild(sc);
+  const sctx = sc.getContext('2d');
+  sc.width = 160; sc.height = 90;
+  const sdata = sctx.createImageData(160, 90);
+  function drawStatic() {
+    const d = sdata.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+    }
+    sctx.putImageData(sdata, 0, 0);
+  }
+  drawStatic();
+  (function staticLoop() {
+    drawStatic();
+    const r = Math.random();
+    sc.style.opacity = r < .12 ? (.5 + Math.random() * .5) : r < .4 ? (Math.random() * .25) : 0;
+    setTimeout(staticLoop, 60 + Math.random() * 120);
+  })();
   const glyphs = '█▓▒░<>/\\|#@$%&?!01';
   setInterval(() => {
     const els = document.querySelectorAll('#app p, #app span, #app a, #app h1, #app h2, #app h3, #app button');
