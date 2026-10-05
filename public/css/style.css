@@ -410,3 +410,19 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .lr-emoji { font-size: 44px; }
 .looney-check { position: absolute; top: 8px; right: 8px; font-size: 22px; filter: drop-shadow(0 2px 4px #000); }
 .game-card { position: relative; }
+
+/* ---------- looney tunes site theme (during event) ---------- */
+body.looney { --blue: #ff6d00; }
+body.looney .topbar { background: linear-gradient(180deg, #d32f2f, #9a0000); border-bottom: 3px solid #ffd400; }
+body.looney .sidebar { background: #26060a; }
+body.looney .sidebar a { color: #ffccbc; }
+body.looney .sidebar a:hover { background: #4a1010; }
+body.looney .sidebar a.active { background: #ff6d00; color: #fff; }
+body.looney .logo-text { color: #ffd400 !important; font-weight: 900; text-shadow: 2px 2px 0 #7f0000; }
+body.looney .logo-text::after { content: ' \1F955'; }
+body.looney h1, body.looney h2 { font-weight: 900; letter-spacing: .01em; }
+body.looney .btn-primary { background: #ff6d00; }
+body.looney .btn-primary:hover { background: #ff8f00; }
+body.looney::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .05;
+  background: repeating-radial-gradient(circle at 50% 130%, #ff6d00 0 70px, transparent 70px 140px); }
+body.looney .sec-h h2 { color: #ffb74d; }
