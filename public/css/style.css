@@ -361,3 +361,6 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .group-game { display: flex; align-items: center; gap: 12px; background: #2a2c2f; border-radius: 8px; padding: 10px 12px; text-decoration: none; color: #fff; }
 .group-game:hover { background: #3d3f42; }
 .group-game b { flex: 1; }
+
+/* ---------- ban ---------- */
+.banned-tag { background: #7a0000; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; margin-left: 6px; }
