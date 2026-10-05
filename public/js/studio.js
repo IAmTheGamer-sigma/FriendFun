@@ -142,7 +142,7 @@ export class Studio {
         resultEl.querySelector('.ai-undo').onclick = () => {
           this.undo();
           resultEl.querySelector('.ai-msg').textContent = 'Undid AI insertion.';
-        });
+        };
         resultEl.querySelectorAll('.ai-view-script').forEach(btn => {
           btn.onclick = () => this.openScriptEditor(btn.dataset.sid);
         });
