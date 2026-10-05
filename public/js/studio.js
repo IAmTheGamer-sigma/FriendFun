@@ -73,6 +73,11 @@ export class Studio {
         <div class="st-side">
           <div class="st-panel"><div class="st-panel-h">Explorer</div><div class="st-explorer"></div></div>
           <div class="st-panel"><div class="st-panel-h">Properties</div><div class="st-props"><div class="st-empty">Select a part to see its properties</div></div></div>
+          <div class="st-panel"><div class="st-panel-h">AI Coder</div><div class="st-ai">
+            <textarea class="ai-prompt" placeholder="Describe what to build... e.g. 'make an obby with lava and coins'"></textarea>
+            <button class="rb-btn ai-gen">Generate</button>
+            <div class="ai-result"></div>
+          </div></div>
         </div>
       </div>
       <div class="st-play hidden"></div>
@@ -90,6 +95,39 @@ export class Studio {
     q('.rb-mat').onchange = e => { if (this.sel) { this.pushUndo(); this.sel.m = e.target.value; this.refresh(this.sel); } };
     q('.rb-snap').onchange = e => { this.snap = e.target.checked; this.applySnap(); };
     q('.rb-sky').oninput = e => { this.world.sky = e.target.value; this.scene.background.set(e.target.value); this.scene.fog.color.set(e.target.value); this.markDirty(); };
+    const aiBtn = q('.ai-gen');
+    if (aiBtn) aiBtn.onclick = async () => {
+      const promptEl = q('.ai-prompt');
+      const resultEl = q('.ai-result');
+      const prompt = (promptEl.value || '').trim();
+      if (!prompt) { resultEl.innerHTML = '<div class="st-empty">Describe what to build first.</div>'; return; }
+      resultEl.innerHTML = '<div class="st-empty">Generating...</div>';
+      try {
+        const token = localStorage.getItem('ff_token');
+        const r = await fetch('/api/ai/coder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+          body: JSON.stringify({ prompt })
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Generation failed');
+        this._aiParts = data.parts || [];
+        resultEl.innerHTML = `<div class="ai-msg">${data.message || ('Generated ' + this._aiParts.length + ' parts.')}</div>
+          <button class="rb-btn ai-add">Add to world (${this._aiParts.length} parts)</button>`;
+        resultEl.querySelector('.ai-add').onclick = () => {
+          this.pushUndo();
+          for (const part of this._aiParts) {
+            part.id = this.newId();
+            this.world.parts.push(part);
+          }
+          this.rebuildAll();
+          this.markDirty();
+          resultEl.innerHTML = '<div class="ai-msg">Added! Edit them like any other parts.</div>';
+        };
+      } catch (e) {
+        resultEl.innerHTML = '<div class="st-empty">Error: ' + promptEl.value.replace(/[<>&]/g, '') + ' - ' + String(e.message).replace(/[<>&]/g, '') + '</div>';
+      }
+    };
   }
 
   three() {
