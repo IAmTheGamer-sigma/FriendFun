@@ -743,6 +743,11 @@ async function adminPage(q = '') {
               ? `<button class="btn-primary ban-revoke" data-name="${esc(u.name)}" title="Unban this user">Unban</button><span class="banned-tag" title="${esc(u.banReason || 'Banned')}">🚫 BANNED${u.bannedUntil ? ' until ' + new Date(u.bannedUntil).toLocaleDateString() : ''}</span>`
               : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
           </span>
+          <span class="admin-inline">
+            ${u.envAdmin ? '<span class="muted small">Env Admin</span>' : u.admin
+              ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
+              : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
+          </span>
         </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
@@ -788,6 +793,15 @@ async function adminPage(q = '') {
     app.querySelectorAll('.ban-revoke').forEach(b => b.onclick = () => {
       if (!confirm(`Unban ${b.dataset.name}?`)) return;
       cmd(b.dataset.name, 'unban', {});
+    });
+    app.querySelectorAll('.admin-grant').forEach(b => b.onclick = () => {
+      if (!confirm(`Grant FULL ADMIN to ${b.dataset.name}? They will have complete control.`)) return;
+      if (!confirm(`Are you REALLY sure? ${b.dataset.name} will be able to ban, grant admin, and more.`)) return;
+      cmd(b.dataset.name, 'grant_admin', {});
+    });
+    app.querySelectorAll('.admin-revoke').forEach(b => b.onclick = () => {
+      if (!confirm(`Remove admin from ${b.dataset.name}?`)) return;
+      cmd(b.dataset.name, 'revoke_admin', {});
     });
   });
 }
