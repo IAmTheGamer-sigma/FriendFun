@@ -23,7 +23,13 @@ export function toast(msg, err = false) {
   const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
   document.getElementById('toasts').appendChild(t); setTimeout(() => t.classList.add('out'), 2600); setTimeout(() => t.remove(), 3000);
 }
-function logout(silent) { if (!silent && token) api('POST', '/api/logout').catch(() => {}); token = null; me = null; localStorage.removeItem('ff_token'); location.hash = '#/login'; route(); }
+function logout(silent) { if (!silent && token) api('POST', '/api/logout').catch(() => {}); removeAccount(me?.name); token = null; me = null; localStorage.removeItem('ff_token'); location.hash = '#/login'; route(); }
+function logoutAll() { const accs = getAccounts(); for (const a of accs) { try { fetch('/api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }); } catch {} } localStorage.removeItem('ff_accounts'); localStorage.removeItem('ff_token'); token = null; me = null; location.hash = '#/login'; route(); }
+function getAccounts() { try { return JSON.parse(localStorage.getItem('ff_accounts') || '[]'); } catch { return []; } }
+function saveAccounts(accs) { localStorage.setItem('ff_accounts', JSON.stringify(accs)); }
+function addAccount(name, tok) { const accs = getAccounts().filter(a => a.name.toLowerCase() !== name.toLowerCase()); accs.push({ name, token: tok }); saveAccounts(accs); }
+function removeAccount(name) { if (!name) return; saveAccounts(getAccounts().filter(a => a.name.toLowerCase() !== String(name).toLowerCase())); }
+function switchAccount(name) { const acc = getAccounts().find(a => a.name.toLowerCase() === String(name).toLowerCase()); if (!acc) return; token = acc.token; localStorage.setItem('ff_token', token); me = null; location.hash = '#/home'; route(); }
 const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1).replace('.0', '') + 'K' : String(n);
 const rating = g => (g.likes + g.dislikes) ? Math.round(g.likes / (g.likes + g.dislikes) * 100) + '%' : '--';
 const icons = {
@@ -82,22 +88,81 @@ function shell(active, content) {
     <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
-      <a class="tb-user" href="#/users/${encodeURIComponent(me.name)}"><img src="${avatarImage(me.avatar)}"><span>${esc(me.name)}</span></a>
+      <div class="tb-user-wrap">
+        <button class="tb-user" title="Account menu"><img src="${avatarImage(me.avatar)}"><span>${esc(me.name)}</span><span class="tb-caret">&#9662;</span></button>
+        <div class="tb-menu hidden">
+          <a href="#/users/${encodeURIComponent(me.name)}" class="tb-menu-item"><span class="sb-ico">${icons.profile}</span>View Profile</a>
+          <div class="tb-menu-sep"></div>
+          <div class="tb-menu-head">Switch account</div>
+          <div class="tb-accounts"></div>
+          <button class="tb-menu-item tb-add-account"><span class="sb-ico">+</span>Add account</button>
+          <div class="tb-menu-sep"></div>
+          <button class="tb-menu-item tb-logout"><span class="sb-ico">&#9094;</span>Log out</button>
+          <button class="tb-menu-item tb-logout-all"><span class="sb-ico">&#10006;</span>Log out all</button>
+        </div>
+      </div>
       <a class="tb-bux" href="#/funtix" title="FunTix">${tix}<span class="me-tix">${fmt(me.funtix ?? 0)}</span></a>
-      <button class="tb-logout" title="Log out">Log Out</button>
     </div>
   </header>
   <aside class="sidebar">
     ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
+    <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
   <main class="content">${content}</main>`;
 }
 function mount(active, html, after) {
   app.className = ''; app.innerHTML = shell(active, html);
+  const userBtn = app.querySelector('.tb-user');
+  const menu = app.querySelector('.tb-menu');
+  if (userBtn && menu) {
+    userBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); renderAccountList(); };
+    document.addEventListener('click', () => menu.classList.add('hidden'), { once: true });
+    menu.onclick = e => e.stopPropagation();
+  }
+  const renderAccountList = () => {
+    const listEl = app.querySelector('.tb-accounts');
+    if (!listEl) return;
+    const accs = getAccounts().filter(a => a.name.toLowerCase() !== me.name.toLowerCase());
+    listEl.innerHTML = accs.length
+      ? accs.map(a => `<button class="tb-menu-item tb-switch" data-name="${esc(a.name)}"><img src="${avatarImage(me.avatar)}" style="width:24px;height:24px;border-radius:50%">${esc(a.name)}</button>`).join('')
+      : '<div class="tb-menu-empty">No other accounts</div>';
+    listEl.querySelectorAll('.tb-switch').forEach(b => b.onclick = () => switchAccount(b.dataset.name));
+  };
+  renderAccountList();
+  app.querySelector('.tb-add-account').onclick = () => showAddAccountModal();
   app.querySelector('.tb-logout').onclick = () => logout();
+  app.querySelector('.tb-logout-all').onclick = () => { if (confirm('Log out of all accounts?')) logoutAll(); };
+  const sbLogout = app.querySelector('.sidebar-logout');
+  if (sbLogout) sbLogout.onclick = () => logout();
   document.body.classList.remove('nav-open');
   after?.(); fillThumbs();
+}
+function showAddAccountModal() {
+  const d = document.createElement('div'); d.className = 'modal-bg';
+  d.innerHTML = `<div class="modal"><h2>Add Account</h2>
+    <p class="muted small">Log in with another account. Your current session stays saved.</p>
+    <form class="auth-form">
+      <label>Username<input name="username" placeholder="Username" required></label>
+      <label>Password<input name="password" type="password" placeholder="Password" required></label>
+      <div class="auth-err"></div>
+      <div class="modal-actions"><button type="button" class="btn-secondary">Cancel</button><button class="btn-primary" type="submit">Add Account</button></div>
+    </form></div>`;
+  document.body.appendChild(d);
+  d.querySelector('.btn-secondary').onclick = () => d.remove();
+  d.onclick = e => { if (e.target === d) d.remove(); };
+  d.querySelector('form').onsubmit = async e => {
+    e.preventDefault();
+    const form = e.target;
+    try {
+      const r = await api('POST', '/api/login', { username: form.username.value.trim(), password: form.password.value });
+      const newMe = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + r.token } }).then(x => x.json());
+      addAccount(newMe.name, r.token);
+      d.remove();
+      switchAccount(newMe.name);
+      toast('Switched to ' + newMe.name);
+    } catch (err) { d.querySelector('.auth-err').textContent = err.message; }
+  };
 }
 function setMoney(r) {
   if (r.funtix != null) { if (me) me.funtix = r.funtix; document.querySelectorAll('.me-tix').forEach(e => (e.textContent = fmt(r.funtix))); }
@@ -135,6 +200,7 @@ function loginPage() {
       const r = await api('POST', mode === 'signup' ? '/api/signup' : '/api/login', { username: form.username.value.trim(), password: form.password.value });
       token = r.token; localStorage.setItem('ff_token', token);
       me = await api('GET', '/api/me');
+      addAccount(me.name, token);
       location.hash = '#/home';
     } catch (err) { form.querySelector('.auth-err').textContent = err.message; }
   };
