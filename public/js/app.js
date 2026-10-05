@@ -1,6 +1,20 @@
 import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
-import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
+// avatar3d.js (with THREE) loads lazily after login - not needed for login page
+let _avatar3d = null;
+async function ensureAvatar3d() {
+  if (!_avatar3d) _avatar3d = await import('./avatar3d.js');
+  return _avatar3d;
+}
+function avatarImage(avatar, mode) {
+  if (_avatar3d) return _avatar3d.avatarImage(avatar, mode);
+  // Fallback: simple placeholder until 3D loads
+  return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="35" r="20" fill="#888"/><rect x="25" y="60" width="50" height="35" rx="10" fill="#888"/></svg>');
+}
+function buildCharacter(avatar) {
+  if (!_avatar3d) throw new Error('avatar3d not loaded yet');
+  return _avatar3d.buildCharacter(avatar);
+}
 import { CATALOG, ITEM, ECON, BADGES } from './catalog.js';
 import { templates } from './worlds.js';
 
@@ -199,6 +213,7 @@ function loginPage() {
       token = r.token; localStorage.setItem('ff_token', token);
       me = await api('GET', '/api/me');
       addAccount(me.name, token);
+      ensureAvatar3d().catch(() => {}); // preload 3D avatars in background
       location.hash = '#/home';
     } catch (err) { form.querySelector('.auth-err').textContent = err.message; }
   };
