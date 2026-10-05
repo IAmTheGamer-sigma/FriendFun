@@ -196,6 +196,11 @@ async function dailyTix(u) {
 
 app.get('/api/me', auth, async (req, res) => {
   const u = req.user;
+  // Repair corrupted FunTix balance (null/NaN from old coin-pickup bug)
+  if (typeof u.funtix !== 'number' || isNaN(u.funtix)) {
+    const { data: repaired } = await supabase.from('users').update({ funtix: 0 }).eq('name', u.name).select().single();
+    if (repaired) u.funtix = repaired.funtix;
+  }
   u.inventory = list(u, 'inventory'); u.requests = list(u, 'requests'); u.friends = list(u, 'friends'); u.favorites = list(u, 'favorites'); u.recent = list(u, 'recent');
   if (isClub(u)) { 
     const entitledItems = isAdmin(u) ? CATALOG : CATALOG.filter(it => it.club);
@@ -938,7 +943,7 @@ wss.on('connection', (ws) => {
       if (!room.coins.has(m.part) || player.coins.has(m.part) || now - player.lastCoin < 150) return;
       const coinId = m.part;
       player.coins.add(coinId); player.lastCoin = now;
-      const earned = ECON.COIN_TIX + (isClub(player.user) ? ECON.CLUB_COIN_BONUS : 0);
+      const earned = ECON.COIN_TIX + (isClub(player.user) ? (Number(ECON.CLUB_COIN_BONUS) || 0) : 0);
       const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + earned }).eq('name', player.user.name).select().single();
       if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
       player.user = updated;
