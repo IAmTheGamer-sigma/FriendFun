@@ -483,19 +483,41 @@ async function leaderboardPage() {
 async function adminPage(q = '') {
   if (!me.admin) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
+  const badgeOpts = Object.entries(BADGES).map(([id, b]) => `<option value="${esc(id)}">${esc(b.name)}</option>`).join('');
   const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('admin', `<h1>Admin Panel</h1>
-    <p class="muted">Give FriendClub to any player for free, or take it away.</p>
+    <p class="muted">Manage players: FriendClub, FunTix, badges and quick actions.</p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <div class="lbp">${users.map(u => `
-      <div class="lbp-row">
+      <div class="lbp-row admin-row-wrap">
         <img src="${avatarImage(u.avatar)}"><a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
-        <span class="admin-status">${status(u)}</span>
-        ${u.admin ? '' : u.club
-          ? `<button class="btn-secondary club-toggle" data-name="${esc(u.name)}" data-on="0">Remove FriendClub</button>`
-          : `<button class="btn-primary club-toggle" data-name="${esc(u.name)}" data-on="1">Give FriendClub</button>`}
+        <span class="admin-status">${status(u)} &middot; ${tix} ${(u.funtix ?? 0).toLocaleString()}</span>
+        <div class="admin-controls">
+          ${u.admin ? '' : u.club
+            ? `<button class="btn-secondary club-toggle" data-name="${esc(u.name)}" data-on="0">Remove FriendClub</button>`
+            : `<button class="btn-primary club-toggle" data-name="${esc(u.name)}" data-on="1">Give FriendClub</button>`}
+          <span class="admin-inline">
+            <input type="number" class="tix-amt" data-name="${esc(u.name)}" value="100" min="1" max="10000" title="FunTix amount">
+            <button class="btn-secondary tix-give" data-name="${esc(u.name)}">Give FunTix</button>
+          </span>
+          <span class="admin-inline">
+            <select class="badge-sel" data-name="${esc(u.name)}">${badgeOpts}</select>
+            <button class="btn-secondary badge-grant" data-name="${esc(u.name)}">Grant badge</button>
+            <button class="btn-secondary badge-revoke" data-name="${esc(u.name)}">Revoke</button>
+          </span>
+          <span class="admin-inline">
+            <button class="btn-secondary items-give" data-name="${esc(u.name)}" title="Give every marketplace item">Give all items</button>
+            <button class="btn-secondary daily-reset" data-name="${esc(u.name)}" title="Reset daily reward">Reset daily</button>
+          </span>
+        </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
+    const cmd = async (name, command, extra = {}) => {
+      try {
+        const r = await api('POST', '/api/admin/users/' + encodeURIComponent(name) + '/command', { command, ...extra });
+        toast(r.message || 'Done'); adminPage(q);
+      } catch (e) { toast(e.message, true); }
+    };
     app.querySelectorAll('.club-toggle').forEach(b => b.onclick = async () => {
       const on = b.dataset.on === '1';
       try {
@@ -503,8 +525,24 @@ async function adminPage(q = '') {
         toast(on ? `Gave FriendClub to ${b.dataset.name}` : `Removed FriendClub from ${b.dataset.name}`); adminPage(q);
       } catch (e) { toast(e.message, true); }
     });
+    app.querySelectorAll('.tix-give').forEach(b => b.onclick = () => {
+      const inp = app.querySelector(`.tix-amt[data-name="${CSS.escape(b.dataset.name)}"]`);
+      const amount = Math.max(1, Math.min(10000, Math.floor(Number(inp?.value) || 100)));
+      cmd(b.dataset.name, 'grant_tix', { amount });
+    });
+    app.querySelectorAll('.items-give').forEach(b => b.onclick = () => cmd(b.dataset.name, 'give_all_items'));
+    app.querySelectorAll('.daily-reset').forEach(b => b.onclick = () => cmd(b.dataset.name, 'reset_daily'));
+    app.querySelectorAll('.badge-grant').forEach(b => b.onclick = () => {
+      const sel = app.querySelector(`.badge-sel[data-name="${CSS.escape(b.dataset.name)}"]`);
+      cmd(b.dataset.name, 'grant_badge', { badge: sel?.value });
+    });
+    app.querySelectorAll('.badge-revoke').forEach(b => b.onclick = () => {
+      const sel = app.querySelector(`.badge-sel[data-name="${CSS.escape(b.dataset.name)}"]`);
+      cmd(b.dataset.name, 'revoke_badge', { badge: sel?.value });
+    });
   });
 }
+
 function clubPage() {
   const bal = me.funtix ?? 0, active = me.club, short = ECON.CLUB_PRICE - bal;
   const days = Math.ceil(((me.clubUntil || 0) - Date.now()) / 86400000);
