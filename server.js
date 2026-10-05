@@ -1417,7 +1417,7 @@ addEventListener('resize', () => {
 const LOONEY_EVENT = {
   id: 'looney',
   name: 'Looney Tunes Event',
-  starts: Date.parse('2026-10-05T00:00:00Z'),
+  starts: Date.parse('2026-10-06T00:00:00Z'),
   ends: Date.parse('2026-10-27T00:00:00Z'),
   need: 20,
   badge: 'looney',
