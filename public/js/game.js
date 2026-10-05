@@ -114,6 +114,7 @@ export class Game {
     this.send({ t: 'chat', text });
   }
   onChat(m) {
+    if (!m.system) for (const fn of (this._scriptState?.chatFns || [])) { try { fn(m.name, m.text); } catch (e) { console.warn('onChat script error:', e); } }
     if (m.system) return this.sys(m.text);
     const color = nameColor(m.name);
     this.addChat(`<b style="color:${color}">${badgeIcon(m.badge)}${esc(m.name)}:</b> ${esc(m.text)}`);
@@ -165,6 +166,15 @@ export class Game {
   runWorldScripts() {
     const scripts = this.world.scripts || [];
     if (!scripts.length) return;
+    if (!this._scriptState) this._scriptState = { score: 0, tickFns: [], deathFns: [], chatFns: [] };
+    const st = this._scriptState;
+    const findMesh = name => {
+      const nm = String(name).toLowerCase();
+      for (const [id, m] of this.meshes) {
+        if ((m.userData.part.name || '').toLowerCase() === nm) return m;
+      }
+      return null;
+    };
     // Script API available to world scripts
     const api = {
       onStart: fn => { try { fn(); } catch (e) { console.warn('Script onStart error:', e); } },
@@ -172,10 +182,58 @@ export class Game {
         if (!this._scriptTouch) this._scriptTouch = [];
         this._scriptTouch.push({ partName: String(partName), fn });
       },
-      giveTix: (player, n) => { /* handled via touch system */ console.log('giveTix', n); },
+      onDeath: fn => { st.deathFns.push(fn); },
+      onChat: fn => { st.chatFns.push(fn); },
+      onTick: fn => { st.tickFns.push(fn); },
+      giveTix: (player, n) => {
+        const amt = Math.max(1, Math.min(100, Math.floor(Number(n) || 5)));
+        this.showBig(`+${amt} FunTix!`, 2000);
+        this.send({ t: 'coin', part: 'script_tix_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
+      },
       teleport: (player, x, y, z) => { this.pos.set(Number(x) || 0, Number(y) || 10, Number(z) || 0); this.vel.set(0, 0, 0); },
       say: (player, msg) => this.showBig(String(msg).slice(0, 120), 2500),
+      sayAll: msg => { this.sendChat(String(msg).slice(0, 200)); },
       kill: player => this.die(),
+      heal: (player, n) => { this.health = Math.min(100, this.health + (Number(n) || 25)); this.updateHud(); },
+      damage: (player, n) => {
+        this.health -= Number(n) || 10; this.updateHud();
+        if (this.health <= 0) this.die();
+      },
+      setCheckpoint: (x, y, z) => {
+        this.checkpoint = new THREE.Vector3(Number(x) || 0, Number(y) || 10, Number(z) || 0);
+        this.showBig('Checkpoint set!', 1500); sfx.checkpoint();
+      },
+      spawnPart: props => {
+        const p = {
+          id: 'dyn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          name: String(props.name || 'Part'), k: 'part',
+          s: props.size || [4, 1, 4], c: props.color || '#a3a2a5',
+          p: [Number(props.x) || 0, Number(props.y) || 10, Number(props.z) || 0],
+        };
+        this.world.parts.push(p);
+        const geo = new THREE.BoxGeometry(p.s[0], p.s[1], p.s[2]);
+        const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.c), roughness: 0.8 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(p.p[0], p.p[1], p.p[2]);
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.userData.part = p;
+        this.scene.add(mesh);
+        this.meshes.set(p.id, mesh);
+        this.solids.push({ p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2] });
+        return p.id;
+      },
+      movePart: (name, x, y, z) => {
+        const m = findMesh(name);
+        if (m) { m.position.set(Number(x), Number(y), Number(z)); m.userData.part.p = [Number(x), Number(y), Number(z)]; }
+      },
+      hidePart: name => { const m = findMesh(name); if (m) m.visible = false; },
+      showPart: name => { const m = findMesh(name); if (m) m.visible = true; },
+      playSound: name => { if (sfx[name]) sfx[name](); },
+      setScore: n => { st.score = Number(n) || 0; },
+      getScore: () => st.score,
+      addScore: n => { st.score += Number(n) || 0; return st.score; },
+      getPos: () => ({ x: this.pos.x, y: this.pos.y, z: this.pos.z }),
+      getHealth: () => this.health,
       world: this.world,
       game: this,
     };
@@ -213,6 +271,7 @@ export class Game {
   die() {
     if (this.dead) return;
     this.dead = true; this.health = 0; sfx.oof();
+    for (const fn of (this._scriptState?.deathFns || [])) { try { fn(); } catch (e) { console.warn('onDeath error:', e); } }
     this.debris = breakApart(this.scene, this.char, this.vel);
     this.char.visible = false;
     setTimeout(() => { if (!this.destroyed) this.spawn(); }, 3000);
@@ -427,6 +486,7 @@ export class Game {
     if (this.o.test && !this.loadHidden) { this.loadHidden = true; this.hideLoading(); }
     if (this.speedTimer > 0) this.speedTimer -= dt;
     if (this.emote === 'wave' && (this.emoteT -= dt) <= 0) this.emote = null;
+    for (const fn of (this._scriptState?.tickFns || [])) { try { fn(dt, this.t); } catch (e) { console.warn('onTick error:', e); } }
     if (!this.dead) {
       this.physics(dt);
       this.char.position.copy(this.pos);
