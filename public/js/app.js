@@ -1,5 +1,6 @@
 import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
 import { worldThumbnail } from './three-util.js';
+import * as THREE from 'three';
 // avatar3d.js (with THREE) loads lazily after login - not needed for login page
 let _avatar3d = null;
 let _avatar3dLoading = null;
