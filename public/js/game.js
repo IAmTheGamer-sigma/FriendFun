@@ -56,7 +56,7 @@ export class Game {
           <div class="esc-help">WASD / arrows: move &middot; Space: jump &middot; Right-drag: rotate camera &middot; Wheel: zoom &middot; Shift: shift-lock &middot; /: chat &middot; /e wave, /e dance<br>Touch: left thumbstick to move &middot; jump button &middot; drag to look &middot; pinch to zoom</div>
         </div>
       </div>
-      <div class="loading"><div class="loading-card"><div class="ff-logo-big">${LOGO}FriendFun</div><div class="loading-name">${esc(this.o.gameName || '')}</div><div class="loading-sub">${this.o.test ? 'Starting test...' : 'Joining server...'}</div><div class="spinner"></div></div></div>
+      <div class="loading"><div class="loading-card"><div class="ff-logo-big">${LOGO}Funtopia</div><div class="loading-name">${esc(this.o.gameName || '')}</div><div class="loading-sub">${this.o.test ? 'Starting test...' : 'Joining server...'}</div><div class="spinner"></div></div></div>
     </div>`;
     const q = s => this.c.querySelector(s);
     this.canvas = q('.game-canvas'); this.chatLog = q('.chat-log'); this.chatInput = q('.chat-input');
