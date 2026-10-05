@@ -324,6 +324,18 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   } else if (command === 'reset_daily') {
     updates = { tixDay: null };
     message = `Reset ${user.name}'s daily reward`;
+  } else if (command === 'grant_badge') {
+    const badgeId = String(req.body?.badge || '').trim();
+    if (!BADGES[badgeId]) return res.status(400).json({ error: 'Unknown badge' });
+    const earned = [...new Set([...(Array.isArray(user.earnedBadges) ? user.earnedBadges : []), badgeId])];
+    updates = { earnedBadges: earned };
+    message = `Gave ${BADGES[badgeId].name} badge to ${user.name}`;
+  } else if (command === 'revoke_badge') {
+    const badgeId = String(req.body?.badge || '').trim();
+    if (!BADGES[badgeId]) return res.status(400).json({ error: 'Unknown badge' });
+    const earned = (Array.isArray(user.earnedBadges) ? user.earnedBadges : []).filter(id => id !== badgeId);
+    updates = { earnedBadges: earned };
+    message = `Removed ${BADGES[badgeId].name} badge from ${user.name}`;
   } else {
     return res.status(400).json({ error: 'Unknown admin command' });
   }
@@ -518,6 +530,23 @@ app.post('/api/games/:id/thumbnail', auth, async (req, res) => {
 });
 
 function validThumb(t) { return typeof t === 'string' && t.startsWith('data:image/') && t.length < 600000 ? t : null; }
+function sanitizeScript(s) {
+  if (!s || typeof s !== 'object') return undefined;
+  const onTouch = s.onTouch;
+  if (!onTouch || typeof onTouch !== 'object') return undefined;
+  const action = String(onTouch.action || 'none');
+  if (!['message', 'tix', 'teleport', 'kill'].includes(action)) return undefined;
+  const out = { onTouch: { action } };
+  if (action === 'message') out.onTouch.text = String(onTouch.text || '').slice(0, 120);
+  if (action === 'tix') out.onTouch.amount = Math.max(1, Math.min(100, Math.floor(Number(onTouch.amount) || 5)));
+  if (action === 'teleport') {
+    const num = v => (Number.isFinite(+v) ? +v : 0);
+    out.onTouch.x = Math.max(-2000, Math.min(2000, num(onTouch.x)));
+    out.onTouch.y = Math.max(-2000, Math.min(2000, num(onTouch.y)));
+    out.onTouch.z = Math.max(-2000, Math.min(2000, num(onTouch.z)));
+  }
+  return out;
+}
 function sanitizeWorld(w) {
   const num = v => (Number.isFinite(+v) ? +v : 0);
   const parts = (Array.isArray(w?.parts) ? w.parts : []).slice(0, 5000).map((p, i) => ({
@@ -527,6 +556,7 @@ function sanitizeWorld(w) {
     k: ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed'].includes(p.k) ? p.k : 'part',
     m: ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'baseplate', 'spawn', 'metal'].includes(p.m) ? p.m : 'plastic',
     ...(p.cc === false ? { cc: false } : {}), ...(p.tr ? { tr: Math.max(0, Math.min(1, num(p.tr))) } : {}),
+    ...(sanitizeScript(p.script) ? { script: sanitizeScript(p.script) } : {}),
   }));
   return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts };
 }
