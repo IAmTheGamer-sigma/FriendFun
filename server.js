@@ -1448,6 +1448,258 @@ const LOONEY_GAMES = [
   { name: "That's All, Folks! Finale", desc: "The grand finale! Earn that last coin!", sky: '#ffd54f', cols: ['#ffd700', '#e53935', '#ffffff'] },
 ];
 
+function looneyHelpers(P, r) {
+  const H = {};
+  H.plat = (x, y, z, w, col, coin) => {
+    P([x, y, z], [w, 1, w], col);
+    if (coin) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+  };
+  H.jumps = (x, y, z, n, col, gap = 9, spread = 6) => {
+    for (let i = 0; i < n; i++) {
+      z -= gap + r() * 3; x += (r() - 0.5) * spread;
+      H.plat(x, y, z, 5, col, r() < 0.45);
+    }
+    return [x, y, z];
+  };
+  H.stairs = (x, y, z, n, col) => {
+    for (let i = 0; i < n; i++) { z -= 5; y += 2.2; P([x, y, z], [6, 1, 3], col, { name: 'Step' }); }
+    return [x, y, z];
+  };
+  H.checkpoint = (x, y, z) => {
+    P([x, y, z], [12, 1, 12], '#efefef', { name: 'Stage' });
+    P([x, y + 0.75, z], [5, 0.5, 5], '#2ec4ff', { name: 'Checkpoint', k: 'checkpoint', m: 'neon' });
+  };
+  H.bounceUp = (x, y, z, col, height = 12) => {
+    P([x, y, z], [6, 1, 6], '#22ff88', { name: 'BouncePad', k: 'bounce', m: 'neon' });
+    z -= 14; y += height;
+    P([x, y, z], [8, 1, 8], col);
+    return [x, y, z];
+  };
+  H.killWalk = (x, y, z, col, len = 30, kb = 5) => {
+    P([x, y, z], [8, 1, len], col, { name: 'Walkway' });
+    for (let i = 0; i < kb; i++) P([x + (i % 2 ? 2 : -2), y + 0.75, z - len / 2 + 4 + i * ((len - 8) / kb)], [4, 0.5, 1.5], '#ff2020', { name: 'KillBrick', k: 'kill', m: 'neon' });
+    return [x, y, z - len];
+  };
+  H.carrot = (x, y, z) => { P([x, y + 0.6, z], [0.7, 1.2, 0.7], '#ff9800', { name: 'Carrot' }); P([x, y + 1.5, z], [0.5, 0.6, 0.5], '#33691e', { name: 'CarrotTop' }); };
+  H.carrotPatch = (x, y, z) => { P([x, y - 0.4, z], [10, 0.8, 10], '#5d4037', { name: 'Dirt' }); for (let i = 0; i < 5; i++) H.carrot(x + (r() - 0.5) * 8, y, z + (r() - 0.5) * 8); };
+  H.cactus = (x, y, z, s = 1) => { P([x, y + 2 * s, z], [1.2 * s, 4 * s, 1.2 * s], '#2e7d32', { name: 'Cactus' }); P([x - 1 * s, y + 2.2 * s, z], [1.6 * s, 1 * s, 1 * s], '#2e7d32', { name: 'CactusArm' }); P([x + 1 * s, y + 2.8 * s, z], [1.6 * s, 1 * s, 1 * s], '#2e7d32', { name: 'CactusArm' }); };
+  H.tree = (x, y, z, leaf = '#2e7d32') => { P([x, y + 2, z], [1.5, 4, 1.5], '#5d4037', { name: 'Trunk' }); P([x, y + 5.5, z], [5, 4, 5], leaf, { name: 'Leaves' }); };
+  H.barn = (x, y, z) => { P([x, y + 3, z], [14, 6, 10], '#c62828', { name: 'Barn' }); P([x, y + 7.5, z], [10, 3, 8], '#eceff1', { name: 'BarnRoof' }); P([x, y + 9.2, z], [6, 1.5, 5], '#eceff1', { name: 'BarnRoof2' }); P([x, y + 1.5, z + 5.1], [4, 3, 0.3], '#ffffff', { name: 'BarnDoor' }); };
+  H.fence = (x, y, z, len, axis = 'x') => { const n = Math.floor(len / 4); for (let i = 0; i <= n; i++) { const o = -len / 2 + i * 4; P(axis === 'x' ? [x + o, y + 1, z] : [x, y + 1, z + o], [0.5, 2, 0.5], '#8d6e63', { name: 'FencePost' }); } P([x, y + 1.6, z], axis === 'x' ? [len, 0.3, 0.3] : [0.3, 0.3, len], '#a1887f', { name: 'FenceRail' }); };
+  H.crate = (x, y, z, s = 2) => { P([x, y + s / 2, z], [s, s, s], '#8d6e63', { name: 'Crate', m: 'wood' }); };
+  H.acmeCrate = (x, y, z) => { H.crate(x, y, z, 2.5); P([x, y + 2.5, z], [2.6, 0.5, 2.6], '#e53935', { name: 'AcmeBand' }); };
+  H.anvil = (x, y, z) => { P([x, y + 0.5, z], [2.4, 1, 1.4], '#37474f', { name: 'Anvil', m: 'metal' }); P([x, y + 1.3, z], [1.2, 0.6, 1], '#455a64', { name: 'AnvilTop', m: 'metal' }); };
+  H.lamppost = (x, y, z) => { P([x, y + 2.5, z], [0.5, 5, 0.5], '#212121', { name: 'LampPost', m: 'metal' }); P([x, y + 5.4, z], [1.4, 1, 1.4], '#fff59d', { name: 'Lamp', m: 'neon' }); };
+  H.mesa = (x, y, z, w = 16, h = 10) => { P([x, y + h / 2, z], [w, h, w], '#bf6b30', { name: 'Mesa' }); P([x, y + h + 1.5, z], [w * 0.7, 3, w * 0.7], '#d98e4a', { name: 'MesaTop' }); };
+  H.rock = (x, y, z, s = 2) => P([x, y + s / 2, z], [s, s, s], '#8d6e63', { name: 'Rock' });
+  H.tnt = (x, y, z) => { P([x, y + 1, z], [2, 2, 2], '#d32f2f', { name: 'TNT' }); P([x, y + 1, z], [2.1, 0.6, 2.1], '#ffffff', { name: 'TNTBand' }); };
+  H.haybale = (x, y, z) => P([x, y + 1, z], [3, 2, 2], '#ffca3a', { name: 'Hay' });
+  H.house = (x, y, z, wall = '#90a4ae') => { P([x, y + 3, z], [12, 6, 10], wall, { name: 'House' }); P([x, y + 7, z], [9, 2.5, 8], '#6d4c41', { name: 'Roof' }); P([x, y + 8.6, z], [5, 1.6, 4.5], '#6d4c41', { name: 'Roof2' }); P([x, y + 1.5, z + 5.1], [2.5, 3, 0.3], '#4e342e', { name: 'Door' }); P([x - 3.5, y + 3.5, z + 5.1], [2, 2, 0.3], '#fff9c4', { name: 'Window', m: 'neon' }); P([x + 3.5, y + 3.5, z + 5.1], [2, 2, 0.3], '#fff9c4', { name: 'Window', m: 'neon' }); };
+  H.eiffel = (x, y, z) => { P([x, y + 2, z], [14, 4, 14], '#78909c', { name: 'Tower', m: 'metal' }); P([x, y + 7, z], [10, 6, 10], '#78909c', { name: 'Tower', m: 'metal' }); P([x, y + 12, z], [6, 4, 6], '#78909c', { name: 'Tower', m: 'metal' }); P([x, y + 15, z], [2, 4, 2], '#78909c', { name: 'Tower', m: 'metal' }); P([x, y + 17.5, z], [1, 1, 1], '#fff59d', { name: 'Beacon', m: 'neon' }); };
+  H.star = (x, y, z) => P([x, y, z], [0.8, 0.8, 0.8], '#ffffff', { name: 'Star', m: 'neon' });
+  H.rocket = (x, y, z) => { P([x, y + 1.5, z], [2, 3, 2], '#eceff1', { name: 'Rocket', m: 'metal' }); P([x, y + 3.6, z], [1.2, 1.2, 1.2], '#e53935', { name: 'RocketNose' }); P([x - 1.2, y + 0.6, z], [0.6, 1.4, 1.6], '#e53935', { name: 'Fin' }); P([x + 1.2, y + 0.6, z], [0.6, 1.4, 1.6], '#e53935', { name: 'Fin' }); };
+  H.sombrero = (x, y, z) => { P([x, y + 0.3, z], [6, 0.5, 6], '#ffca3a', { name: 'Sombrero' }); P([x, y + 1.5, z], [2.5, 2.5, 2.5], '#ffb300', { name: 'SombreroTop' }); };
+  return H;
+}
+
+const LOONEY_BUILDERS = [
+  (P, r, H, x, y, z) => { // 1. Bugs' Burrow Dash
+    H.carrotPatch(x + 10, 0, z - 6); H.carrotPatch(x - 10, 0, z - 24);
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#8d6e63', 9, 5);
+      if (s % 2 === 0) H.carrotPatch(x + 9, y, z);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 2. Daffy's Duck Season
+    for (let s = 0; s < 7; s++) {
+      H.tree(x + 10, y, z - 4, ['#ef6c00', '#e65100', '#f9a825'][s % 3]);
+      H.tree(x - 10, y, z - 12, '#c62828');
+      [x, y, z] = H.jumps(x, y, z, 4, '#a1887f', 10, 8);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 3. Porky's Perilous Path
+    H.barn(x + 16, 0, z - 10); H.fence(x - 8, 0, z - 14, 24); H.haybale(x + 8, 0, z - 26); H.haybale(x - 6, 0, z - 44);
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#f48fb1', 9, 5);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 4. Tweety's Cage Escape
+    for (let i = 0; i < 8; i++) P([x + 18, i * 6, z - 20 - i * 12], [1, 6, 1], '#29b6f6', { name: 'CageBar', m: 'metal' });
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.stairs(x, y, z, 5, '#ffee58');
+      [x, y, z] = H.jumps(x, y, z, 4, '#ffee58', 10, 6);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 5. Sylvester's Alley Chase
+    for (let s = 0; s < 7; s++) {
+      P([x + 9, y + 4, z - 6], [2, 8, 20], '#6d4c41', { name: 'BrickWall', m: 'brick' });
+      P([x - 9, y + 4, z - 6], [2, 8, 20], '#6d4c41', { name: 'BrickWall', m: 'brick' });
+      P([x + 5, y + 1, z - 10], [2, 2, 2], '#78909c', { name: 'TrashCan', m: 'metal' });
+      [x, y, z] = H.jumps(x, y, z, 5, '#78909c', 9, 4);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 6. Road Runner's Canyon Run
+    H.mesa(x + 25, -2, z - 30, 20, 14); H.mesa(x - 28, -2, z - 70, 24, 18);
+    H.cactus(x + 8, 0, z - 20); H.cactus(x - 9, 0, z - 45, 1.4); H.cactus(x + 10, 0, z - 80);
+    for (let s = 0; s < 8; s++) {
+      z -= 16; P([x, y, z], [7, 1, 14], '#e65100', { name: 'Sprint' });
+      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      if (s % 2 === 0) z -= 12;
+      if (s === 7) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 7. Wile E.'s Rocket Ride
+    H.rocket(x + 10, 0, z - 8); H.acmeCrate(x - 8, 0, z - 16); H.anvil(x + 9, 0, z - 30); H.tnt(x - 9, 0, z - 44);
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.bounceUp(x, y, z, '#78909c', 12);
+      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      H.acmeCrate(x + 10, y, z - 4);
+      z -= 6; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 8. Taz's Tornado Spin
+    const cx = x; let a = 0;
+    for (let s = 0; s < 24; s++) {
+      a += 0.55; y += 2.4;
+      x = cx + Math.cos(a) * 12; z -= 4;
+      P([x, y, z], [6, 1, 6], s % 2 ? '#8d6e63' : '#a1887f', { name: 'TornadoStep' });
+      if (s % 4 === 2) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      if (s % 6 === 5) H.checkpoint(x, y, z);
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 9. Elmer's Forest Frolic
+    for (let s = 0; s < 7; s++) {
+      H.tree(x + 11, y, z - 2); H.tree(x - 11, y, z - 12, '#1b5e20'); H.tree(x + 9, y, z - 22);
+      [x, y, z] = H.jumps(x, y, z, 5, '#2e7d32', 9, 7);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 10. Marvin's Martian Maze
+    for (let i = 0; i < 40; i++) H.star(x + (r() - 0.5) * 120, 20 + r() * 40, z - r() * 160);
+    for (let s = 0; s < 6; s++) {
+      for (const dx of [-8, 0, 8]) P([x + dx, y, z - 12], [5, 1, 5], dx === 0 ? '#00e676' : '#212121', { name: 'MarsPad' });
+      z -= 12;
+      [x, y, z] = H.jumps(x, y, z, 3, '#00e676', 10, 4);
+      H.rock(x + 9, y, z, 3);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 11. Foghorn's Farmyard Frenzy
+    H.barn(x - 18, 0, z - 16); H.fence(x + 6, 0, z - 10, 30); H.haybale(x - 8, 0, z - 34); H.haybale(x + 10, 0, z - 52);
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#e53935', 9, 5);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 12. Pepe's Parisian Promenade
+    H.eiffel(x + 20, 0, z - 30); H.lamppost(x - 10, 0, z - 12); H.lamppost(x + 10, 0, z - 40); H.lamppost(x - 10, 0, z - 68);
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#7b1fa2', 9, 6);
+      [x, y, z] = H.stairs(x, y, z, 4, '#7b1fa2');
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 13. Speedy Gonzales Sprint
+    H.sombrero(x + 10, 0, z - 10); H.cactus(x - 10, 0, z - 30); H.sombrero(x - 12, 0, z - 55); H.cactus(x + 11, 0, z - 75, 1.3);
+    for (let s = 0; s < 9; s++) {
+      z -= 18; P([x, y, z], [8, 1, 16], '#d32f2f', { name: 'Sprint' });
+      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      z -= 10;
+      if (s === 8) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 14. Yosemite Sam's Showdown
+    H.house(x + 18, 0, z - 20, '#8d6e63'); H.house(x - 18, 0, z - 45, '#a1887f');
+    P([x + 14, 7, z - 60], [3, 14, 3], '#6d4c41', { name: 'WaterLeg' });
+    P([x + 14, 15, z - 60], [8, 5, 8], '#8d6e63', { name: 'WaterTank' });
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#8d6e63', 9, 5);
+      [x, y, z] = H.killWalk(x, y, z - 4, '#8d6e63', 30, 5); z -= 4;
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 15. Granny's House Hijinks
+    H.house(x + 16, 0, z - 14, '#b39ddb'); H.tree(x - 12, 0, z - 8); H.tree(x + 12, 0, z - 40, '#66bb6a');
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#7e57c2', 9, 5);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 16. Acme Factory Floor
+    for (let s = 0; s < 7; s++) {
+      H.crate(x + 10, y, z - 4); H.crate(x - 10, y, z - 16, 3); H.anvil(x + 9, y, z - 28);
+      P([x, y - 0.6, z - 8], [10, 0.2, 3], '#ffc107', { name: 'Hazard', m: 'neon' });
+      [x, y, z] = H.jumps(x, y, z, 4, '#546e7a', 10, 5);
+      [x, y, z] = H.killWalk(x, y, z - 4, '#546e7a', 30, 6); z -= 4;
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 17. Looney Tower Climb
+    const cols = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'];
+    const cx = x; let a = 0;
+    for (let s = 0; s < 30; s++) {
+      a += 0.5; y += 2.2; x = cx + Math.cos(a) * 10; z -= 3.2;
+      P([x, y, z], [6, 1, 6], cols[s % cols.length], { name: 'TowerStep' });
+      if (s % 5 === 2) P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      if (s % 7 === 6) H.checkpoint(x, y, z);
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 18. Carrot Patch Capers
+    H.house(x - 18, 0, z - 12, '#d7ccc8');
+    for (let s = 0; s < 6; s++) {
+      H.carrotPatch(x + 11, y, z - 6); H.carrotPatch(x - 11, y, z - 18);
+      [x, y, z] = H.jumps(x, y, z, 5, '#33691e', 9, 5);
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 19. Duck Dodgers' Space Station
+    for (let i = 0; i < 50; i++) H.star(x + (r() - 0.5) * 140, 15 + r() * 50, z - r() * 180);
+    P([x + 30, 40, z - 60], [10, 10, 1], '#0d47a1', { name: 'Earth', m: 'neon' });
+    for (let s = 0; s < 6; s++) {
+      [x, y, z] = H.jumps(x, y, z, 5, '#3a506b', 10, 6);
+      P([x, y + 3.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      z -= 8; H.checkpoint(x, y, z); z -= 4;
+    }
+    return [x, y, z];
+  },
+  (P, r, H, x, y, z) => { // 20. That's All, Folks! Finale
+    for (let s = 0; s < 8; s++) {
+      z -= 16; P([x, y, z], [10, 1, 16], '#b71c1c', { name: 'RedCarpet' });
+      P([x, y + 2.2, z], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+      P([x - 6, y + 3, z], [1, 6, 1], '#212121', { name: 'SpotPole' });
+      P([x - 6, y + 6.5, z], [1.6, 1, 1.6], '#fff59d', { name: 'Spotlight', m: 'neon' });
+      P([x + 6, y + 3, z], [1, 6, 1], '#212121', { name: 'SpotPole' });
+      P([x + 6, y + 6.5, z], [1.6, 1, 1.6], '#fff59d', { name: 'Spotlight', m: 'neon' });
+      z -= 10;
+      if (s === 7) { z -= 8; H.checkpoint(x, y, z); z -= 4; }
+    }
+    return [x, y, z];
+  },
+];
+
 function looneyWorld(idx) {
   const cfg = LOONEY_GAMES[idx];
   const w = { sky: cfg.sky, parts: [] };
@@ -1455,54 +1707,31 @@ function looneyWorld(idx) {
   const P = (p, s, c, extra = {}) => w.parts.push({ id: 'p' + (pid++), name: extra.name || 'Part', p, s, c, k: 'part', m: 'plastic', ...extra });
   let sd = 1234 + idx * 999;
   const r = () => ((sd = (sd * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const cols = cfg.cols;
+  const H = looneyHelpers(P, r);
   P([0, -40, 0], [2000, 1, 2000], '#ff3b1f', { name: 'Lava', k: 'kill', m: 'neon' });
   P([0, 0, 0], [24, 2, 24], '#d9d9d9', { name: 'StartPlatform' });
   P([0, 1.25, 0], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' });
-  const stages = 6 + Math.floor(idx / 3);
-  let z = -12, y = 0, x = 0;
-  for (let stage = 1; stage <= stages; stage++) {
-    const col = cols[stage % cols.length];
-    const type = stage % 5;
-    const hard = idx / 19;
-    if (type === 1) {
-      const n = 5 + Math.floor(r() * 3);
-      for (let i = 0; i < n; i++) { z -= 8 + r() * (2 + hard * 3); x += (r() - 0.5) * (6 + hard * 6); y += r() < 0.35 ? 2 : 0; P([x, y, z], [5 - hard, 1, 5 - hard], col); }
-    } else if (type === 2) {
-      z -= 22; P([x, y, z], [8, 1, 36], col, { name: 'Walkway' });
-      const kb = 4 + Math.floor(hard * 3);
-      for (let i = 0; i < kb; i++) P([x + (i % 2 ? 2 : -2), y + 0.75, z - 14 + i * (28 / kb)], [4, 0.5, 1.5], '#ff2020', { name: 'KillBrick', k: 'kill', m: 'neon' });
-      z -= 18;
-    } else if (type === 3) {
-      const n = 6 + Math.floor(hard * 3);
-      for (let i = 0; i < n; i++) { z -= 5; y += 2.2; P([x, y, z], [6, 1, 3], col, { name: 'Step' }); }
-    } else if (type === 4) {
-      z -= 10; P([x, y, z], [6, 1, 6], '#22ff88', { name: 'BouncePad', k: 'bounce', m: 'neon' });
-      z -= 14; y += 10; P([x, y, z], [8 - hard * 2, 1, 8 - hard * 2], col);
-    } else {
-      for (let i = 0; i < 3; i++) { z -= 12; P([x, y, z], [2 - hard * 0.5, 1, 14], col, { name: 'Beam' }); }
-      z -= 10;
-    }
-    z -= 10;
-    P([x, y, z], [12, 1, 12], '#efefef', { name: 'Stage' + stage });
-    P([x, y + 0.75, z], [5, 0.5, 5], '#2ec4ff', { name: 'Checkpoint' + stage, k: 'checkpoint', m: 'neon' });
-    P([x + 4, y + 2.5, z + 4], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
-  }
+  let [x, y, z] = LOONEY_BUILDERS[idx](P, r, H, 0, 0, -12);
   z -= 14;
   P([x, y, z], [20, 1, 20], '#ffd700', { name: 'WinPlatform', m: 'neon' });
   P([x, y + 0.75, z], [8, 0.5, 8], '#ffffff', { name: 'WinPad', k: 'win', m: 'neon' });
   return w;
 }
-
 async function seedLooneyGames() {
   try {
     const { data: existing } = await supabase.from('games').select('id').eq('event', 'looney');
     const have = new Set((existing || []).map(g => g.id));
-    if (have.size >= LOONEY_GAMES.length) return { created: 0 };
+    // Detect old (generic) worlds: new themed worlds contain decor parts like 'Carrot'
+    let isThemed = false;
+    if (have.size >= LOONEY_GAMES.length) {
+      const { data: sample } = await supabase.from('games').select('world').eq('id', 'g_looney01').maybeSingle();
+      isThemed = (sample?.world?.parts || []).some(p => p.name === 'Carrot');
+    }
+    if (have.size >= LOONEY_GAMES.length && isThemed && !process.env.LOONEY_RESEED) return { created: 0 };
+    await supabase.from('games').delete().eq('event', 'looney');
     let created = 0;
     for (let i = 0; i < LOONEY_GAMES.length; i++) {
       const id = 'g_looney' + String(i + 1).padStart(2, '0');
-      if (have.has(id)) continue;
       const cfg = LOONEY_GAMES[i];
       const game = {
         id, name: cfg.name, creator: 'FriendFun', description: '🥕 ' + cfg.desc,
