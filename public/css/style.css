@@ -395,3 +395,18 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .dm-form input { flex: 1; background: #232527; border: 1px solid #3a3d40; border-radius: 10px; padding: 10px 14px; color: var(--text); font-size: 15px; }
 .friend-card-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
 .friend-card-actions .btn-secondary { padding: 6px 12px; font-size: 13px; }
+
+/* ---------- looney tunes event ---------- */
+.looney-banner { display: block; background: linear-gradient(135deg, #ff6d00, #ffab40); color: #fff; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 18px #ff6d0088; }
+.looney-banner:hover { filter: brightness(1.08); }
+.looney-hero { background: linear-gradient(160deg, #4a148c, #ff6d00); border-radius: 18px; padding: 32px 24px; text-align: center; color: #fff; margin-bottom: 20px; }
+.looney-hero h1 { margin: 0 0 8px; font-size: 34px; }
+.looney-progress { position: relative; background: #00000055; border-radius: 12px; height: 34px; margin: 16px auto; max-width: 440px; overflow: hidden; }
+.looney-bar { height: 100%; background: linear-gradient(90deg, #ffd700, #ffab00); transition: width .5s; }
+.looney-progress span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+.looney-claimed { font-size: 18px; font-weight: 700; }
+.looney-rewards { display: flex; gap: 14px; flex-wrap: wrap; }
+.looney-reward { background: #232527; border-radius: 14px; padding: 18px; text-align: center; min-width: 150px; flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.lr-emoji { font-size: 44px; }
+.looney-check { position: absolute; top: 8px; right: 8px; font-size: 22px; filter: drop-shadow(0 2px 4px #000); }
+.game-card { position: relative; }
