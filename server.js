@@ -621,10 +621,12 @@ app.post('/api/friends/:name', auth, async (req, res) => {
     const updatedMe = { friends: [...(me.friends || []), ok], requests: (me.requests || []).filter(x => x !== ok) };
     await supabase.from('users').update(updatedMe).eq('name', me.name);
     await supabase.from('users').update({ friends: [...(other.friends || []), mk] }).eq('name', ok);
+    notify(ok, 'friend', `${me.name} accepted your friend request`, '#/friends');
     return res.json({ status: 'friends' });
   }
   const updatedOther = { requests: [...(other.requests || []), mk] };
   await supabase.from('users').update(updatedOther).eq('name', ok);
+  notify(ok, 'friend', `${me.name} sent you a friend request`, '#/friends');
   res.json({ status: 'requested' });
 });
 
@@ -802,6 +804,64 @@ function winBadges(game) {
 }
 
 app.get('/api/catalog', (req, res) => res.json(CATALOG));
+
+// ---------- direct messages & notifications ----------
+async function notify(username, type, text, link = '') {
+  try { await supabase.from('notifications').insert({ username, type, text, link, created: Date.now() }); }
+  catch (e) { console.warn('notify failed:', e.message); }
+}
+
+app.get('/api/dms', auth, async (req, res) => {
+  const me = req.user.name;
+  const { data } = await supabase.from('dms').select('*').or(`sender.eq.${me},recipient.eq.${me}`).order('created', { ascending: false }).limit(500);
+  const convos = new Map();
+  for (const m of (data || [])) {
+    const other = m.sender === me ? m.recipient : m.sender;
+    if (!convos.has(other)) convos.set(other, { name: other, lastText: m.text, lastCreated: m.created, unread: 0 });
+    if (m.recipient === me && !m.read) convos.get(other).unread++;
+  }
+  res.json([...convos.values()]);
+});
+
+app.get('/api/dm/:name', auth, async (req, res) => {
+  const me = req.user.name;
+  const { data: u } = await supabase.from('users').select('name').eq('name', key(req.params.name)).maybeSingle();
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  const other = u.name;
+  const { data } = await supabase.from('dms').select('*')
+    .or(`and(sender.eq.${me},recipient.eq.${other}),and(sender.eq.${other},recipient.eq.${me})`)
+    .order('created', { ascending: true }).limit(200);
+  await supabase.from('dms').update({ read: true }).eq('recipient', me).eq('sender', other).eq('read', false);
+  res.json(data || []);
+});
+
+app.post('/api/dm/:name', auth, async (req, res) => {
+  const me = req.user.name;
+  const text = String(req.body?.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'Empty message' });
+  const { data: u } = await supabase.from('users').select('name').eq('name', key(req.params.name)).maybeSingle();
+  if (!u || u.name === me) return res.status(400).json({ error: 'Invalid user' });
+  const { data, error } = await supabase.from('dms').insert({ sender: me, recipient: u.name, text, created: Date.now() }).select().single();
+  if (error) return res.status(500).json({ error: 'Could not send' });
+  notify(u.name, 'dm', `${me} sent you a message`, `#/messages/${encodeURIComponent(me)}`);
+  res.json(data);
+});
+
+app.get('/api/notifications', auth, async (req, res) => {
+  const me = req.user.name;
+  const { data } = await supabase.from('notifications').select('*').eq('username', me).order('created', { ascending: false }).limit(30);
+  const list = data || [];
+  res.json({ list, unread: list.filter(n => !n.read).length });
+});
+
+app.post('/api/notifications/read', auth, async (req, res) => {
+  const me = req.user.name;
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
+  let q = supabase.from('notifications').update({ read: true }).eq('username', me).eq('read', false);
+  if (ids && ids.length) q = q.in('id', ids);
+  await q;
+  res.json({ ok: true });
+});
 
 // ---------- realtime ----------
 const rooms = new Map();
