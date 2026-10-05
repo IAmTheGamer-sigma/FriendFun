@@ -498,7 +498,7 @@ async function dmPage(name) {
   });
   refreshNotif();
 }
-const LOONEY_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
+const LOONEY_DATES = { starts: Date.parse('2026-10-05T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_DATES.starts && n <= LOONEY_DATES.ends; };
 async function looneyPage() {
   const ev = await api('GET', '/api/event/looney');
