@@ -75,11 +75,11 @@ export class Studio {
         <div class="st-side">
           <div class="st-panel"><div class="st-panel-h">Explorer</div><div class="st-explorer"></div></div>
           <div class="st-panel"><div class="st-panel-h">Properties</div><div class="st-props"><div class="st-empty">Select a part to see its properties</div></div></div>
-          <div class="st-panel"><div class="st-panel-h">AI Coder</div><div class="st-ai">
+          ${this.o.aiAccess ? `<div class="st-panel"><div class="st-panel-h">AI Coder</div><div class="st-ai">
             <textarea class="ai-prompt" placeholder="Describe what to build... e.g. 'make an obby with lava and coins'"></textarea>
             <button class="rb-btn ai-gen">Generate</button>
             <div class="ai-result"></div>
-          </div></div>
+          </div></div>` : ''}
         </div>
       </div>
       <div class="st-play hidden"></div>
