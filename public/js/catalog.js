@@ -26,6 +26,10 @@ export const CATALOG = [
   { id: 'head_tall', type: 'head', name: 'Tall Head', price: 60 },
   { id: 'head_wide', type: 'head', name: 'Wide Head', price: 60 },
   { id: 'shirt_suit', type: 'shirt', name: 'Business Suit', price: 300, color: '#263238' },
+  { id: 'hat_bunnyears', type: 'hat', name: "Bugs' Ears", price: 0, limited: true, color: '#9e9e9e' },
+  { id: 'face_buckteeth', type: 'face', name: 'Buck Teeth', price: 0, limited: true },
+  { id: 'hat_ducktuft', type: 'hat', name: 'Feather Tuft', price: 0, limited: true, color: '#212121' },
+  { id: 'face_beak', type: 'face', name: 'Duck Bill', price: 0, limited: true },
 ];
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2 };
@@ -40,4 +44,5 @@ export const BADGES = {
   club: { name: 'FriendClub', desc: 'A FriendClub member.', color: '#ffd400', path: 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z' },
   creator: { name: 'Creator', desc: 'Published a game.', color: '#00b06f', path: 'M3 17.25V21h3.75L17.8 9.94l-3.75-3.75zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z' },
   champ: { name: 'Obby Champ', desc: 'Beat an obby.', color: '#4aa3ff', path: 'M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3zM6 7v1a2 2 0 0 0 2 2V7zm10 0v3a2 2 0 0 0 2-2V7z' },
+  looney: { name: 'Looney Tunes', desc: 'Collected all 20 Looney Coins in the Looney Tunes event.', color: '#ff6d00', path: 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 12.2l7.1-.6z' },
 };
