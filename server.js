@@ -64,7 +64,7 @@ async function statusOf(name) {
 }
 
 // ---------- helpers ----------
-function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()); }
+function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
   const has = {
@@ -298,7 +298,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0 }))));
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0, admin: isAdmin(u), envAdmin: ADMINS.includes(u.name.toLowerCase()) }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -361,12 +361,21 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   } else if (command === 'unban') {
     updates = { banned: false, banReason: '', bannedUntil: 0 };
     message = `Unbanned ${user.name}`;
+  } else if (command === 'grant_admin') {
+    if (isAdmin(user)) return res.status(400).json({ error: 'Already an admin' });
+    updates = { admin: true };
+    message = `Granted full admin to ${user.name}`;
+  } else if (command === 'revoke_admin') {
+    if (ADMINS.includes(user.name.toLowerCase())) return res.status(400).json({ error: 'Cannot revoke env-based admin' });
+    updates = { admin: false };
+    message = `Revoked admin from ${user.name}`;
   } else {
     return res.status(400).json({ error: 'Unknown admin command' });
   }
   const { data: updated, error } = await supabase.from('users').update(updates).eq('name', user.name).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever } });
+  const isBanned = !!updated.banned && (!updated.bannedUntil || updated.bannedUntil > Date.now());
+  res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever, aiAccess: isAdmin(updated) || !!updated.aiAccess, banned: isBanned, banReason: updated.banReason || '', bannedUntil: updated.bannedUntil || 0, admin: isAdmin(updated) } });
 });
 
 function groupView(group, username) {
