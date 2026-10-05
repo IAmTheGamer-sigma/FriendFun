@@ -398,7 +398,40 @@ async function friendsPage() {
   });
 }
 
-async function groupsPage() {
+async async function showGroupDetail(id, reload) {
+  try {
+    const g = await api('GET', '/api/groups/' + encodeURIComponent(id));
+    const isOwner = g.isCreator || me.admin;
+    const d = document.createElement('div'); d.className = 'modal-bg';
+    d.innerHTML = `<div class="modal"><h2>${g.icon ? esc(g.icon) + ' ' : ''}${esc(g.name)}</h2>
+      <p class="muted">${esc(g.description || 'No description yet.')}</p>
+      <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>by ${esc(g.creator)}</span></div>
+      ${isOwner ? `<label>Icon (emoji)<input class="group-icon-input" maxlength="4" value="${esc(g.icon || '')}" placeholder="🎮"></label>
+      <label>Description<textarea class="group-desc-input" maxlength="240" rows="3">${esc(g.description || '')}</textarea></label>` : ''}
+      <h3>Members (${g.memberList.length})</h3>
+      <div class="group-members">${g.memberList.map(m => `<div class="group-member"><span>${esc(m)}</span>${isOwner && m !== g.creator ? `<button class="btn-danger btn-sm group-kick" data-name="${esc(m)}">Kick</button>` : ''}${m === g.creator ? '<span class="owner-badge">Owner</span>' : ''}</div>`).join('')}</div>
+      <div class="modal-actions">
+        ${isOwner ? '<button class="btn-primary group-save">Save</button>' : ''}
+        <button class="btn-secondary group-close">Close</button>
+      </div></div>`;
+    document.body.appendChild(d);
+    d.querySelector('.group-close').onclick = () => d.remove();
+    d.onclick = e => { if (e.target === d) d.remove(); };
+    d.querySelectorAll('.group-kick').forEach(b => b.onclick = async () => {
+      if (!confirm(`Kick ${b.dataset.name}?`)) return;
+      try { await api('POST', `/api/groups/${encodeURIComponent(id)}/kick`, { name: b.dataset.name }); toast('Kicked.'); d.remove(); showGroupDetail(id, reload); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
+    const saveBtn = d.querySelector('.group-save');
+    if (saveBtn) saveBtn.onclick = async () => {
+      try {
+        await api('PUT', `/api/groups/${encodeURIComponent(id)}`, { icon: d.querySelector('.group-icon-input').value, description: d.querySelector('.group-desc-input').value });
+        toast('Group updated.'); d.remove(); reload();
+      } catch (e) { toast(e.message, true); }
+    };
+  } catch (e) { toast(e.message, true); }
+}
+function groupsPage() {
   const load = async () => {
     const groups = await api('GET', '/api/groups');
     const q = String(app.querySelector('.groups-search')?.value || '').trim().toLowerCase();
@@ -407,20 +440,33 @@ async function groupsPage() {
     if (!list) return;
     list.innerHTML = filtered.length ? filtered.map(g => `
       <article class="group-card">
-        <div class="group-icon">${esc(g.name.slice(0, 1).toUpperCase())}</div>
+        <div class="group-icon">${g.icon ? esc(g.icon) : esc(g.name.slice(0, 1).toUpperCase())}</div>
         <div class="group-card-body">
           <h3>${esc(g.name)}</h3>
           <p>${esc(g.description || 'No description yet.')}</p>
-          <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>Creator: ${esc(g.creator || 'Unknown')}</span></div>
-          <button class="${g.joined ? 'btn-secondary' : 'btn-primary'} group-action" data-id="${esc(g.id)}" data-action="${g.joined ? 'leave' : 'join'}" ${g.isCreator ? 'disabled title="The creator cannot leave their group"' : ''}>
-            ${g.joined ? 'Leave Group' : 'Join Group'}
-          </button>
+          <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>by ${esc(g.creator || 'Unknown')}</span></div>
+          <div class="group-btns">
+            <button class="${g.joined ? 'btn-secondary' : 'btn-primary'} group-action" data-id="${esc(g.id)}" data-action="${g.joined ? 'leave' : 'join'}" ${g.isCreator ? 'disabled title="The creator cannot leave their group"' : ''}>
+              ${g.joined ? 'Leave' : 'Join'}
+            </button>
+            <button class="btn-secondary group-view" data-id="${esc(g.id)}">View</button>
+            ${(g.isCreator || me.admin) ? `<button class="btn-danger group-delete" data-id="${esc(g.id)}" data-name="${esc(g.name)}">Delete</button>` : ''}
+          </div>
         </div>
       </article>`).join('') : '<p class="muted">No groups found. Create the first one!</p>';
     list.querySelectorAll('.group-action').forEach(btn => btn.onclick = async () => {
       try {
         await api('POST', `/api/groups/${encodeURIComponent(btn.dataset.id)}/${btn.dataset.action}`);
         toast(btn.dataset.action === 'join' ? 'Joined group!' : 'Left group.');
+        await load();
+      } catch (e) { toast(e.message, true); }
+    });
+    list.querySelectorAll('.group-view').forEach(btn => btn.onclick = () => showGroupDetail(btn.dataset.id, load));
+    list.querySelectorAll('.group-delete').forEach(btn => btn.onclick = async () => {
+      if (!confirm(`Delete "${btn.dataset.name}"? This cannot be undone.`)) return;
+      try {
+        await api('DELETE', `/api/groups/${encodeURIComponent(btn.dataset.id)}`);
+        toast('Group deleted.');
         await load();
       } catch (e) { toast(e.message, true); }
     });
@@ -444,6 +490,7 @@ async function groupsPage() {
         <h2>Create a Group</h2>
         <form class="group-create-form">
           <label>Group name<input name="name" maxlength="40" minlength="3" placeholder="e.g. Obby Masters" required></label>
+          <label>Icon (emoji, optional)<input name="icon" maxlength="4" placeholder="🎮"></label>
           <label>Description<textarea name="description" maxlength="240" rows="4" placeholder="What is your group about?"></textarea></label>
           <div class="modal-actions"><button type="button" class="btn-secondary cancel">Cancel</button><button class="btn-primary">Create</button></div>
         </form>
@@ -454,7 +501,7 @@ async function groupsPage() {
         e.preventDefault();
         const form = e.currentTarget;
         try {
-          await api('POST', '/api/groups', { name: form.name.value.trim(), description: form.description.value.trim() });
+          await api('POST', '/api/groups', { name: form.name.value.trim(), icon: form.icon.value.trim(), description: form.description.value.trim() });
           d.remove();
           toast('Group created!');
           await load();
@@ -526,7 +573,7 @@ async function studioPage(id, tpl) {
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
   const studio = new Studio(app.querySelector('.studio-container'), {
-    gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast,
+    gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: (box, world, name, done) => {
@@ -576,6 +623,11 @@ async function adminPage(q = '') {
             <button class="btn-secondary items-give" data-name="${esc(u.name)}" title="Give every marketplace item">Give all items</button>
             <button class="btn-secondary daily-reset" data-name="${esc(u.name)}" title="Reset daily reward">Reset daily</button>
           </span>
+          <span class="admin-inline">
+            ${u.aiAccess
+              ? `<button class="btn-secondary ai-revoke" data-name="${esc(u.name)}" title="Remove AI coder access">Revoke AI</button>`
+              : `<button class="btn-primary ai-grant" data-name="${esc(u.name)}" title="Grant AI coder access">Grant AI</button>`}
+          </span>
         </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
@@ -607,6 +659,8 @@ async function adminPage(q = '') {
       const sel = app.querySelector(`.badge-sel[data-name="${CSS.escape(b.dataset.name)}"]`);
       cmd(b.dataset.name, 'revoke_badge', { badge: sel?.value });
     });
+    app.querySelectorAll('.ai-grant').forEach(b => b.onclick = () => cmd(b.dataset.name, 'grant_ai', {}));
+    app.querySelectorAll('.ai-revoke').forEach(b => b.onclick = () => cmd(b.dataset.name, 'revoke_ai', {}));
   });
 }
 
