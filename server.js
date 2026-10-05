@@ -1511,6 +1511,25 @@ function scrBoss(label, hits, dmg, cx, cz, range, by) {
     + "else{say('" + label + ": '+hp+' bonks left!');}});"
     + "onTick((dt,t)=>{if(!bossDone&&!game.won)movePart('Boss',bx+Math.sin(t*1.3)*6," + by + ",bz+Math.cos(t)*6);});";
 }
+function scrNPC(bodyName, intro, lines) {
+  var code = "onStart(()=>{setTimeout(()=>{say(" + JSON.stringify(intro) + ");},1500);});";
+  code += "var npcI=0,npcLast=0;onTouch('" + bodyName + "',()=>{var n=Date.now();if(n-npcLast<3000)return;npcLast=n;say(" + JSON.stringify(lines) + "[npcI++%" + lines.length + "]);playSound('coin');});";
+  return code;
+}
+function scrBossChar(label, hits, dmg, cx, cz, range, parts) {
+  var code = "onStart(()=>{hidePart('WinPad');say(" + JSON.stringify('Bonk ' + label + ' ' + hits + ' times! Careful, it fights back!') + ");});"
+    + "var hp=" + hits + ",bx=" + cx + ",bz=" + cz + ",lastBonk=-9,bossDone=false;";
+  code += "function placeBoss(px,pz){";
+  parts.forEach(function (p) { code += "movePart('" + p.n + "',px+(" + p.ox + "),(" + p.oy + "),pz+(" + p.oz + "));"; });
+  code += "}placeBoss(bx,bz);";
+  code += "onTouch('Boss',()=>{var now=Date.now()/1000;if(now-lastBonk<1.5||bossDone||game.won)return;lastBonk=now;"
+    + "hp--;damage(null," + dmg + ");playSound('coin');"
+    + "bx=" + cx + "+(Math.random()-0.5)*" + range + ";bz=" + cz + "+(Math.random()-0.5)*" + range + ";placeBoss(bx,bz);"
+    + "if(hp<=0){bossDone=true;showPart('WinPad');say(" + JSON.stringify(label + ' defeated! Touch the golden pad!') + ");playSound('win');}"
+    + "else{say(" + JSON.stringify(label + ': ') + "+hp+" + JSON.stringify(' bonks left!') + ");}});";
+  code += "onTick((dt,t)=>{if(!bossDone&&!game.won)placeBoss(bx+Math.sin(t*1.3)*6,bz+Math.cos(t)*6);});";
+  return code;
+}
 function scrSprint(secs) {
   return "onStart(()=>{say('Reach the finish arch in " + secs + " seconds! Green pads = speed!');});"
     + "var raceT=0,raceDone=false,wB=false;"
@@ -1534,6 +1553,23 @@ function scrMaze(sx, sz, label) {
 
 function looneyHelpers(P, r) {
   const H = {};
+  H.fig = (x, y, z, s, pre, boxes) => {
+    for (const b of boxes) P([x + b[0] * s, y + b[1] * s, z + b[2] * s], [b[3] * s, b[4] * s, b[5] * s], b[6], { name: pre + b[7] });
+  };
+  H.bugs = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 4, 2, "#9e9e9e", "Body"], [0, 5.2, 0, 2.8, 2.8, 2.6, "#9e9e9e", "Head"], [0, 4.9, 1.4, 1.6, 1, 0.5, "#ffffff", "Muzzle"], [-0.35, 4.3, 1.45, 0.5, 0.7, 0.3, "#ffffff", "ToothL"], [0.35, 4.3, 1.45, 0.5, 0.7, 0.3, "#ffffff", "ToothR"], [-0.7, 8, 0, 0.9, 3.2, 0.7, "#9e9e9e", "EarL"], [0.7, 8, 0, 0.9, 3.2, 0.7, "#9e9e9e", "EarR"], [-0.7, 8, 0.28, 0.45, 2.2, 0.25, "#f8bbd0", "InnerL"], [0.7, 8, 0.28, 0.45, 2.2, 0.25, "#f8bbd0", "InnerR"], [-0.7, 5.7, 1.32, 0.55, 0.7, 0.2, "#212121", "EyeL"], [0.7, 5.7, 1.32, 0.55, 0.7, 0.2, "#212121", "EyeR"], [0, 2.2, -1.35, 1.3, 1.3, 0.8, "#ffffff", "Tail"], [-0.9, 0.4, 0.3, 1.1, 0.8, 2, "#9e9e9e", "FootL"], [0.9, 0.4, 0.3, 1.1, 0.8, 2, "#9e9e9e", "FootR"], [-1.75, 2.5, 0, 0.8, 2.4, 0.8, "#9e9e9e", "ArmL"], [1.75, 2.5, 0, 0.8, 2.4, 0.8, "#9e9e9e", "ArmR"]]);
+  H.daffy = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 4, 2.2, "#212121", "Body"], [0, 3.9, 0, 3.2, 0.7, 2.4, "#ffffff", "Ring"], [0, 5.3, 0, 2.6, 2.6, 2.4, "#212121", "Head"], [0, 5.0, 1.5, 1.7, 0.9, 1.0, "#ff9800", "Bill"], [-0.65, 5.9, 1.15, 0.6, 0.8, 0.25, "#ffffff", "EyeL"], [0.65, 5.9, 1.15, 0.6, 0.8, 0.25, "#ffffff", "EyeR"], [-0.65, 5.9, 1.28, 0.25, 0.35, 0.1, "#212121", "PupilL"], [0.65, 5.9, 1.28, 0.25, 0.35, 0.1, "#212121", "PupilR"], [0, 7.1, 0, 1.2, 1.0, 1.2, "#212121", "Tuft"], [-0.9, 0.35, 0.4, 1.2, 0.7, 2.2, "#ff9800", "FootL"], [0.9, 0.35, 0.4, 1.2, 0.7, 2.2, "#ff9800", "FootR"], [-1.7, 2.6, 0, 0.7, 2.2, 2.6, "#212121", "WingL"], [1.7, 2.6, 0, 0.7, 2.2, 2.6, "#212121", "WingR"]]);
+  H.tweety = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 1.8, 0, 2.6, 3.2, 2.2, "#ffeb3b", "Body"], [0, 4.6, 0, 3.4, 3.2, 3.0, "#ffeb3b", "Head"], [-0.8, 5.2, 1.5, 0.9, 1.1, 0.25, "#ffffff", "EyeL"], [0.8, 5.2, 1.5, 0.9, 1.1, 0.25, "#ffffff", "EyeR"], [-0.8, 5.2, 1.62, 0.4, 0.5, 0.1, "#1565c0", "PupilL"], [0.8, 5.2, 1.62, 0.4, 0.5, 0.1, "#1565c0", "PupilR"], [0, 4.3, 1.6, 1.0, 0.7, 0.7, "#ff9800", "Beak"], [0, 6.6, 0, 1.6, 0.9, 1.6, "#ffeb3b", "Tuft"], [-0.7, 0.3, 0.3, 1.0, 0.6, 1.8, "#ff9800", "FootL"], [0.7, 0.3, 0.3, 1.0, 0.6, 1.8, "#ff9800", "FootR"], [-1.5, 2.2, 0, 0.6, 1.8, 1.2, "#ffeb3b", "WingL"], [1.5, 2.2, 0, 0.6, 1.8, 1.2, "#ffeb3b", "WingR"]]);
+  H.sylvester = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 4, 2.2, "#212121", "Body"], [0, 2, 1.15, 1.8, 2.6, 0.4, "#ffffff", "Belly"], [0, 5.3, 0, 2.8, 2.8, 2.6, "#212121", "Head"], [0, 4.8, 1.35, 1.7, 1.2, 0.5, "#ffffff", "Muzzle"], [0, 5.15, 1.6, 0.5, 0.4, 0.3, "#e53935", "Nose"], [-1.1, 7, 0, 0.9, 1.4, 0.8, "#212121", "EarL"], [1.1, 7, 0, 0.9, 1.4, 0.8, "#212121", "EarR"], [-0.7, 5.8, 1.32, 0.55, 0.7, 0.2, "#ffffff", "EyeL"], [0.7, 5.8, 1.32, 0.55, 0.7, 0.2, "#ffffff", "EyeR"], [0, 2.2, -1.4, 1.0, 1.0, 1.6, "#212121", "Tail"], [-0.9, 0.4, 0.3, 1.1, 0.8, 2, "#212121", "FootL"], [0.9, 0.4, 0.3, 1.1, 0.8, 2, "#212121", "FootR"]]);
+  H.porky = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3.2, 4, 2.4, "#f48fb1", "Body"], [0, 5.2, 0, 2.8, 2.6, 2.6, "#f48fb1", "Head"], [0, 4.9, 1.4, 1.4, 1.1, 0.7, "#f06292", "Snout"], [-0.35, 4.9, 1.78, 0.25, 0.25, 0.15, "#4e342e", "NostrilL"], [0.35, 4.9, 1.78, 0.25, 0.25, 0.15, "#4e342e", "NostrilR"], [-1, 6.9, 0, 0.8, 1.2, 0.6, "#f48fb1", "EarL"], [1, 6.9, 0, 0.8, 1.2, 0.6, "#f48fb1", "EarR"], [-0.75, 5.7, 1.32, 0.55, 0.7, 0.2, "#ffffff", "EyeL"], [0.75, 5.7, 1.32, 0.55, 0.7, 0.2, "#ffffff", "EyeR"], [-0.9, 0.4, 0.3, 1.1, 0.8, 1.8, "#f48fb1", "FootL"], [0.9, 0.4, 0.3, 1.1, 0.8, 1.8, "#f48fb1", "FootR"], [0, 2.2, -1.5, 0.4, 0.4, 1.2, "#f06292", "Tail"]]);
+  H.elmer = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 4, 2, "#6d4c41", "Body"], [0, 5.2, 0, 2.6, 2.6, 2.4, "#ffcc99", "Head"], [-0.65, 5.7, 1.22, 0.5, 0.6, 0.2, "#ffffff", "EyeL"], [0.65, 5.7, 1.22, 0.5, 0.6, 0.2, "#ffffff", "EyeR"], [0, 4.7, 1.25, 1.2, 0.35, 0.25, "#8d6e63", "Mouth"], [0, 6.9, 0, 3.4, 0.7, 3.2, "#4e342e", "HatBrim"], [0, 7.9, 0, 2.0, 1.6, 2.0, "#4e342e", "HatTop"], [-0.9, 0.4, 0.2, 1.1, 0.8, 1.8, "#3e2723", "BootL"], [0.9, 0.4, 0.2, 1.1, 0.8, 1.8, "#3e2723", "BootR"], [2.2, 3.2, 0.6, 0.7, 3.4, 0.7, "#5d4037", "Rifle"]]);
+  H.marvin = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 3.6, 2, "#2e7d32", "Body"], [0, 4.9, 0, 2.6, 2.6, 2.4, "#212121", "Head"], [-0.6, 5.3, 1.22, 0.7, 0.9, 0.2, "#ffffff", "EyeL"], [0.6, 5.3, 1.22, 0.7, 0.9, 0.2, "#ffffff", "EyeR"], [0, 6.6, 0, 3.0, 1.2, 2.8, "#9e9e9e", "Helmet"], [0, 7.6, 0, 1.8, 1.2, 1.8, "#9e9e9e", "HelmetTop"], [0, 8.5, -0.2, 0.7, 0.9, 2.2, "#e53935", "Plume"], [-0.9, 0.35, 0.2, 1.0, 0.7, 1.6, "#212121", "FootL"], [0.9, 0.35, 0.2, 1.0, 0.7, 1.6, "#212121", "FootR"], [-1.7, 2.4, 0, 0.7, 1.8, 0.7, "#2e7d32", "ArmL"], [1.7, 2.4, 0, 0.7, 1.8, 0.7, "#2e7d32", "ArmR"]]);
+  H.foghorn = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2.2, 0, 3.4, 4.4, 2.6, "#ffffff", "Body"], [0, 5.6, 0, 2.6, 2.6, 2.4, "#ffffff", "Head"], [0, 6.3, 1.3, 1.2, 0.9, 0.9, "#ff9800", "Beak"], [-0.65, 6.1, 1.22, 0.55, 0.7, 0.2, "#212121", "EyeL"], [0.65, 6.1, 1.22, 0.55, 0.7, 0.2, "#212121", "EyeR"], [0, 7.3, 0, 1.8, 1.0, 0.6, "#e53935", "Comb"], [0, 4.9, 1.35, 0.8, 1.2, 0.4, "#e53935", "Wattle"], [-1.9, 2.8, 0, 0.8, 2.6, 1.4, "#ffffff", "WingL"], [1.9, 2.8, 0, 0.8, 2.6, 1.4, "#ffffff", "WingR"], [0, 2.6, -1.8, 1.6, 2.4, 1.0, "#2e7d32", "TailF"], [-0.8, 0.35, 0.3, 1.0, 0.7, 2.0, "#ff9800", "FootL"], [0.8, 0.35, 0.3, 1.0, 0.7, 2.0, "#ff9800", "FootR"]]);
+  H.pepe = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2, 0, 3, 4, 2.2, "#212121", "Body"], [0, 2, 1.2, 1.4, 3.4, 0.35, "#ffffff", "Stripe"], [0, 5.2, 0, 2.6, 2.6, 2.4, "#212121", "Head"], [0, 6.2, 0.6, 1.2, 1.6, 1.4, "#ffffff", "HeadStripe"], [0, 4.9, 1.3, 0.9, 0.7, 0.6, "#212121", "Nose"], [-0.65, 5.7, 1.22, 0.5, 0.6, 0.2, "#ffffff", "EyeL"], [0.65, 5.7, 1.22, 0.5, 0.6, 0.2, "#ffffff", "EyeR"], [0, 3, -2.2, 2.4, 3.4, 1.6, "#212121", "Tail"], [0, 3, -2.2, 1.2, 2.6, 1.7, "#ffffff", "TailStripe"], [-0.9, 0.4, 0.3, 1.1, 0.8, 1.8, "#212121", "FootL"], [0.9, 0.4, 0.3, 1.1, 0.8, 1.8, "#212121", "FootR"]]);
+  H.speedy = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 1.2, 0, 1.8, 2.2, 1.4, "#8d6e63", "Body"], [0, 2.9, 0, 1.6, 1.6, 1.4, "#8d6e63", "Head"], [0, 2.7, 0.75, 0.7, 0.5, 0.4, "#d7ccc8", "Snout"], [-0.4, 3.2, 0.72, 0.3, 0.35, 0.15, "#212121", "EyeL"], [0.4, 3.2, 0.72, 0.3, 0.35, 0.15, "#212121", "EyeR"], [-0.9, 3.6, 0, 0.5, 0.7, 0.3, "#8d6e63", "EarL"], [0.9, 3.6, 0, 0.5, 0.7, 0.3, "#8d6e63", "EarR"], [0, 4.1, 0, 5.5, 0.5, 5.5, "#ffca3a", "Sombrero"], [0, 5.0, 0, 2.2, 1.8, 2.2, "#ffb300", "SombreroTop"], [-0.5, 0.25, 0.2, 0.6, 0.5, 1.2, "#8d6e63", "FootL"], [0.5, 0.25, 0.2, 0.6, 0.5, 1.2, "#8d6e63", "FootR"], [0, 1.2, -1.0, 0.3, 0.3, 1.4, "#d7ccc8", "TailM"]]);
+  H.granny = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 1.8, 0, 3.2, 3.6, 2.4, "#5c6bc0", "Dress"], [0, 4.6, 0, 2.4, 2.4, 2.2, "#ffcc99", "Head"], [0, 6.0, -0.3, 1.4, 1.2, 1.4, "#9e9e9e", "Bun"], [-0.6, 5.0, 1.12, 0.45, 0.55, 0.2, "#212121", "EyeL"], [0.6, 5.0, 1.12, 0.45, 0.55, 0.2, "#212121", "EyeR"], [-0.9, 5.9, 0.6, 1.2, 0.5, 0.5, "#eeeeee", "HairL"], [0.9, 5.9, 0.6, 1.2, 0.5, 0.5, "#eeeeee", "HairR"], [0, 4.3, 1.15, 0.9, 0.3, 0.2, "#8d6e63", "Mouth"], [-1.8, 2.6, 0, 0.7, 2.0, 0.7, "#5c6bc0", "ArmL"], [1.8, 2.6, 0, 0.7, 2.0, 0.7, "#5c6bc0", "ArmR"]]);
+  H.wile = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2.2, 0, 2.8, 4.4, 2.0, "#8d6e63", "Body"], [0, 5.4, 0.2, 2.4, 2.4, 2.2, "#8d6e63", "Head"], [0, 5.0, 1.6, 1.2, 1.0, 1.2, "#a1887f", "Snout"], [0, 5.0, 2.25, 0.4, 0.3, 0.2, "#212121", "NoseTip"], [-1.0, 7.0, 0, 0.8, 1.6, 0.7, "#8d6e63", "EarL"], [1.0, 7.0, 0, 0.8, 1.6, 0.7, "#8d6e63", "EarR"], [-0.6, 5.9, 1.15, 0.5, 0.65, 0.2, "#ffffff", "EyeL"], [0.6, 5.9, 1.15, 0.5, 0.65, 0.2, "#ffffff", "EyeR"], [0, 2.4, -1.6, 1.0, 1.0, 1.8, "#8d6e63", "Tail"], [-0.8, 0.4, 0.3, 1.0, 0.8, 1.8, "#8d6e63", "FootL"], [0.8, 0.4, 0.3, 1.0, 0.8, 1.8, "#8d6e63", "FootR"]]);
+  H.roadrunner = (x, y, z, s, pre) => H.fig(x, y, z, s, pre, [[0, 2.4, 0, 2.2, 3.6, 1.8, "#1976d2", "Body"], [0, 5.0, 0.2, 2.0, 2.0, 1.8, "#1976d2", "Head"], [0, 4.8, 1.3, 0.9, 0.6, 0.9, "#ff9800", "Beak"], [-0.5, 5.4, 0.95, 0.4, 0.5, 0.2, "#ffffff", "EyeL"], [0.5, 5.4, 0.95, 0.4, 0.5, 0.2, "#ffffff", "EyeR"], [0, 6.3, -0.2, 0.5, 1.2, 1.8, "#0d47a1", "Crest"], [-0.7, 1.0, 0, 0.5, 2.0, 0.5, "#ff9800", "LegL"], [0.7, 1.0, 0, 0.5, 2.0, 0.5, "#ff9800", "LegR"], [-0.7, 0.2, 0.3, 0.7, 0.4, 1.4, "#ff9800", "FootL"], [0.7, 0.2, 0.3, 0.7, 0.4, 1.4, "#ff9800", "FootR"], [0, 2.8, -1.4, 1.2, 1.6, 1.2, "#0d47a1", "Tail"], [-1.3, 3.0, 0, 0.5, 1.6, 1.0, "#1976d2", "WingL"], [1.3, 3.0, 0, 0.5, 1.6, 1.0, "#1976d2", "WingR"]]);
+
   H.finish = (x, y, z) => {
     P([x, y, z], [20, 1, 20], '#ffd700', { name: 'WinPlatform', m: 'neon' });
     P([x, y + 0.75, z], [8, 0.5, 8], '#ffffff', { name: 'WinPad', k: 'win', m: 'neon' });
@@ -1602,7 +1638,9 @@ const LOONEY_BUILDERS = [
     for (let i = 0; i < 6; i++) P([-35 + r() * 70, 2, -15 - r() * 70], [14 + r() * 10, 4, 2], '#5d4037', { name: 'TunnelWall' });
     H.carrotPatch(-25, 0, -30); H.carrotPatch(25, 0, -45); H.carrotPatch(-20, 0, -70); H.carrotPatch(20, 0, -80);
     for (let i = 0; i < 12; i++) H.coinAt(-40 + r() * 80, 1.2, -15 - r() * 70, 'Coin', '#ff9800', [1.2, 1.6, 1.2]);
+    H.bugs(7, 1, -8, 1, 'Bugs');
     S('Burrow Hunt', scrHunt(12, 'carrots'));
+    S('NPC Talk', scrNPC("BugsBody", "Bugs: What's up, doc? Find all 12 carrots!", ["What's up, doc?", "This hunt is gonna be a carrot cakewalk!", "Ain't I a stinker?"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1615,7 +1653,9 @@ const LOONEY_BUILDERS = [
       P([tx, 1.5, tz], [3, 2.5, 3], i % 2 ? '#212121' : '#ff9800', { name: nm, k: 'coin' });
       targets.push({ name: nm, x: tx.toFixed(1), y: 1.5, z: tz.toFixed(1), sp: (0.5 + r() * 0.5).toFixed(2), rg: (5 + r() * 4).toFixed(1), ph: (r() * 6).toFixed(2) });
     }
+    H.daffy(7, 1, -8, 1, 'Daffy');
     S('Duck Tag', scrBlitz(targets, 'ducks'));
+    S('NPC Talk', scrNPC("DaffyBody", "Daffy: You're despicable! Tag all 8 ducks!", ["You're despicable!", "Woo-hoo! Woo-hoo!", "I'm not like other ducks!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1623,7 +1663,9 @@ const LOONEY_BUILDERS = [
     const mz = H.maze(0, -60, 7, 10, 5, '#8d6e63', '#f8bbd0');
     H.barn(mz.ex + 20, 0, mz.ez);
     for (let i = 0; i < 4; i++) H.coinAt(mz.x0 + Math.floor(r() * 7) * 10 + 5, 1.2, mz.z0 + Math.floor(r() * 7) * 10 + 5, 'Coin', '#ffd400');
+    H.porky(mz.sx + 1, 0, mz.sz + 8, 1, 'Porky');
     S('Pigpen Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Find your way out of the pigpen!'));
+    S('NPC Talk', scrNPC("PorkyBody", "Porky: Th-th-the exit is through the maze!", ["Th-th-that's the way out!", "Be vewy vewy careful!"]));
     H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
@@ -1638,7 +1680,9 @@ const LOONEY_BUILDERS = [
     P([20, 1, -60], [6, 2, 6], '#a1887f', { name: 'Perch', m: 'wood' });
     const hx = 12 + r() * 16, hz = -58 - r() * 12;
     P([hx, 1.5, hz], [3, 3, 1], '#ffd400', { name: 'HiddenItem', k: 'coin', m: 'neon' });
+    H.tweety(7, 1, -8, 1, 'Tweety');
     S('Hidden Key', scrHotCold(hx.toFixed(1), hz.toFixed(1), 'golden key'));
+    S('NPC Talk', scrNPC("TweetyBody", "Tweety: I tawt I taw a golden key! Follow the hints!", ["I tawt I taw a golden key!", "The poor puddy tat will never find it!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1655,7 +1699,9 @@ const LOONEY_BUILDERS = [
       P([0, 1.5, hz], [3, 3, 3], '#212121', { name: nm, k: 'kill' });
       hazards.push({ name: nm, x: 0, y: 1.5, z: hz, ax: 13, az: 0, sp: (0.6 + i * 0.15).toFixed(2) });
     }
+    H.sylvester(7, 1, -8, 1, 'Sylvester');
     S('Alley Survival', scrSurvival(45, hazards));
+    S('NPC Talk', scrNPC("SylvesterBody", "Sylvester: Sufferin' succotash! Dodge the cats for 45 seconds!", ["Sufferin' succotash!", "Those cats are tough customers!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1668,7 +1714,9 @@ const LOONEY_BUILDERS = [
     P([cx - 8, 4, -12 - len], [2, 8, 2], '#ffffff', { name: 'Arch' });
     P([cx + 8, 4, -12 - len], [2, 8, 2], '#ffffff', { name: 'Arch' });
     P([cx, 8.5, -12 - len], [18, 2, 2], '#ffffff', { name: 'Arch' });
+    H.roadrunner(7, 1, -8, 1, 'RoadRunner');
     S('Canyon Sprint', scrSprint(60));
+    S('NPC Talk', scrNPC("RoadRunnerBody", "Road Runner: Meep meep! Reach the finish in 60 seconds!", ["Meep meep!", "Beep beep!"]));
     H.finish(cx, 0, -12 - len - 16);
     return [x, y, z];
   },
@@ -1677,7 +1725,9 @@ const LOONEY_BUILDERS = [
     H.rocket(12, 0, -20); H.acmeCrate(-10, 0, -25); H.acmeCrate(8, 0, -60); H.tnt(-12, 0, -55);
     H.cactus(20, 0, -40); H.cactus(-22, 0, -65, 1.3);
     for (let i = 0; i < 8; i++) P([0, 55, -45], [3, 2, 2], '#37474f', { name: 'Anvil' + i, k: 'kill', m: 'metal' });
+    H.wile(7, 1, -8, 1, 'Wile');
     S('Anvil Rain', scrAnvilRain(60, 8, 0, -45, 56, 55, 26));
+    S('NPC Talk', scrNPC("WileBody", "Wile E.: My anvil storm never misses! Survive 60 seconds!", ["...", "My genius is unmatched! (The anvils disagree.)"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1685,8 +1735,9 @@ const LOONEY_BUILDERS = [
     P([0, -0.5, -50], [70, 1, 70], '#8d6e63', { name: 'ArenaFloor' });
     for (let i = 0; i < 6; i++) P([-24, 2 + i * 3, -30], [10 - i * 1.2, 3, 10 - i * 1.2], '#a1887f', { name: 'Tornado' });
     for (let i = 0; i < 6; i++) P([24, 2 + i * 3, -70], [10 - i * 1.2, 3, 10 - i * 1.2], '#a1887f', { name: 'Tornado' });
-    P([0, 3, -50], [6, 6, 6], '#6d4c41', { name: 'Boss' });
-    S('Taz Battle', scrBoss('Taz', 5, 10, 0, -50, 40, 3));
+    H.fig(0, 0, -50, 1, 'Boss', [[0,3,0, 6,6,5, '#6d4c41', ''],[0,7.2,0, 4.6,3.2,4.2, '#6d4c41', 'Head'],[0,6.6,2.15, 3.0,1.6,0.5, '#3e2723', 'Mouth'],[0,2.6,2.55, 3.4,3.4,0.4, '#d7ccc8', 'Belly'],[-1.6,9.2,0, 0.9,1.2,0.9, '#6d4c41', 'EarL'],[1.6,9.2,0, 0.9,1.2,0.9, '#6d4c41', 'EarR'],[-3.4,3.4,0, 1.0,2.6,1.0, '#6d4c41', 'ArmL'],[3.4,3.4,0, 1.0,2.6,1.0, '#6d4c41', 'ArmR']]);
+    const tazParts = [{ n: 'Boss', ox: 0, oy: 3, oz: 0 },{ n: 'BossHead', ox: 0, oy: 7.2, oz: 0 },{ n: 'BossMouth', ox: 0, oy: 6.6, oz: 2.15 },{ n: 'BossBelly', ox: 0, oy: 2.6, oz: 2.55 },{ n: 'BossEarL', ox: -1.6, oy: 9.2, oz: 0 },{ n: 'BossEarR', ox: 1.6, oy: 9.2, oz: 0 },{ n: 'BossArmL', ox: -3.4, oy: 3.4, oz: 0 },{ n: 'BossArmR', ox: 3.4, oy: 3.4, oz: 0 }];
+    S('Taz Battle', scrBossChar('Taz', 5, 10, 0, -50, 40, tazParts));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1694,7 +1745,9 @@ const LOONEY_BUILDERS = [
     const mz = H.maze(0, -60, 7, 10, 6, '#1b5e20', '#2e7d32');
     for (let i = 0; i < 12; i++) H.tree(-45 + r() * 90, 0, -105 - r() * 15, '#1b5e20');
     for (let i = 0; i < 4; i++) H.coinAt(mz.x0 + Math.floor(r() * 7) * 10 + 5, 1.2, mz.z0 + Math.floor(r() * 7) * 10 + 5, 'Coin', '#ffd400');
+    H.elmer(mz.sx + 1, 0, mz.sz + 8, 1, 'Elmer');
     S('Forest Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Find your way out of the forest!'));
+    S('NPC Talk', scrNPC("ElmerBody", "Elmer: Be vewy vewy quiet! Find the exit!", ["Be vewy vewy quiet!", "I'm hunting exits!"]));
     H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
@@ -1705,7 +1758,9 @@ const LOONEY_BUILDERS = [
     P([-20, 4, -30], [6, 8, 6], '#00e676', { name: 'Martian' });
     const hx = -30 + r() * 60, hz = -20 - r() * 55;
     P([hx, 1.5, hz], [3, 3, 3], '#00e676', { name: 'HiddenItem', k: 'coin', m: 'neon' });
+    H.marvin(7, 1, -8, 1, 'Marvin');
     S('Hidden Orb', scrHotCold(hx.toFixed(1), hz.toFixed(1), 'Illudium Q-36'));
+    S('NPC Talk', scrNPC("MarvinBody", "Marvin: Find my Illudium Q-36! Where's the kaboom?!", ["Where's the kaboom?", "You are making me very angry."]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1718,7 +1773,9 @@ const LOONEY_BUILDERS = [
       P([tx, 1.25, tz], [2.5, 2.5, 2.5], '#ffffff', { name: nm, k: 'coin' });
       targets.push({ name: nm, x: tx.toFixed(1), y: 1.25, z: tz.toFixed(1), sp: (0.6 + r() * 0.6).toFixed(2), rg: (4 + r() * 4).toFixed(1), ph: (r() * 6).toFixed(2) });
     }
+    H.foghorn(7, 1, -8, 1, 'Foghorn');
     S('Chicken Roundup', scrBlitz(targets, 'chickens'));
+    S('NPC Talk', scrNPC("FoghornBody", "Foghorn: Tag those chickens, I say, tag 'em all!", ["That's a joke, son!", "Pay attention, boy!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1727,7 +1784,9 @@ const LOONEY_BUILDERS = [
     H.eiffel(24, 0, -60);
     H.lamppost(-14, 0, -25); H.lamppost(14, 0, -45); H.lamppost(-14, 0, -65); H.lamppost(14, 0, -85);
     for (let i = 0; i < 10; i++) H.coinAt(-35 + r() * 70, 1.4, -15 - r() * 70, 'Coin', '#f48fb1', [1.4, 1.4, 1.4]);
+    H.pepe(7, 1, -8, 1, 'Pepe');
     S('Flower Hunt', scrHunt(10, 'flowers'));
+    S('NPC Talk', scrNPC("PepeBody", "Pepe: Come wiz me, cherie! Find 10 flowers!", ["Come wiz me!", "Ahh, l'amour!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1739,7 +1798,9 @@ const LOONEY_BUILDERS = [
     P([cx - 7, 4, -12 - len], [2, 8, 2], '#ffca3a', { name: 'Arch' });
     P([cx + 7, 4, -12 - len], [2, 8, 2], '#ffca3a', { name: 'Arch' });
     P([cx, 8.5, -12 - len], [16, 2, 2], '#ffca3a', { name: 'Arch' });
+    H.speedy(7, 1, -8, 1, 'Speedy');
     S('Fiesta Sprint', scrSprint(45));
+    S('NPC Talk', scrNPC("SpeedyBody", "Speedy: \u00a1\u00c1ndale! Reach the fiesta in 45 seconds!", ["\u00a1\u00c1ndale! \u00a1\u00c1ndale!", "\u00a1Arriba! \u00a1Arriba!"]));
     H.finish(cx, 0, -12 - len - 16);
     return [x, y, z];
   },
@@ -1748,8 +1809,9 @@ const LOONEY_BUILDERS = [
     H.house(20, 0, -35, '#8d6e63'); H.house(-20, 0, -60, '#a1887f');
     P([14, 7, -75], [3, 14, 3], '#6d4c41', { name: 'WaterLeg' });
     P([14, 15, -75], [8, 5, 8], '#8d6e63', { name: 'WaterTank' });
-    P([0, 3.5, -50], [5, 7, 5], '#b71c1c', { name: 'Boss' });
-    S('Showdown', scrBoss('Yosemite Sam', 5, 15, 0, -50, 36, 3.5));
+    H.fig(0, 0, -50, 1, 'Boss', [[0,3,0, 5,6,4, '#b71c1c', ''],[0,7.4,0, 3,3,2.8, '#ffcc99', 'Head'],[0,9.1,0, 5.6,0.8,5.2, '#4e342e', 'Hat'],[0,10.3,0, 3,2.4,3, '#4e342e', 'HatTop'],[-0.8,6.9,1.5, 1.2,0.5,0.3, '#ffffff', 'MusL'],[0.8,6.9,1.5, 1.2,0.5,0.3, '#ffffff', 'MusR'],[0,7.4,1.55, 0.6,0.7,0.5, '#e53935', 'Nose'],[-3,4,0, 0.9,2.6,0.9, '#b71c1c', 'ArmL'],[3,4,0, 0.9,2.6,0.9, '#b71c1c', 'ArmR']]);
+    const samParts = [{ n: 'Boss', ox: 0, oy: 3, oz: 0 },{ n: 'BossHead', ox: 0, oy: 7.4, oz: 0 },{ n: 'BossHat', ox: 0, oy: 9.1, oz: 0 },{ n: 'BossHatTop', ox: 0, oy: 10.3, oz: 0 },{ n: 'BossMusL', ox: -0.8, oy: 6.9, oz: 1.5 },{ n: 'BossMusR', ox: 0.8, oy: 6.9, oz: 1.5 },{ n: 'BossNose', ox: 0, oy: 7.4, oz: 1.55 },{ n: 'BossArmL', ox: -3, oy: 4, oz: 0 },{ n: 'BossArmR', ox: 3, oy: 4, oz: 0 }];
+    S('Showdown', scrBossChar('Yosemite Sam', 5, 15, 0, -50, 36, samParts));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1764,7 +1826,9 @@ const LOONEY_BUILDERS = [
     P([0, 1, -40], [10, 2, 6], '#d7ccc8', { name: 'Rug' });
     const spots = [[-20, -30], [-8, -38], [8, -30], [20, -38], [-20, -55], [-5, -60], [12, -52], [22, -62]];
     for (const sp of spots) H.coinAt(sp[0], 1.2, sp[1], 'Coin', '#d2a679', [1.6, 0.7, 1.6]);
+    H.granny(7, 1, -8, 1, 'Granny');
     S('Cookie Hunt', scrHunt(8, 'cookies'));
+    S('NPC Talk', scrNPC("GrannyDress", "Granny: Someone hid my 8 cookies! Find them, dearie!", ["Find my cookies, dearie!", "Have some tea when you're done!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1779,7 +1843,9 @@ const LOONEY_BUILDERS = [
       P([0, 2, hz], [6, 4, 2], '#e53935', { name: nm, k: 'kill', m: 'metal' });
       hazards.push({ name: nm, x: 0, y: 2, z: hz, ax: 24, az: 0, sp: (0.5 + i * 0.12).toFixed(2) });
     }
+    H.wile(7, 1, -8, 1, 'Wile');
     S('Factory Survival', scrSurvival(60, hazards));
+    S('NPC Talk', scrNPC("WileBody", "Wile E.: Acme crushers, the finest! Survive 60 seconds!", ["...", "Acme: quality you can trust! (Do not trust.)"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1790,8 +1856,10 @@ const LOONEY_BUILDERS = [
     P([0, 5, -50], [14, 2, 14], '#ffd700', { name: 'Summit', m: 'neon' });
     H.tree(-25, 0, -30); H.tree(25, 0, -70); H.rock(-20, 0, -65, 3); H.rock(22, 0, -35, 2);
     P([0, 1.5, -50], [3, 3, 3], '#e53935', { name: 'Guard', k: 'kill' });
+    H.bugs(7, 1, -8, 1, 'Bugs');
     S('Summit Hold', scrKoth(0, 6, -50, 8, 30)
       + "onTick((dt,t)=>{if(!game.won)movePart('Guard',Math.sin(t*0.8)*28,1.5,-50+Math.cos(t*0.5)*28);});");
+    S('NPC Talk', scrNPC("BugsBody", "Bugs: Hold that summit 30 seconds, doc!", ["What's up, doc?", "That guard is one tough customer!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1800,7 +1868,9 @@ const LOONEY_BUILDERS = [
     H.house(-28, 0, -25, '#d7ccc8');
     for (let i = 0; i < 8; i++) H.carrotPatch(-35 + r() * 70, 0, -20 - r() * 60);
     for (let i = 0; i < 12; i++) H.coinAt(-38 + r() * 76, 1.2, -15 - r() * 70, 'Coin', '#ffd400', [1.2, 1.6, 1.2]);
+    H.bugs(-7, 1, -8, 1, 'Bugs');
     S('Golden Carrot Hunt', scrHunt(12, 'golden carrots'));
+    S('NPC Talk', scrNPC("BugsBody", "Bugs: Find 12 GOLDEN carrots, doc! Not the regular ones!", ["Golden ones, doc!", "My carrots! Well, the golden ones anyway."]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
@@ -1809,7 +1879,9 @@ const LOONEY_BUILDERS = [
     for (let i = 0; i < 30; i++) H.star((r() - 0.5) * 160, 25 + r() * 45, -20 - r() * 110);
     P([mz.ex + 24, 25, mz.ez], [12, 12, 1], '#0d47a1', { name: 'Earth', m: 'neon' });
     P([mz.ex + 12, 1, mz.ez + 12], [6, 2, 8], '#546e7a', { name: 'Bridge', m: 'metal' });
+    H.daffy(mz.sx + 1, 0, mz.sz + 8, 1, 'Dodgers');
     S('Station Maze', scrMaze(mz.sx.toFixed(1), mz.sz.toFixed(1), 'Navigate to the bridge!'));
+    S('NPC Talk', scrNPC("DodgersBody", "Duck Dodgers: To the bridge! In the 24th and a half century!", ["Duck Dodgers, away!", "You're despicable... in space!"]));
     H.finish(mz.ex + 12, 0, mz.ez);
     return [x, y, z];
   },
@@ -1828,7 +1900,9 @@ const LOONEY_BUILDERS = [
       P([tx, 1.5, tz], [2.5, 2.5, 2.5], '#ffd400', { name: nm, k: 'coin', m: 'neon' });
       targets.push({ name: nm, x: tx.toFixed(1), y: 1.5, z: tz.toFixed(1), sp: (0.3 + r() * 0.3).toFixed(2), rg: (3 + r() * 3).toFixed(1), ph: (r() * 6).toFixed(2) });
     }
+    H.bugs(7, 1, -8, 1, 'Bugs');
     S('Star Pop', scrBlitz(targets, 'stars'));
+    S('NPC Talk', scrNPC("BugsBody", "Bugs: Pop 12 stars! That's almost all, folks!", ["What's up, doc?", "That's almost all, folks!"]));
     H.finish(0, 0, 26);
     return [x, y, z];
   },
