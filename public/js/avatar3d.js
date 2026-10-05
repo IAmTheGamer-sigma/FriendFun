@@ -76,34 +76,35 @@ function buildBugsHead(g) {
   const M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
   const add = (geo, color, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, M(color)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
   const grey = '#9e9e9e', pink = '#f8bbd0';
-  const skull = add(new THREE.SphereGeometry(0.62, 24, 18), grey, 0, 0.62); skull.scale.set(1, 1.1, 0.95);
-  const mz = add(new THREE.SphereGeometry(0.34, 18, 14), '#e8e8e8', 0, 0.4, 0.42); mz.scale.set(1.15, 0.8, 0.9);
-  const nose = add(new THREE.SphereGeometry(0.09, 10, 8), '#212121', 0, 0.53, 0.66); nose.scale.set(1.3, 0.8, 0.7);
-  add(new THREE.BoxGeometry(0.11, 0.22, 0.06), '#ffffff', -0.06, 0.2, 0.6);
-  add(new THREE.BoxGeometry(0.11, 0.22, 0.06), '#ffffff', 0.06, 0.2, 0.6);
+  const skull = add(new THREE.SphereGeometry(0.62, 24, 18), grey, 0, 0.62); skull.scale.set(1, 1.12, 0.95);
+  const mz = add(new THREE.SphereGeometry(0.36, 18, 14), '#f2f2f2', 0, 0.38, 0.44); mz.scale.set(1.2, 0.85, 0.9);
+  const nose = add(new THREE.SphereGeometry(0.1, 10, 8), '#212121', 0, 0.54, 0.7); nose.scale.set(1.4, 0.85, 0.7);
+  add(new THREE.BoxGeometry(0.12, 0.26, 0.06), '#ffffff', -0.065, 0.16, 0.64);
+  add(new THREE.BoxGeometry(0.12, 0.26, 0.06), '#ffffff', 0.065, 0.16, 0.64);
   for (const sx of [-1, 1]) {
-    const eye = add(new THREE.SphereGeometry(0.16, 14, 12), '#ffffff', sx * 0.24, 0.92, 0.4); eye.scale.set(1, 1.25, 0.6);
-    add(new THREE.SphereGeometry(0.07, 10, 8), '#212121', sx * 0.24, 0.92, 0.53);
-    const ear = add(new THREE.CapsuleGeometry(0.15, 0.7, 6, 12), grey, sx * 0.28, 1.5);
-    ear.rotation.z = sx * -0.18;
-    const inner = add(new THREE.CapsuleGeometry(0.07, 0.5, 6, 12), pink, sx * 0.31, 1.46, 0.09);
-    inner.rotation.z = sx * -0.18;
+    const eye = add(new THREE.SphereGeometry(0.17, 14, 12), '#ffffff', sx * 0.25, 0.94, 0.42); eye.scale.set(1, 1.3, 0.6);
+    add(new THREE.SphereGeometry(0.075, 10, 8), '#212121', sx * 0.25, 0.94, 0.55);
+    const ear = add(new THREE.CapsuleGeometry(0.16, 0.95, 6, 12), grey, sx * 0.27, 1.62);
+    ear.rotation.z = sx * -0.16;
+    const inner = add(new THREE.CapsuleGeometry(0.075, 0.68, 6, 12), pink, sx * 0.3, 1.58, 0.09);
+    inner.rotation.z = sx * -0.16;
   }
 }
 function buildDaffyHead(g) {
   const M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 });
   const add = (geo, color, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, M(color)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
   const black = '#212121';
-  const skull = add(new THREE.SphereGeometry(0.62, 24, 18), black, 0, 0.62); skull.scale.set(1, 1.1, 0.95);
-  const bill = add(new THREE.SphereGeometry(0.3, 18, 14), '#ff9800', 0, 0.48, 0.55); bill.scale.set(1.35, 0.45, 1.0);
-  add(new THREE.BoxGeometry(0.5, 0.03, 0.05), '#e65100', 0, 0.6, 0.72);
+  const skull = add(new THREE.SphereGeometry(0.62, 24, 18), black, 0, 0.62); skull.scale.set(1, 1.12, 0.95);
+  const bill = add(new THREE.SphereGeometry(0.32, 18, 14), '#ff9800', 0, 0.44, 0.6); bill.scale.set(1.5, 0.42, 1.15);
+  const billLo = add(new THREE.SphereGeometry(0.3, 16, 12), '#fb8c00', 0, 0.36, 0.62); billLo.scale.set(1.35, 0.3, 1.0);
+  add(new THREE.BoxGeometry(0.55, 0.03, 0.05), '#e65100', 0, 0.58, 0.78);
   for (const sx of [-1, 1]) {
-    const eye = add(new THREE.SphereGeometry(0.17, 14, 12), '#ffffff', sx * 0.25, 0.98, 0.38); eye.scale.set(1, 1.2, 0.6);
-    add(new THREE.SphereGeometry(0.075, 10, 8), '#212121', sx * 0.25, 0.98, 0.51);
+    const eye = add(new THREE.SphereGeometry(0.18, 14, 12), '#ffffff', sx * 0.22, 1.04, 0.4); eye.scale.set(1, 1.25, 0.6);
+    add(new THREE.SphereGeometry(0.08,  10, 8), '#212121', sx * 0.22, 1.04, 0.54);
   }
   for (let i = -2; i <= 2; i++) {
-    const f = add(new THREE.ConeGeometry(0.12, 0.6 - Math.abs(i) * 0.08, 8), black, i * 0.18, 1.42);
-    f.rotation.z = -i * 0.3; f.rotation.x = -0.2;
+    const f = add(new THREE.ConeGeometry(0.13, 0.7 - Math.abs(i) * 0.09, 8), black, i * 0.19, 1.48);
+    f.rotation.z = -i * 0.32; f.rotation.x = -0.22;
   }
   const ring = add(new THREE.TorusGeometry(0.55, 0.1, 10, 24), '#ffffff', 0, 0.02);
   ring.rotation.x = Math.PI / 2;
@@ -125,10 +126,12 @@ export function buildCharacter(avatar) {
   const suitColor = BODY_SUITS[avatar.head];
   if (suitColor) for (const k of Object.keys(C)) C[k] = suitColor;
   const suit = avatar.shirt === 'shirt_suit' && !suitColor;
+  const isBugs = avatar.head === 'head_bugs', isDaffy = avatar.head === 'head_daffy';
   const root = new THREE.Group();
-  const torso = box(2, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
+  const torsoW = isBugs ? 1.8 : 2;
+  const torso = box(torsoW, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
   if (avatar.shirt && avatar.shirt !== 'shirt_none') {
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(torsoW, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
     d.position.z = 0.501; torso.add(d);
   }
   const headPivot = new THREE.Group(); headPivot.position.y = 4; root.add(headPivot);
@@ -143,20 +146,33 @@ export function buildCharacter(avatar) {
     face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
   }
   const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); }
-  const limb = (x, y, color) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(1, 2, 1, color); m.position.y = -1; p.add(m); root.add(p); return p; };
-  const larm = limb(-1.5, 4, suit ? '#263238' : C.larm), rarm = limb(1.5, 4, suit ? '#263238' : C.rarm);
-  const lleg = limb(-0.5, 2, C.lleg), rleg = limb(0.5, 2, C.rleg);
-  if (avatar.head === 'head_bugs') {
-    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), mat('#ffffff'));
+  const limb = (x, y, color, w = 1) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(w, 2, w, color); m.position.y = -1; p.add(m); root.add(p); return p; };
+  let larm, rarm, lleg, rleg;
+  if (isBugs) {
+    larm = limb(-1.35, 4, C.larm, 0.8); rarm = limb(1.35, 4, C.rarm, 0.8);
+    lleg = limb(-0.45, 2, C.lleg, 0.9); rleg = limb(0.45, 2, C.rleg, 0.9);
+    for (const leg of [lleg, rleg]) {
+      const foot = box(0.95, 0.45, 1.7, '#9e9e9e');
+      foot.position.set(0, -1.85, 0.45); foot.castShadow = true; leg.add(foot);
+    }
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 12), mat('#ffffff'));
     tail.position.set(0, 2.3, -0.62); tail.castShadow = true; root.add(tail);
-    const belly = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 0.15), mat('#f5f5f5'));
+    const belly = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.5, 0.15), mat('#f5f5f5'));
     belly.position.set(0, 2.9, 0.5); root.add(belly);
-  }
-  if (avatar.head === 'head_daffy') {
+  } else if (isDaffy) {
+    larm = limb(-1.35, 4, C.larm, 0.75); rarm = limb(1.35, 4, C.rarm, 0.75);
+    lleg = limb(-0.4, 2, '#ff9800', 0.55); rleg = limb(0.4, 2, '#ff9800', 0.55);
+    for (const leg of [lleg, rleg]) {
+      const foot = box(1.15, 0.28, 1.5, '#ff9800');
+      foot.position.set(0, -1.9, 0.5); foot.castShadow = true; leg.add(foot);
+    }
     for (let i = -1; i <= 1; i++) {
       const f = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 8), mat('#212121'));
       f.position.set(i * 0.3, 2.2, -0.7); f.rotation.x = 1.9; f.castShadow = true; root.add(f);
     }
+  } else {
+    larm = limb(-1.5, 4, suit ? '#263238' : C.larm); rarm = limb(1.5, 4, suit ? '#263238' : C.rarm);
+    lleg = limb(-0.5, 2, C.lleg); rleg = limb(0.5, 2, C.rleg);
   }
   root.userData.limbs = { larm, rarm, lleg, rleg, head: headPivot, torso };
   return root;
