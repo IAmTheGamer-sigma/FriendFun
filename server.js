@@ -246,6 +246,7 @@ app.put('/api/me/bio', auth, async (req, res) => {
 app.post('/api/buy/:item', auth, async (req, res) => {
   const it = ITEM[req.params.item];
   if (!it) return res.status(404).json({ error: 'No such item' });
+  if (it.limited) return res.status(403).json({ error: 'This item is event-only' });
   if (req.user.inventory.includes(it.id)) return res.status(400).json({ error: 'You already own this' });
   if (it.club && !isClub(req.user)) return res.status(403).json({ error: 'FriendClub members only' });
   const price = it.free ? 0 : it.price;
@@ -946,12 +947,27 @@ wss.on('connection', (ws) => {
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
-      const earnedBadges = [...new Set([...list(player.user, 'earnedBadges'), ...winBadges(player.game)])];
-      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges }).eq('name', player.user.name).select().single();
+      let earnedBadges = [...new Set([...list(player.user, 'earnedBadges'), ...winBadges(player.game)])];
+      let inventory = list(player.user, 'inventory');
+      let looneyWins = Array.isArray(player.user.looneyWins) ? [...player.user.looneyWins] : [];
+      let looneyComplete = false, looneyCoin = false;
+      if (player.game.event === 'looney' && looneyActive() && !looneyWins.includes(player.game.id)) {
+        looneyWins.push(player.game.id); looneyCoin = true;
+        if (looneyWins.length >= LOONEY_EVENT.need && !earnedBadges.includes(LOONEY_EVENT.badge)) {
+          earnedBadges.push(LOONEY_EVENT.badge);
+          inventory = [...new Set([...inventory, ...LOONEY_EVENT.items])];
+          looneyComplete = true;
+        }
+      }
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges, inventory, looneyWins }).eq('name', player.user.name).select().single();
       if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
       player.user = updated;
-      send(ws, { t: 'money', ...money(updated), earned: ECON.WIN_TIX });
+      send(ws, { t: 'money', ...money(updated), earned: ECON.WIN_TIX, ...(looneyCoin ? { looneyCoins: looneyWins.length } : {}) });
       broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix, ${winBadges(player.game).length} badge${winBadges(player.game).length === 1 ? '' : 's'} earned)` });
+      if (looneyComplete) {
+        notify(player.name, 'event', 'You collected all 20 Looney Coins! Bugs Bunny, Daffy Duck and the Looney Tunes badge are yours!', '#/looney');
+        broadcast(room, { t: 'chat', system: true, text: `🎉 ${player.name} collected all 20 Looney Coins and earned Bugs Bunny, Daffy Duck and the Looney Tunes badge!` });
+      }
     }
     else if (m.t === 'emote' && ['wave', 'dance', 'sit'].includes(m.e)) broadcast(room, { t: 'emote', id: player.id, e: m.e }, ws);
   });
@@ -1397,7 +1413,128 @@ addEventListener('resize', () => {
   res.send(html);
 });
 
+// ---------- Looney Tunes event ----------
+const LOONEY_EVENT = {
+  id: 'looney',
+  name: 'Looney Tunes Event',
+  starts: Date.parse('2026-10-06T00:00:00Z'),
+  ends: Date.parse('2026-10-27T00:00:00Z'),
+  need: 20,
+  badge: 'looney',
+  items: ['hat_bunnyears', 'face_buckteeth', 'hat_ducktuft', 'face_beak'],
+};
+const looneyActive = () => { const n = Date.now(); return n >= LOONEY_EVENT.starts && n <= LOONEY_EVENT.ends; };
+
+const LOONEY_GAMES = [
+  { name: "Bugs' Burrow Dash", desc: "What's up, doc? Hop through Bugs' burrow!", sky: '#9fd6ff', cols: ['#8ac926', '#ffca3a', '#ff924c'] },
+  { name: "Daffy's Duck Season", desc: "You're despicable! Dodge through duck season.", sky: '#ffb74d', cols: ['#ff9800', '#212121', '#ffca3a'] },
+  { name: "Porky's Perilous Path", desc: "Th-th-that's all it takes, folks!", sky: '#f8bbd0', cols: ['#f48fb1', '#ce93d8', '#ffffff'] },
+  { name: "Tweety's Cage Escape", desc: "I tawt I taw a way out!", sky: '#fff9c4', cols: ['#ffee58', '#29b6f6', '#ffffff'] },
+  { name: "Sylvester's Alley Chase", desc: "Sufferin' succotash! Chase that bird!", sky: '#b0bec5', cols: ['#78909c', '#ef5350', '#37474f'] },
+  { name: "Road Runner's Canyon Run", desc: "Beep beep! Zoom through the canyon!", sky: '#ffcc80', cols: ['#e65100', '#ffb74d', '#a1887f'] },
+  { name: "Wile E.'s Rocket Ride", desc: "Acme rockets: what could go wrong?", sky: '#90caf9', cols: ['#78909c', '#e53935', '#eceff1'] },
+  { name: "Taz's Tornado Spin", desc: "Hold on tight through the tornado!", sky: '#d7ccc8', cols: ['#8d6e63', '#a1887f', '#ffca3a'] },
+  { name: "Elmer's Forest Frolic", desc: "Shhh! Be vewy, vewy careful.", sky: '#a5d6a7', cols: ['#2e7d32', '#66bb6a', '#8d6e63'] },
+  { name: "Marvin's Martian Maze", desc: "Where's the kaboom? On Mars!", sky: '#1a237e', cols: ['#00e676', '#212121', '#76ff03'] },
+  { name: "Foghorn's Farmyard Frenzy", desc: "I say, I say, watch your step, boy!", sky: '#fff59d', cols: ['#e53935', '#ffffff', '#8d6e63'] },
+  { name: "Pepe's Parisian Promenade", desc: "Come with me, mon ami.", sky: '#ce93d8', cols: ['#7b1fa2', '#f48fb1', '#212121'] },
+  { name: "Speedy Gonzales Sprint", desc: "Arriba! The fastest race in Mexico!", sky: '#ffe082', cols: ['#d32f2f', '#ffca3a', '#ffffff'] },
+  { name: "Yosemite Sam's Showdown", desc: "Great horny toads! The rootin'est course!", sky: '#ffab91', cols: ['#b71c1c', '#0d47a1', '#ffca3a'] },
+  { name: "Granny's House Hijinks", desc: "Mind the knitting needles!", sky: '#d1c4e9', cols: ['#7e57c2', '#ffb74d', '#ffffff'] },
+  { name: "Acme Factory Floor", desc: "Fresh off the Acme assembly line!", sky: '#b0bec5', cols: ['#546e7a', '#ffc107', '#37474f'] },
+  { name: "Looney Tower Climb", desc: "Climb to the top of the Looney Tower!", sky: '#9fd6ff', cols: ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'] },
+  { name: "Carrot Patch Capers", desc: "So many carrots, so little time!", sky: '#c5e1a5', cols: ['#ff9800', '#33691e', '#8ac926'] },
+  { name: "Duck Dodgers' Space Station", desc: "In the 24th and a half century!", sky: '#0d1b2a', cols: ['#00e5ff', '#3a506b', '#ffffff'] },
+  { name: "That's All, Folks! Finale", desc: "The grand finale! Earn that last coin!", sky: '#ffd54f', cols: ['#ffd700', '#e53935', '#ffffff'] },
+];
+
+function looneyWorld(idx) {
+  const cfg = LOONEY_GAMES[idx];
+  const w = { sky: cfg.sky, parts: [] };
+  let pid = 1;
+  const P = (p, s, c, extra = {}) => w.parts.push({ id: 'p' + (pid++), name: extra.name || 'Part', p, s, c, k: 'part', m: 'plastic', ...extra });
+  let sd = 1234 + idx * 999;
+  const r = () => ((sd = (sd * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const cols = cfg.cols;
+  P([0, -40, 0], [2000, 1, 2000], '#ff3b1f', { name: 'Lava', k: 'kill', m: 'neon' });
+  P([0, 0, 0], [24, 2, 24], '#d9d9d9', { name: 'StartPlatform' });
+  P([0, 1.25, 0], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' });
+  const stages = 6 + Math.floor(idx / 3);
+  let z = -12, y = 0, x = 0;
+  for (let stage = 1; stage <= stages; stage++) {
+    const col = cols[stage % cols.length];
+    const type = stage % 5;
+    const hard = idx / 19;
+    if (type === 1) {
+      const n = 5 + Math.floor(r() * 3);
+      for (let i = 0; i < n; i++) { z -= 8 + r() * (2 + hard * 3); x += (r() - 0.5) * (6 + hard * 6); y += r() < 0.35 ? 2 : 0; P([x, y, z], [5 - hard, 1, 5 - hard], col); }
+    } else if (type === 2) {
+      z -= 22; P([x, y, z], [8, 1, 36], col, { name: 'Walkway' });
+      const kb = 4 + Math.floor(hard * 3);
+      for (let i = 0; i < kb; i++) P([x + (i % 2 ? 2 : -2), y + 0.75, z - 14 + i * (28 / kb)], [4, 0.5, 1.5], '#ff2020', { name: 'KillBrick', k: 'kill', m: 'neon' });
+      z -= 18;
+    } else if (type === 3) {
+      const n = 6 + Math.floor(hard * 3);
+      for (let i = 0; i < n; i++) { z -= 5; y += 2.2; P([x, y, z], [6, 1, 3], col, { name: 'Step' }); }
+    } else if (type === 4) {
+      z -= 10; P([x, y, z], [6, 1, 6], '#22ff88', { name: 'BouncePad', k: 'bounce', m: 'neon' });
+      z -= 14; y += 10; P([x, y, z], [8 - hard * 2, 1, 8 - hard * 2], col);
+    } else {
+      for (let i = 0; i < 3; i++) { z -= 12; P([x, y, z], [2 - hard * 0.5, 1, 14], col, { name: 'Beam' }); }
+      z -= 10;
+    }
+    z -= 10;
+    P([x, y, z], [12, 1, 12], '#efefef', { name: 'Stage' + stage });
+    P([x, y + 0.75, z], [5, 0.5, 5], '#2ec4ff', { name: 'Checkpoint' + stage, k: 'checkpoint', m: 'neon' });
+    P([x + 4, y + 2.5, z + 4], [1.2, 1.2, 1.2], '#ffd400', { name: 'Coin', k: 'coin' });
+  }
+  z -= 14;
+  P([x, y, z], [20, 1, 20], '#ffd700', { name: 'WinPlatform', m: 'neon' });
+  P([x, y + 0.75, z], [8, 0.5, 8], '#ffffff', { name: 'WinPad', k: 'win', m: 'neon' });
+  return w;
+}
+
+async function seedLooneyGames() {
+  try {
+    const { data: existing } = await supabase.from('games').select('id').eq('event', 'looney');
+    const have = new Set((existing || []).map(g => g.id));
+    if (have.size >= LOONEY_GAMES.length) return { created: 0 };
+    let created = 0;
+    for (let i = 0; i < LOONEY_GAMES.length; i++) {
+      const id = 'g_looney' + String(i + 1).padStart(2, '0');
+      if (have.has(id)) continue;
+      const cfg = LOONEY_GAMES[i];
+      const game = {
+        id, name: cfg.name, creator: 'FriendFun', description: '🥕 ' + cfg.desc,
+        world: sanitizeWorld(looneyWorld(i)), event: 'looney',
+        visits: 0, likes: 0, dislikes: 0, max_players: 30,
+        created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false,
+      };
+      const { error } = await supabase.from('games').insert(game);
+      if (error) console.warn('looney seed failed for', id, error.message);
+      else { created++; console.log('looney seed: created', id); }
+    }
+    return { created };
+  } catch (e) { console.warn('looney seed error:', e.message); return { created: 0 }; }
+}
+
+app.post('/api/admin/event/seed', auth, async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
+  res.json(await seedLooneyGames());
+});
+
+app.get('/api/event/looney', auth, async (req, res) => {
+  const { data: games } = await supabase.from('games').select('id,name,description,visits,thumbnail').eq('event', 'looney').order('id');
+  const wins = Array.isArray(req.user.looneyWins) ? req.user.looneyWins : [];
+  res.json({
+    id: LOONEY_EVENT.id, name: LOONEY_EVENT.name, need: LOONEY_EVENT.need,
+    starts: LOONEY_EVENT.starts, ends: LOONEY_EVENT.ends, active: looneyActive(),
+    games: games || [], wins, coins: wins.length, claimed: wins.length >= LOONEY_EVENT.need,
+  });
+});
+
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
+seedLooneyGames().then(r => console.log('Looney games seeded:', r.created));
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
