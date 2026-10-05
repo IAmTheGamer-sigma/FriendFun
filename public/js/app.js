@@ -11,6 +11,7 @@ const badgeDef = id => BADGE_DEFS[id] || (BADGES[id] ? { id, ...BADGES[id], cust
 const badgeIcon2 = (id, size = 18) => {
   const b = badgeDef(id);
   if (!b) return '';
+  if (b.image) return `<img src="${b.image}" width="${size}" height="${size}" style="border-radius:6px;vertical-align:-4px" title="${esc(b.name)}" alt="${esc(b.name)}">`;
   if (b.custom || b.icon) return `<span style="font-size:${size}px" title="${esc(b.name)}">${b.icon || '🏅'}</span>`;
   return badgeIcon(id, size);
 };
@@ -730,13 +731,15 @@ async function adminPage(q = '') {
     <section class="admin-section"><h3>Create Badge</h3>
       <div class="badge-creator">
         <input class="badge-name" placeholder="Badge name" maxlength="30">
-        <input class="badge-icon" placeholder="🏅" maxlength="4" title="Emoji icon">
+        <input class="badge-icon" placeholder="🏅" maxlength="4" title="Emoji icon (or upload image)">
+        <label class="btn-secondary btn-small" style="cursor:pointer">Upload image<input type="file" class="badge-file" accept="image/*" hidden></label>
+        <img class="badge-preview" style="display:none;width:32px;height:32px;border-radius:6px;vertical-align:middle">
         <input type="color" class="badge-color" value="#888888" title="Color">
         <input class="badge-desc" placeholder="Description" maxlength="100">
         <button class="btn-primary badge-create">Create</button>
       </div>
       <div class="custom-badges">${Object.values(BADGE_DEFS).filter(b => b.custom).map(b => `
-        <span class="custom-badge-chip"><span style="font-size:20px">${b.icon}</span> ${esc(b.name)}
+        <span class="custom-badge-chip">${b.image ? `<img src="${b.image}" style="width:20px;height:20px;border-radius:4px;vertical-align:-4px">` : `<span style="font-size:20px">${b.icon}</span>`} ${esc(b.name)}
         <button class="btn-danger btn-small badge-delete" data-id="${esc(b.id)}" title="Delete badge">×</button></span>`).join('') || '<span class="muted small">No custom badges yet</span>'}
       </div>
     </section>
@@ -799,6 +802,25 @@ async function adminPage(q = '') {
     });
     app.querySelectorAll('.items-give').forEach(b => b.onclick = () => cmd(b.dataset.name, 'give_all_items'));
     app.querySelectorAll('.daily-reset').forEach(b => b.onclick = () => cmd(b.dataset.name, 'reset_daily'));
+    let badgeImageData = '';
+    const bcFile = app.querySelector('.badge-file');
+    const bcPreview = app.querySelector('.badge-preview');
+    if (bcFile) bcFile.onchange = () => {
+      const f = bcFile.files[0];
+      if (!f) return;
+      const img = new Image();
+      img.onload = () => {
+        const max = 128;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        badgeImageData = c.toDataURL('image/png');
+        bcPreview.src = badgeImageData; bcPreview.style.display = '';
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(f);
+    };
     const bcBtn = app.querySelector('.badge-create');
     if (bcBtn) bcBtn.onclick = async () => {
       const name = app.querySelector('.badge-name').value.trim();
@@ -807,7 +829,7 @@ async function adminPage(q = '') {
       const desc = app.querySelector('.badge-desc').value.trim();
       if (!name) { toast('Enter a badge name', true); return; }
       try {
-        await api('POST', '/api/admin/badges', { name, icon, color, desc });
+        await api('POST', '/api/admin/badges', { name, icon, color, desc, image: badgeImageData });
         toast('Badge created'); await loadBadgeDefs(); adminPage(q);
       } catch (e) { toast(e.message, true); }
     };
