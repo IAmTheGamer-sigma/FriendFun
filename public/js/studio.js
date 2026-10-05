@@ -12,6 +12,12 @@ const PRESETS = {
   bounce: { name: 'BouncePad', s: [6, 1, 6], c: '#22ff88', k: 'bounce', m: 'neon' },
   speed: { name: 'SpeedPad', s: [4, 0.5, 4], c: '#ff9800', k: 'speed', m: 'neon' },
   win: { name: 'WinPad', s: [8, 0.5, 8], c: '#ffffff', k: 'win', m: 'neon' },
+  lava: { name: 'Lava', s: [4, 1, 4], c: '#ff4500', k: 'kill', m: 'neon' },
+  ice: { name: 'Ice', s: [4, 1, 4], c: '#a0e8ff', k: 'part', m: 'glass' },
+  wall: { name: 'Wall', s: [1, 12, 12], c: '#c0c0c0', k: 'part', m: 'brick' },
+  platform: { name: 'Platform', s: [12, 1, 12], c: '#8b9a6b', k: 'part', m: 'grass' },
+  gem: { name: 'Gem', s: [1.5, 1.5, 1.5], c: '#00ffcc', k: 'coin', m: 'neon' },
+  pillar: { name: 'Pillar', s: [2, 12, 2], c: '#a3a2a5', k: 'part', m: 'concrete' },
 };
 const MATERIALS = ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'metal', 'baseplate', 'spawn'];
 const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed'];
@@ -44,7 +50,7 @@ export class Studio {
           ${tool('select', 'Select', '&#x2196;', 'Select (1)')}${tool('move', 'Move', '&#x2725;', 'Move (2)')}${tool('scale', 'Scale', '&#x2922;', 'Scale (3)')}
         </div><div class="rb-label">Tools</div></div>
         <div class="rb-group"><div class="rb-row">
-          ${ins('part', 'Part', '#a3a2a5')}${ins('spawn', 'Spawn', '#6b6b6b')}${ins('kill', 'Kill', '#ff2020')}${ins('checkpoint', 'Checkpoint', '#2ec4ff')}${ins('coin', 'Coin', '#ffd400')}${ins('bounce', 'Bounce', '#22ff88')}${ins('speed', 'Speed', '#ff9800')}${ins('win', 'Win', '#ffffff')}
+          ${Object.entries(PRESETS).map(([k, pr]) => ins(k, pr.name, pr.c)).join('')}
         </div><div class="rb-label">Insert</div></div>
         <div class="rb-group"><div class="rb-row">
           <label class="rb-btn" title="Color of selection"><input type="color" class="rb-color" value="#a3a2a5">Color</label>
@@ -154,6 +160,8 @@ export class Studio {
     const p = this.sel;
     if (!p) { this.props.innerHTML = '<div class="st-empty">Select a part to see its properties</div>'; return; }
     const v3 = (k, label) => `<div class="pr-row"><span>${label}</span><div class="pr-v3">${[0, 1, 2].map(i => `<input type="number" step="0.5" data-v3="${k}" data-i="${i}" value="${+p[k][i].toFixed(2)}">`).join('')}</div></div>`;
+    const script = p.script?.onTouch || { action: 'none' };
+    const scriptActions = ['none', 'message', 'tix', 'teleport', 'kill'];
     this.props.innerHTML = `
       <div class="pr-sec">Data</div>
       <div class="pr-row"><span>Name</span><input data-f="name" value="${esc(p.name)}"></div>
@@ -164,10 +172,37 @@ export class Studio {
       <div class="pr-sec">Behavior</div>
       <div class="pr-row"><span>Type</span><select data-f="k">${KINDS.map(k => `<option ${k === p.k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
       <div class="pr-row"><span>CanCollide</span><input type="checkbox" data-f="cc" ${p.cc !== false ? 'checked' : ''}></div>
+      <div class="pr-sec">Scripting — On Touch</div>
+      <div class="pr-row"><span>Action</span><select data-script="action">${scriptActions.map(a => `<option value="${a}" ${script.action === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div>
+      <div class="pr-row"><span>Message</span><input data-script="text" placeholder="Hello!" value="${esc(script.text || '')}"></div>
+      <div class="pr-row"><span>FunTix</span><input type="number" data-script="amount" min="1" max="100" value="${script.amount || 5}"></div>
+      <div class="pr-row"><span>Teleport to</span><div class="pr-v3">${[0,1,2].map(i => `<input type="number" step="1" data-script-xyz="${i}" value="${[script.x ?? 0, script.y ?? 10, script.z ?? 0][i]}">`).join('')}</div></div>
       <div class="pr-sec">Transform</div>
       ${v3('p', 'Position')}${v3('s', 'Size')}`;
     this.props.querySelectorAll('input,select').forEach(inp => inp.addEventListener('change', () => {
       this.pushUndo();
+      if (inp.dataset.script) {
+        const key = inp.dataset.script;
+        if (!p.script) p.script = { onTouch: { action: 'none' } };
+        if (!p.script.onTouch) p.script.onTouch = { action: 'none' };
+        if (key === 'action') {
+          p.script.onTouch.action = inp.value;
+          if (inp.value === 'none') delete p.script;
+        } else if (key === 'text') {
+          p.script.onTouch.text = String(inp.value).slice(0, 120);
+        } else if (key === 'amount') {
+          p.script.onTouch.amount = Math.max(1, Math.min(100, Math.floor(Number(inp.value) || 5)));
+        }
+        this.markDirty(); this.renderProps(); return;
+      }
+      if (inp.dataset.scriptXyz !== undefined) {
+        const i = +inp.dataset.scriptXyz;
+        if (!p.script) p.script = { onTouch: { action: 'teleport', x: 0, y: 10, z: 0 } };
+        if (!p.script.onTouch) p.script.onTouch = { action: 'teleport', x: 0, y: 10, z: 0 };
+        const v = parseFloat(inp.value) || 0;
+        if (i === 0) p.script.onTouch.x = v; if (i === 1) p.script.onTouch.y = v; if (i === 2) p.script.onTouch.z = v;
+        this.markDirty(); return;
+      }
       if (inp.dataset.v3) { const v = parseFloat(inp.value); if (!isNaN(v)) p[inp.dataset.v3][+inp.dataset.i] = inp.dataset.v3 === 's' ? Math.max(0.05, v) : v; }
       else { const f = inp.dataset.f; if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; } else if (f === 'tr') { const t = Math.max(0, Math.min(1, parseFloat(inp.value) || 0)); if (t) p.tr = t; else delete p.tr; } else p[f] = inp.value; }
       this.refresh(p);
