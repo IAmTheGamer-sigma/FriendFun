@@ -434,7 +434,75 @@ app.get('/api/groups/:id', auth, async (req, res) => {
   const { data: group, error } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
   if (error || !group) return res.status(404).json({ error: 'Group not found' });
   const members = Array.isArray(group.members) ? group.members : [];
-  res.json({ ...groupView(group, req.user.name), memberList: members, icon: group.icon || '' });
+  const gameIds = Array.isArray(group.games) ? group.games : [];
+  let games = [];
+  if (gameIds.length) {
+    const { data: gameRows } = await supabase.from('games').select('id, name, creator, visits').in('id', gameIds);
+    games = (gameRows || []).map(g => ({ id: g.id, name: g.name, creator: g.creator, visits: g.visits || 0 }));
+  }
+  const announcements = (Array.isArray(group.announcements) ? group.announcements : []).slice(0, 50);
+  res.json({ ...groupView(group, req.user.name), memberList: members, icon: group.icon || '', games, announcements });
+});
+
+// Add game to group (owner only)
+app.post('/api/groups/:id/games', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can add games' });
+  const gameId = String(req.body?.gameId || '').trim();
+  if (!gameId) return res.status(400).json({ error: 'Game ID required' });
+  // Verify game exists and user owns it (or is admin)
+  const { data: game } = await supabase.from('games').select('id, creator').eq('id', gameId).single();
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (game.creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'You can only add your own games' });
+  const games = Array.isArray(group.games) ? group.games : [];
+  if (games.includes(gameId)) return res.status(400).json({ error: 'Game already in group' });
+  if (games.length >= 20) return res.status(400).json({ error: 'Group already has 20 games' });
+  const { error } = await supabase.from('groups').update({ games: [...games, gameId] }).eq('id', group.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Remove game from group (owner only)
+app.delete('/api/groups/:id/games/:gameId', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can remove games' });
+  const games = (Array.isArray(group.games) ? group.games : []).filter(g => g !== req.params.gameId);
+  const { error } = await supabase.from('groups').update({ games }).eq('id', group.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Post announcement (owner only)
+app.post('/api/groups/:id/announcements', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can post announcements' });
+  const title = filter(String(req.body?.title || '')).trim().slice(0, 80);
+  const content = filter(String(req.body?.content || '')).trim().slice(0, 1000);
+  if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
+  const announcements = Array.isArray(group.announcements) ? group.announcements : [];
+  if (announcements.length >= 50) return res.status(400).json({ error: 'Too many announcements, delete some first' });
+  const ann = { id: 'a' + Date.now().toString(36), title, content, author: req.user.name, created: Date.now() };
+  const { error } = await supabase.from('groups').update({ announcements: [ann, ...announcements] }).eq('id', group.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, announcement: ann });
+});
+
+// Delete announcement (owner only)
+app.delete('/api/groups/:id/announcements/:annId', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can delete announcements' });
+  const announcements = (Array.isArray(group.announcements) ? group.announcements : []).filter(a => a.id !== req.params.annId);
+  const { error } = await supabase.from('groups').update({ announcements }).eq('id', group.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 // Update group (owner: icon, description)
