@@ -114,20 +114,21 @@ export class Studio {
         this._aiParts = data.parts || [];
         this._aiHtml = data.html || '';
         const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        resultEl.innerHTML = `<div class="ai-msg">${data.message || ('Generated ' + this._aiParts.length + ' parts.')}</div>
-          <button class="rb-btn ai-add">Add to world (${this._aiParts.length} parts)</button>
+        // Automatically add parts to the world
+        this.pushUndo();
+        for (const part of this._aiParts) {
+          part.id = this.newId();
+          this.world.parts.push(part);
+        }
+        this.rebuildAll();
+        this.markDirty();
+        resultEl.innerHTML = `<div class="ai-msg">Done! Added ${this._aiParts.length} parts automatically. Edit them like any other parts. <button class="rb-btn ai-undo" style="margin-left:8px">Undo</button></div>
           ${this._aiHtml ? `<div class="ai-sec">HTML Script</div>
           <pre class="ai-code">${escHtml(this._aiHtml.slice(0, 2000))}</pre>
           <button class="rb-btn ai-copy">Copy HTML</button>` : ''}`;
-        resultEl.querySelector('.ai-add').onclick = () => {
-          this.pushUndo();
-          for (const part of this._aiParts) {
-            part.id = this.newId();
-            this.world.parts.push(part);
-          }
-          this.rebuildAll();
-          this.markDirty();
-          resultEl.querySelector('.ai-msg').textContent = 'Added! Edit them like any other parts.';
+        resultEl.querySelector('.ai-undo').onclick = () => {
+          this.undo();
+          resultEl.querySelector('.ai-msg').textContent = 'Undid AI insertion.';
         };
         const copyBtn = resultEl.querySelector('.ai-copy');
         if (copyBtn) copyBtn.onclick = async () => {
