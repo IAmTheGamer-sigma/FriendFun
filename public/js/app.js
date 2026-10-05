@@ -412,7 +412,7 @@ async function friendsPage() {
   });
 }
 
-async async function showGroupDetail(id, reload) {
+async function showGroupDetail(id, reload) {
   try {
     const g = await api('GET', '/api/groups/' + encodeURIComponent(id));
     const isOwner = g.isCreator || me.admin;
