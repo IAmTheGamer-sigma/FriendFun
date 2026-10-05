@@ -1077,19 +1077,22 @@ function horrorPage() {
     while (chat.children.length > 6) chat.firstChild.remove();
   }, 3200);
 
-  // PLAY -> jumpscare
+  // PLAY -> jumpscare -> the whole site becomes horror
   document.getElementById('hwPlay').onclick = () => {
     const s = document.createElement('div');
     s.className = 'hw-scare';
     s.innerHTML = `<div class="face">💀</div><div class="hw-after" id="hwAfter"></div>`;
     document.body.appendChild(s);
-    const after = ['there is no game.', 'only us.', 'stay a while.'];
+    const after = ['there is no game.', 'only us.', 'welcome to FearFun.'];
     let ai = 0;
     const aTimer = setInterval(() => {
       const el = document.getElementById('hwAfter');
       if (!el) { clearInterval(aTimer); return; }
       el.textContent = after[ai++];
-      if (ai > after.length) { clearInterval(aTimer); setTimeout(() => s.remove(), 2500); }
+      if (ai > after.length) {
+        clearInterval(aTimer);
+        setTimeout(() => { s.remove(); enableHorror(); location.hash = '#/home'; }, 1800);
+      }
     }, 900);
   };
 
@@ -1099,6 +1102,115 @@ function horrorPage() {
     document.body.classList.remove('horror');
     if (oldCleanup) oldCleanup();
   };
+}
+
+// ---------- SITE-WIDE HORROR MODE ----------
+let horrorMode = false;
+let horrorTimers = [];
+
+const HORROR_WORDS = [
+  [/FriendFun/g, 'FearFun'],
+  [/\bFriends\b/g, 'Victims'],
+  [/\bFriend\b/g, 'Victim'],
+  [/\bPLAY\b/g, 'SUMMON'],
+  [/\bPlay\b/g, 'Summon'],
+  [/\bGames\b/g, 'Rituals'],
+  [/\bGame\b/g, 'Ritual'],
+  [/\bGroups\b/g, 'Cults'],
+  [/\bGroup\b/g, 'Cult'],
+  [/\bHome\b/g, 'Hell'],
+  [/\bCatalog\b/g, 'Relics'],
+  [/\bAvatar\b/g, 'Vessel'],
+  [/\bLeaderboard\b/g, 'Death Toll'],
+  [/\bCreate\b/g, 'Conjure'],
+  [/\bDiscover\b/g, 'Unearth'],
+  [/\bShop\b/g, 'Crypt'],
+];
+
+function horrorWordSweep() {
+  const skip = new Set(['INPUT', 'TEXTAREA', 'SCRIPT', 'STYLE', 'CODE', 'PRE']);
+  const walker = document.createTreeWalker(document.getElementById('app'), NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    let el = n.parentElement;
+    let bad = false;
+    while (el && el.id !== 'app') { if (skip.has(el.tagName)) { bad = true; break; } el = el.parentElement; }
+    if (bad || !n.nodeValue.trim()) continue;
+    let v = n.nodeValue;
+    for (const [re, rep] of HORROR_WORDS) v = v.replace(re, rep);
+    if (v !== n.nodeValue) n.nodeValue = v;
+  }
+  // Logo text
+  document.querySelectorAll('.logo-text').forEach(e => { e.textContent = e.textContent.replace(/FriendFun/g, 'FearFun'); });
+}
+
+const HORROR_WHISPERS = ['we see you.', "don't log out.", "it's cold here.", 'stay a while.', 'we liked your vessel.', 'the rituals hunger.', 'you cannot wake up.'];
+function horrorWhisper() {
+  const d = document.createElement('div');
+  d.textContent = HORROR_WHISPERS[Math.floor(Math.random() * HORROR_WHISPERS.length)];
+  d.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:#f33;z-index:99997;pointer-events:none;font-style:italic;font-family:Georgia,serif;font-size:17px;text-shadow:0 0 10px #f00;opacity:0;transition:opacity 1.5s';
+  document.body.appendChild(d);
+  requestAnimationFrame(() => d.style.opacity = 1);
+  setTimeout(() => { d.style.opacity = 0; setTimeout(() => d.remove(), 1600); }, 3200);
+}
+
+function enableHorror() {
+  if (horrorMode) return;
+  horrorMode = true;
+  document.body.classList.remove('horror');
+  document.body.classList.add('horror-mode');
+  if (!document.getElementById('hm-css')) {
+    const st = document.createElement('style');
+    st.id = 'hm-css';
+    st.textContent = `
+    body.horror-mode { background:#050000 !important; }
+    body.horror-mode #app { animation:hmflick 6s infinite; }
+    @keyframes hmflick { 0%,100%{opacity:1} 93%{opacity:1} 94%{opacity:.72} 95%{opacity:1} 97%{opacity:.9} 98%{opacity:1} }
+    body.horror-mode h1, body.horror-mode h2, body.horror-mode h3 { color:#c00 !important; text-shadow:0 0 14px rgba(255,0,0,.8); font-family:Impact,'Arial Black',sans-serif !important; letter-spacing:.04em; }
+    body.horror-mode .btn-primary, body.horror-mode button.btn-primary { background:#5a0000 !important; border-color:#f00 !important; box-shadow:0 0 12px rgba(255,0,0,.5); }
+    body.horror-mode a { color:#f44 !important; }
+    body.horror-mode .card, body.horror-mode .panel, body.horror-mode .box { background:rgba(30,0,0,.6) !important; border-color:#500 !important; }
+    body.horror-mode input, body.horror-mode textarea, body.horror-mode select { background:#0d0000 !important; border-color:#500 !important; color:#d99 !important; }
+    body.horror-mode .topbar, body.horror-mode header, body.horror-mode nav { background:#0a0000 !important; border-color:#400 !important; }
+    body.horror-mode .logo-text { color:#f00 !important; text-shadow:0 0 12px #f00; font-family:Impact,'Arial Black',sans-serif !important; letter-spacing:.08em; }
+    #hm-fog { position:fixed; inset:-20%; pointer-events:none; z-index:99990;
+      background:radial-gradient(ellipse at 30% 60%, rgba(120,0,0,.10), transparent 60%),
+                 radial-gradient(ellipse at 70% 30%, rgba(120,0,0,.08), transparent 60%);
+      animation:hmfog 16s infinite alternate ease-in-out; }
+    @keyframes hmfog { from{transform:translateX(-4%)} to{transform:translateX(4%)} }
+    #hm-vig { position:fixed; inset:0; pointer-events:none; z-index:99991;
+      background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.85) 100%); }
+    #hm-wake { position:fixed; bottom:14px; right:14px; z-index:99999; background:transparent; border:1px solid #333;
+      color:#444; font-size:12px; padding:6px 12px; cursor:pointer; font-family:Georgia,serif; }
+    #hm-wake:hover { color:#999; border-color:#666; }`;
+    document.head.appendChild(st);
+  }
+  if (!document.getElementById('hm-fog')) {
+    const fog = document.createElement('div'); fog.id = 'hm-fog'; document.body.appendChild(fog);
+    const vig = document.createElement('div'); vig.id = 'hm-vig'; document.body.appendChild(vig);
+    const wake = document.createElement('button'); wake.id = 'hm-wake'; wake.textContent = 'wake up';
+    wake.onclick = () => disableHorror();
+    document.body.appendChild(wake);
+  }
+  horrorWordSweep();
+  horrorTimers.push(setInterval(horrorWordSweep, 1500));
+  const whisperLoop = () => {
+    if (!horrorMode) return;
+    horrorWhisper();
+    horrorTimers.push(setTimeout(whisperLoop, 25000 + Math.random() * 25000));
+  };
+  horrorTimers.push(setTimeout(whisperLoop, 8000));
+}
+
+function disableHorror() {
+  horrorMode = false;
+  horrorTimers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  horrorTimers = [];
+  document.body.classList.remove('horror-mode');
+  ['hm-fog', 'hm-vig', 'hm-wake'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); });
+  location.hash = '#/home';
+  setTimeout(() => route(), 50);
 }
 
 // ---------- IKNOW GLITCH MODE ----------
