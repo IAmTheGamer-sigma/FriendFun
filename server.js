@@ -1971,6 +1971,18 @@ app.get('/api/event/looney', auth, async (req, res) => {
 
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
 seedLooneyGames().then(r => console.log('Looney games seeded:', r.created));
+// Unlock the limited-edition Looney rewards for @fun
+(async () => {
+  try {
+    const { data: u } = await supabase.from('users').select('earnedBadges,inventory').eq('name', 'fun').maybeSingle();
+    if (u) {
+      const badges = [...new Set([...(Array.isArray(u.earnedBadges) ? u.earnedBadges : []), LOONEY_EVENT.badge])];
+      const inv = [...new Set([...(Array.isArray(u.inventory) ? u.inventory : []), ...LOONEY_EVENT.items])];
+      await supabase.from('users').update({ earnedBadges: badges, inventory: inv }).eq('name', 'fun');
+      console.log('Looney rewards unlocked for @fun');
+    }
+  } catch (e) { console.log('Looney @fun unlock failed:', e.message); }
+})();
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
