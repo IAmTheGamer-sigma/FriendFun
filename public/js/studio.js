@@ -47,7 +47,7 @@ export class Studio {
       </div>
       <div class="st-ribbon">
         <div class="rb-group"><div class="rb-row">
-          ${tool('select', 'Select', '&#x2196;', 'Select (1)')}${tool('move', 'Move', '&#x2725;', 'Move (2)')}${tool('scale', 'Scale', '&#x2922;', 'Scale (3)')}
+          ${tool('select', 'Select', '&#x2196;', 'Select (1)')}${tool('move', 'Move', '&#x2725;', 'Move (2)')}${tool('scale', 'Scale', '&#x2922;', 'Scale (3)')}${tool('rotate', 'Rotate', '&#x27F3;', 'Rotate (4)')}
         </div><div class="rb-label">Tools</div></div>
         <div class="rb-group"><div class="rb-row">
           ${Object.entries(PRESETS).map(([k, pr]) => ins(k, pr.name, pr.c)).join('')}
@@ -112,8 +112,13 @@ export class Studio {
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || 'Generation failed');
         this._aiParts = data.parts || [];
+        this._aiHtml = data.html || '';
+        const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         resultEl.innerHTML = `<div class="ai-msg">${data.message || ('Generated ' + this._aiParts.length + ' parts.')}</div>
-          <button class="rb-btn ai-add">Add to world (${this._aiParts.length} parts)</button>`;
+          <button class="rb-btn ai-add">Add to world (${this._aiParts.length} parts)</button>
+          ${this._aiHtml ? `<div class="ai-sec">HTML Script</div>
+          <pre class="ai-code">${escHtml(this._aiHtml.slice(0, 2000))}</pre>
+          <button class="rb-btn ai-copy">Copy HTML</button>` : ''}`;
         resultEl.querySelector('.ai-add').onclick = () => {
           this.pushUndo();
           for (const part of this._aiParts) {
@@ -122,7 +127,12 @@ export class Studio {
           }
           this.rebuildAll();
           this.markDirty();
-          resultEl.innerHTML = '<div class="ai-msg">Added! Edit them like any other parts.</div>';
+          resultEl.querySelector('.ai-msg').textContent = 'Added! Edit them like any other parts.';
+        };
+        const copyBtn = resultEl.querySelector('.ai-copy');
+        if (copyBtn) copyBtn.onclick = async () => {
+          try { await navigator.clipboard.writeText(this._aiHtml); copyBtn.textContent = 'Copied!'; }
+          catch { copyBtn.textContent = 'Copy failed'; }
         };
       } catch (e) {
         resultEl.innerHTML = '<div class="st-empty">Error: ' + promptEl.value.replace(/[<>&]/g, '') + ' - ' + String(e.message).replace(/[<>&]/g, '') + '</div>';
@@ -156,9 +166,9 @@ export class Studio {
   setTool(t) {
     this.tool = t;
     this.c.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
-    if (t === 'select') this.tc.detach(); else { this.tc.setMode(t === 'move' ? 'translate' : 'scale'); if (this.sel) this.tc.attach(this.meshes.get(this.sel.id)); }
+    if (t === 'select') this.tc.detach(); else { this.tc.setMode(t === 'move' ? 'translate' : t === 'rotate' ? 'rotate' : 'scale'); if (this.sel) this.tc.attach(this.meshes.get(this.sel.id)); }
   }
-  applySnap() { this.tc.setTranslationSnap(this.snap ? 1 : null); this.tc.setScaleSnap(this.snap ? 0.25 : null); }
+  applySnap() { this.tc.setTranslationSnap(this.snap ? 1 : null); this.tc.setScaleSnap(this.snap ? 0.25 : null); this.tc.setRotationSnap(this.snap ? Math.PI / 12 : null); }
 
   // ---------- world mesh management ----------
   rebuildAll() {
@@ -321,7 +331,7 @@ export class Studio {
       else if (e.code === 'Delete' || e.code === 'Backspace') this.remove();
       else if (e.code === 'Digit1') this.setTool('select');
       else if (e.code === 'Digit2') this.setTool('move');
-      else if (e.code === 'Digit3') this.setTool('scale');
+      else if (e.code === 'Digit3') this.setTool('scale');       else if (e.code === 'Digit4') this.setTool('rotate');
       else if (e.code === 'KeyF' && this.sel) { const p = new THREE.Vector3(...this.sel.p); const d = Math.max(...this.sel.s) * 1.5 + 8; this.camPos.copy(p).addScaledVector(this.forward(), -d); }
       else if (e.code === 'F5') { e.preventDefault(); this.play(); }
     };
