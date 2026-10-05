@@ -674,6 +674,155 @@ setInterval(() => {
   }
 }, 66);
 
+// ---------- AI Coder (rule-based generator, swap for LLM later) ----------
+function aiGenerateParts(prompt) {
+  const p = String(prompt || '').toLowerCase().slice(0, 500);
+  const parts = [];
+  let n = 1;
+  const nid = () => 'ai' + (n++) + '_' + Math.random().toString(36).slice(2, 6);
+  const add = (name, k, s, c, m, x, y, z, extra = {}) => {
+    parts.push({ id: nid(), name: String(name).slice(0, 40), k, s, c, m, p: [x, y, z], ...extra });
+  };
+  const has = (...words) => words.some(w => p.includes(w));
+  if (has('obby', 'obstacle', 'course', 'parkour')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 0);
+    for (let i = 0; i < 5; i++) {
+      const x = (i + 1) * 10;
+      add('Platform ' + (i + 1), 'part', [6, 1, 6], '#a3a2a5', 'plastic', x, 10, 0);
+      add('Checkpoint ' + (i + 1), 'checkpoint', [5, 0.5, 5], '#2ec4ff', 'neon', x, 10.8, 0);
+      if (i % 2 === 1) add('Coin ' + (i + 1), 'coin', [1.2, 1.2, 1.2], '#ffd400', 'plastic', x, 12, 3);
+    }
+    add('Lava Pit', 'kill', [30, 1, 16], '#ff4500', 'neon', 30, 5, 0);
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 60, 10.8, 0,
+      { script: { onTouch: { action: 'message', text: 'You win!' } } });
+  }
+  if (has('tower', 'climb')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 20, 10.8, 0);
+    for (let i = 0; i < 6; i++) {
+      add('Tower Level ' + (i + 1), 'part', [10 - i, 1, 10 - i], '#c0c0c0', 'concrete', 0, 10 + i * 5, 0);
+    }
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 0, 41, 0);
+  }
+  if (has('lava')) {
+    add('Lava', 'kill', [12, 1, 12], '#ff4500', 'neon', 0, 10, 0,
+      { script: { onTouch: { action: 'message', text: 'Ouch! Lava!' } } });
+  }
+  if (has('coin', 'collect', 'treasure')) {
+    for (let i = 0; i < 6; i++) {
+      add('Coin ' + (i + 1), 'coin', [1.2, 1.2, 1.2], '#ffd400', 'plastic', i * 4 - 10, 12, 5);
+    }
+    add('Gem', 'coin', [1.5, 1.5, 1.5], '#00ffcc', 'neon', 0, 12, -5,
+      { script: { onTouch: { action: 'tix', amount: 10 } } });
+  }
+  if (has('bounce', 'trampoline')) {
+    for (let i = 0; i < 3; i++) add('Bounce ' + (i + 1), 'bounce', [6, 1, 6], '#22ff88', 'neon', i * 12, 10, 0);
+  }
+  if (has('speed', 'race')) {
+    for (let i = 0; i < 3; i++) add('Speed ' + (i + 1), 'speed', [4, 0.5, 4], '#ff9800', 'neon', i * 12, 10.5, 0);
+  }
+  if (has('teleport', 'portal')) {
+    add('Portal', 'part', [4, 6, 1], '#8a4bd8', 'neon', 0, 13, 0,
+      { script: { onTouch: { action: 'teleport', x: 20, y: 15, z: 0 } } });
+    add('Portal Exit', 'part', [4, 1, 4], '#8a4bd8', 'neon', 20, 10, 0);
+  }
+  if (has('message', 'sign', 'text')) {
+    const msg = String(prompt).slice(0, 60);
+    add('Message Sign', 'part', [6, 3, 1], '#ffffff', 'plastic', 0, 12, 0,
+      { script: { onTouch: { action: 'message', text: msg || 'Hello!' } } });
+  }
+  if (!parts.length) {
+    // Default: a starter platform with a message script
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 0);
+    add('Starter Platform', 'part', [12, 1, 12], '#8b9a6b', 'grass', 0, 10, 0);
+    add('Welcome Sign', 'part', [6, 3, 1], '#ffffff', 'plastic', 0, 13, -5,
+      { script: { onTouch: { action: 'message', text: 'Welcome to my game!' } } });
+  }
+  return parts.slice(0, 50);
+}
+app.post('/api/ai/coder', auth, async (req, res) => {
+  const prompt = String(req.body?.prompt || '').trim().slice(0, 500);
+  if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+  try {
+    const parts = aiGenerateParts(prompt);
+    res.json({ parts, message: `Generated ${parts.length} parts. Click "Add to world" to insert them.` });
+  } catch (e) {
+    res.status(500).json({ error: 'AI coder failed: ' + e.message });
+  }
+});
+
+// ---------- HTML export for games ----------
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+app.get('/g/:id.html', async (req, res) => {
+  const { data: g } = await supabase.from('games').select('*').eq('id', req.params.id).single();
+  if (!g || g.unpublished) return res.status(404).send('Game not found');
+  const world = g.world || { sky: '#8fc8ff', parts: [] };
+  const worldJson = JSON.stringify(world).replace(/</g, '\\u003c');
+  const title = escapeHtml(g.name || 'FriendFun Game');
+  const desc = escapeHtml(g.description || '');
+  const creator = escapeHtml(g.creator || 'Unknown');
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title} - FriendFun</title>
+<style>
+body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #fff; }
+#hdr { padding: 12px 16px; background: #1b1d1f; display: flex; align-items: center; gap: 12px; }
+#hdr h1 { font-size: 18px; margin: 0; }
+#hdr .meta { color: #aaa; font-size: 13px; }
+#c { display: block; width: 100vw; height: calc(100vh - 53px); }
+</style>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="hdr"><h1>${title}</h1><span class="meta">by ${creator} &middot; ${desc}</span><span class="meta" style="margin-left:auto">Exported from FriendFun</span></div>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const WORLD = ${worldJson};
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(innerWidth, innerHeight - 53);
+renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(WORLD.sky || '#8fc8ff');
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(50, 80, 30); sun.castShadow = true;
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / (innerHeight - 53), 0.1, 3000);
+camera.position.set(30, 30, 30);
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 10, 0); controls.update();
+for (const p of (WORLD.parts || [])) {
+  const geo = new THREE.BoxGeometry(p.s[0], p.s[1], p.s[2]);
+  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(p.c || '#a3a2a5'), roughness: 0.8 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(p.p[0], p.p[1], p.p[2]);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / (innerHeight - 53);
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight - 53);
+});
+</script>
+</body>
+</html>`;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
