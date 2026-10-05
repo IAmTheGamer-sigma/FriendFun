@@ -830,7 +830,7 @@ wss.on('connection', (ws) => {
       const g = gameRes.data;
 
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
-      if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map() });
+      if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map(), coins: new Set((g.world?.parts || []).filter(p => p.k === 'coin').map(p => p.id)) });
       room = rooms.get(g.id);
       if (room.players.size >= (g.max_players || 30)) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
@@ -863,7 +863,7 @@ wss.on('connection', (ws) => {
     }
     else if (m.t === 'coin' && typeof m.part === 'string') {
       const now = Date.now();
-      if (player.coins.has(m.part) || now - player.lastCoin < 150) return;
+      if (!room.coins.has(m.part) || player.coins.has(m.part) || now - player.lastCoin < 150) return;
       const coinId = m.part;
       player.coins.add(coinId); player.lastCoin = now;
       const earned = ECON.COIN_TIX + (isClub(player.user) ? ECON.CLUB_COIN_BONUS : 0);
@@ -871,6 +871,18 @@ wss.on('connection', (ws) => {
       if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned });
+    }
+    else if (m.t === 'scriptTix') {
+      const now = Date.now();
+      const amt = Math.max(1, Math.min(100, Math.floor(Number(m.amount) || 0)));
+      if (!amt) return;
+      const st = player.scriptTix || (player.scriptTix = { last: 0, total: 0 });
+      if (now - st.last < 5000 || st.total + amt > 500) return;
+      st.last = now; st.total += amt;
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + amt }).eq('name', player.user.name).select().single();
+      if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
+      player.user = updated;
+      send(ws, { t: 'money', ...money(updated), earned: amt });
     }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
@@ -1250,14 +1262,6 @@ app.post('/api/ai/coder', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'AI coder failed: ' + e.message });
   }
-});
-
-// ---------- iknow easter egg ----------
-app.get('/iknow', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-app.get('/iknow/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ---------- HTML export for games ----------
