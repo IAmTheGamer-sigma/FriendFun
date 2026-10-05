@@ -118,6 +118,10 @@ async function auth(req, res, next) {
   if (sErr || !session) return res.status(401).json({ error: 'Not logged in' });
   const { data: user, error: uErr } = await supabase.from('users').select('*').eq('name', session.username).single();
   if (uErr || !user) return res.status(401).json({ error: 'User not found' });
+  if (user.banned && (!user.bannedUntil || user.bannedUntil > Date.now())) {
+    await supabase.from('sessions').delete().eq('token', tok);
+    return res.status(403).json({ error: 'Your account is banned' });
+  }
   req.user = user;
   touch(req.user.name);
   next();
@@ -148,6 +152,10 @@ app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
   const { data: u, error: uErr } = await supabase.from('users').select('*').eq('name', key(username || '')).single();
   if (uErr || !u || hash(password || '', u.salt) !== u.pw) return res.status(400).json({ error: 'Incorrect username or password' });
+  if (u.banned && (!u.bannedUntil || u.bannedUntil > Date.now())) {
+    const msg = u.banReason ? `Banned: ${u.banReason}` : 'Your account is banned';
+    return res.status(403).json({ error: msg });
+  }
   
   const tok = crypto.randomBytes(24).toString('hex');
   await supabase.from('sessions').insert({ token: tok, username: u.name });
@@ -290,7 +298,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess }))));
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0 }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -342,6 +350,17 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   } else if (command === 'revoke_ai') {
     updates = { aiAccess: false };
     message = `Revoked AI coder access from ${user.name}`;
+  } else if (command === 'ban') {
+    if (isAdmin(user)) return res.status(400).json({ error: 'Cannot ban an admin' });
+    const reason = String(req.body?.reason || '').slice(0, 200);
+    const days = Math.max(0, Math.min(365, Math.floor(Number(req.body?.days) || 0)));
+    updates = { banned: true, banReason: reason, bannedUntil: days > 0 ? Date.now() + days * 864e5 : 0 };
+    message = `Banned ${user.name}${days ? ` for ${days} days` : ' permanently'}${reason ? `: ${reason}` : ''}`;
+    // Kill their sessions
+    await supabase.from('sessions').delete().eq('username', user.name);
+  } else if (command === 'unban') {
+    updates = { banned: false, banReason: '', bannedUntil: 0 };
+    message = `Unbanned ${user.name}`;
   } else {
     return res.status(400).json({ error: 'Unknown admin command' });
   }
