@@ -27,8 +27,10 @@ export class Studio {
   constructor(container, o) {
     this.c = container; this.o = o;
     this.world = structuredClone(o.world);
+    if (!Array.isArray(this.world.folders)) this.world.folders = [];
+    if (!Array.isArray(this.world.scripts)) this.world.scripts = [];
     this.gameId = o.gameId || null; this.name = o.name || 'Untitled Game'; this.description = o.description || '';
-    this.meshes = new Map(); this.sel = null; this.undoStack = []; this.redoStack = []; this.dirty = false;
+    this.meshes = new Map(); this.sel = null; this.closedFolders = new Set(); this.undoStack = []; this.redoStack = []; this.dirty = false;
     this.snap = true; this.keys = {};
     this.dom(); this.three(); this.bind(); this.rebuildAll();
     const sp = findSpawn(this.world);
@@ -201,8 +203,128 @@ export class Studio {
     this.renderProps();
   }
   renderExplorer() {
-    this.explorer.innerHTML = `<div class="ex-root">&#x25B8; Workspace</div>` + this.world.parts.map(p => `<div class="ex-item" data-id="${p.id}"><i class="sw" style="background:${p.c}"></i>${esc(p.name)}</div>`).join('');
-    this.explorer.onclick = e => { const it = e.target.closest('.ex-item'); if (it) this.select(this.world.parts.find(p => p.id === it.dataset.id)); };
+    const folders = this.world.folders || [];
+    const scripts = this.world.scripts || [];
+    const parts = this.world.parts || [];
+    const folderMap = {};
+    folders.forEach(f => folderMap[f.id] = f);
+    // Parts grouped by folder
+    const partsByFolder = { '': [] };
+    parts.forEach(p => { const fid = p.folder || ''; if (!partsByFolder[fid]) partsByFolder[fid] = []; partsByFolder[fid].push(p); });
+    const scriptsByFolder = { '': [] };
+    scripts.forEach(s => { const fid = s.folder || ''; if (!scriptsByFolder[fid]) scriptsByFolder[fid] = []; scriptsByFolder[fid].push(s); });
+
+    const renderFolder = (fid, depth) => {
+      const f = fid ? folderMap[fid] : null;
+      const isOpen = fid ? !this.closedFolders.has(fid) : true;
+      let html = '';
+      if (f) {
+        html += `<div class="ex-folder" data-fid="${f.id}" style="padding-left:${depth * 12}px">
+          <span class="ex-toggle">${isOpen ? '&#x25BE;' : '&#x25B8;'}</span>
+          <span class="ex-fico">&#x1F4C1;</span>
+          <span class="ex-fname">${esc(f.name)}</span>
+          <span class="ex-actions">
+            <button class="ex-act" data-act="rename-folder" title="Rename">✎</button>
+            <button class="ex-act" data-act="del-folder" title="Delete">✕</button>
+          </span>
+        </div>`;
+      }
+      if (isOpen) {
+        // Subfolders
+        folders.filter(sf => (sf.parent || '') === fid).forEach(sf => { html += renderFolder(sf.id, depth + 1); });
+        // Scripts in this folder
+        (scriptsByFolder[fid] || []).forEach(s => {
+          html += `<div class="ex-item ex-script" data-sid="${s.id}" style="padding-left:${(depth + 1) * 12 + 16}px">
+            <span class="ex-sico">&#x1F4DD;</span>${esc(s.name)}
+            <span class="ex-actions"><button class="ex-act" data-act="del-script" title="Delete">✕</button></span>
+          </div>`;
+        });
+        // Parts in this folder
+        (partsByFolder[fid] || []).forEach(p => {
+          html += `<div class="ex-item" data-id="${p.id}" style="padding-left:${(depth + 1) * 12 + 16}px"><i class="sw" style="background:${p.c}"></i>${esc(p.name)}</div>`;
+        });
+      }
+      return html;
+    };
+
+    this.explorer.innerHTML = `
+      <div class="ex-toolbar">
+        <button class="ex-tbtn" data-act="new-folder" title="New Folder">📁+</button>
+        <button class="ex-tbtn" data-act="new-script" title="New Script">📝+</button>
+      </div>
+      <div class="ex-root">&#x25B8; Workspace</div>` + renderFolder('', 0);
+
+    this.explorer.onclick = e => {
+      const actBtn = e.target.closest('.ex-act, .ex-tbtn');
+      if (actBtn) { this.explorerAction(actBtn.dataset.act, actBtn); return; }
+      const folderEl = e.target.closest('.ex-folder');
+      if (folderEl && !e.target.closest('.ex-actions')) {
+        const fid = folderEl.dataset.fid;
+        if (this.closedFolders.has(fid)) this.closedFolders.delete(fid); else this.closedFolders.add(fid);
+        this.renderExplorer(); return;
+      }
+      const scriptEl = e.target.closest('.ex-script');
+      if (scriptEl && !e.target.closest('.ex-actions')) { this.openScriptEditor(scriptEl.dataset.sid); return; }
+      const it = e.target.closest('.ex-item');
+      if (it) this.select(this.world.parts.find(p => p.id === it.dataset.id));
+    };
+  }
+  explorerAction(act, btn) {
+    if (act === 'new-folder') {
+      const name = prompt('Folder name:', 'New Folder');
+      if (!name) return;
+      const id = 'f' + Date.now().toString(36);
+      this.world.folders.push({ id, name: name.trim(), parent: '' });
+      this.markDirty(); this.renderExplorer();
+    } else if (act === 'new-script') {
+      const name = prompt('Script name:', 'script.js');
+      if (!name) return;
+      const id = 's' + Date.now().toString(36);
+      this.world.scripts.push({ id, name: name.trim().endsWith('.js') ? name.trim() : name.trim() + '.js', folder: '', code: '// Write your script here\n// Available: onStart(fn), onTouch(partName, fn), giveTix(player, n), teleport(player, x, y, z), say(player, msg)\n\nonStart(() => {\n  \n});\n' });
+      this.markDirty(); this.renderExplorer(); this.openScriptEditor(id);
+    } else if (act === 'rename-folder') {
+      const fid = btn.closest('.ex-folder').dataset.fid;
+      const f = this.world.folders.find(x => x.id === fid);
+      const name = prompt('Rename folder:', f.name);
+      if (name) { f.name = name.trim(); this.markDirty(); this.renderExplorer(); }
+    } else if (act === 'del-folder') {
+      const fid = btn.closest('.ex-folder').dataset.fid;
+      if (!confirm('Delete this folder? Items inside will move to root.')) return;
+      this.world.folders = this.world.folders.filter(x => x.id !== fid);
+      this.world.parts.forEach(p => { if (p.folder === fid) p.folder = ''; });
+      this.world.scripts.forEach(s => { if (s.folder === fid) s.folder = ''; });
+      this.markDirty(); this.renderExplorer();
+    } else if (act === 'del-script') {
+      const sid = btn.closest('.ex-script').dataset.sid;
+      if (!confirm('Delete this script?')) return;
+      this.world.scripts = this.world.scripts.filter(x => x.id !== sid);
+      this.markDirty(); this.renderExplorer();
+    }
+  }
+  openScriptEditor(sid) {
+    const s = this.world.scripts.find(x => x.id === sid);
+    if (!s) return;
+    const d = document.createElement('div'); d.className = 'modal-bg';
+    d.innerHTML = `<div class="modal modal-wide"><h2>📝 ${esc(s.name)}</h2>
+      <p class="muted small">Script API: <code>onStart(fn)</code> · <code>onTouch(partName, fn)</code> · <code>giveTix(player, n)</code> · <code>teleport(player, x, y, z)</code> · <code>say(player, msg)</code> · <code>kill(player)</code></p>
+      <textarea class="script-code" spellcheck="false">${esc(s.code || '')}</textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary">Close</button>
+        <button type="button" class="btn-primary">Save Script</button>
+      </div></div>`;
+    document.body.appendChild(d);
+    const ta = d.querySelector('.script-code');
+    // Tab key inserts spaces
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Tab') { e.preventDefault(); const st = ta.selectionStart; ta.value = ta.value.slice(0, st) + '  ' + ta.value.slice(ta.selectionEnd); ta.selectionStart = ta.selectionEnd = st + 2; }
+    });
+    d.querySelector('.btn-secondary').onclick = () => d.remove();
+    d.onclick = e => { if (e.target === d) d.remove(); };
+    d.querySelector('.btn-primary').onclick = () => {
+      s.code = ta.value;
+      this.markDirty(); d.remove();
+      toast('Script saved');
+    };
   }
   renderExplorerItem(p) { const el = this.explorer.querySelector(`[data-id="${p.id}"]`); if (el) el.innerHTML = `<i class="sw" style="background:${p.c}"></i>${esc(p.name)}`; }
   renderProps() {
