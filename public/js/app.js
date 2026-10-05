@@ -270,9 +270,8 @@ async function gamePage(id) {
 async function playPage(id) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
-  app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"><div class="ff-loader"><div class="ff-loader-spin"></div><p>Loading 3D...</p></div></div>';
+  app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
   const { Game } = await import('./game.js');
-  app.querySelector('.play-container').innerHTML = '';
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -574,9 +573,7 @@ async function studioPage(id, tpl) {
   else { g = await api('GET', '/api/games/' + id); if (g.creator.toLowerCase() !== me.name.toLowerCase()) { toast('You can only edit your own games', true); location.hash = '#/games/' + id; return; } }
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
-  app.querySelector('.studio-container').innerHTML = '<div class="ff-loader"><div class="ff-loader-spin"></div><p>Loading Studio...</p></div>';
   const { Studio } = await import('./studio.js');
-  app.querySelector('.studio-container').innerHTML = '';
   const studio = new Studio(app.querySelector('.studio-container'), {
     gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
