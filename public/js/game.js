@@ -152,7 +152,7 @@ export class Game {
       const box = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2] };
       if (p.k === 'coin') { box.min = box.min.map(v => v - 0.3); box.max = box.max.map(v => v + 0.3); this.triggers.push(box); continue; }
       if (p.cc !== false) this.solids.push(box);
-      if (p.k !== 'part' && p.k !== 'spawn') this.triggers.push(box);
+      if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) this.triggers.push(box);
     }
     this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
     this.char = buildCharacter(this.me.avatar);
@@ -361,6 +361,26 @@ export class Game {
         this.collected.add(p.id); this.meshes.get(p.id).visible = false; sfx.coin();
         this.send({ t: 'coin', part: p.id });
         if (this.o.test) this.txCount.textContent = this.collected.size + ' coins';
+      }
+      const sc = p.script?.onTouch;
+      if (sc && sc.action && sc.action !== 'none') {
+        const now = performance.now();
+        if (!this._scriptCd) this._scriptCd = new Map();
+        const last = this._scriptCd.get(p.id) || 0;
+        if (now - last > 2000) {
+          this._scriptCd.set(p.id, now);
+          if (sc.action === 'message') this.showBig(String(sc.text || 'Hello!').slice(0, 120), 2000);
+          else if (sc.action === 'kill') this.die();
+          else if (sc.action === 'teleport') {
+            this.pos.set(Number(sc.x) || 0, Number(sc.y) || 10, Number(sc.z) || 0);
+            this.vel.set(0, 0, 0);
+            this.showBig('Teleported!', 1500);
+          } else if (sc.action === 'tix') {
+            const amt = Math.max(1, Math.min(100, Math.floor(Number(sc.amount) || 5)));
+            this.showBig(`+${amt} FunTix!`, 2000);
+            this.send({ t: 'coin', part: 'script_' + p.id });
+          }
+        }
       }
     }
   }
