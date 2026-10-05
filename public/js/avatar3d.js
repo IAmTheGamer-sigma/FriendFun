@@ -15,6 +15,8 @@ function faceTexture(id) {
     case 'face_wink': g.beginPath(); g.ellipse(44, 50, 7, 9, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(74, 52); g.lineTo(94, 50); g.stroke(); g.beginPath(); g.arc(64, 70, 24, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); break;
     case 'face_shock': eyes(22); g.beginPath(); g.ellipse(64, 90, 10, 14, 0, 0, Math.PI * 2); g.fill(); break;
     case 'face_mad': eyes(14); g.beginPath(); g.moveTo(32, 32); g.lineTo(54, 42); g.moveTo(96, 32); g.lineTo(74, 42); g.stroke(); g.beginPath(); g.arc(64, 104, 22, 1.2 * Math.PI, 1.8 * Math.PI); g.stroke(); break;
+    case 'face_buckteeth': eyes(); g.beginPath(); g.moveTo(34, 74); g.quadraticCurveTo(64, 108, 94, 74); g.closePath(); g.fill(); g.fillStyle = '#fff'; g.fillRect(52, 80, 10, 20); g.fillRect(66, 80, 10, 20); g.strokeStyle = '#111'; g.lineWidth = 3; g.strokeRect(52, 80, 10, 20); g.strokeRect(66, 80, 10, 20); break;
+    case 'face_beak': eyes(); g.fillStyle = '#ff9800'; g.beginPath(); g.ellipse(64, 88, 26, 14, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#e65100'; g.lineWidth = 4; g.beginPath(); g.moveTo(40, 88); g.lineTo(88, 88); g.stroke(); break;
     default: eyes(); g.beginPath(); g.arc(64, 66, 26, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
@@ -52,6 +54,16 @@ function buildHat(id) {
     case 'hat_clubhat': { add(new THREE.SphereGeometry(0.7, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), it.color); add(new THREE.CylinderGeometry(0.95, 0.95, 0.07, 28), it.color, 0, 0.03); const r = add(new THREE.TorusGeometry(0.66, 0.07, 6, 24, Math.PI), '#f2c200'); r.rotation.y = Math.PI / 2; break; }
     case 'hat_cone': add(new THREE.ConeGeometry(0.6, 1.4, 20), it.color, 0, 0.65); add(new THREE.CylinderGeometry(0.36, 0.44, 0.22, 20), '#ffffff', 0, 0.75); add(new THREE.BoxGeometry(1.3, 0.1, 1.3), it.color, 0, 0); break;
     case 'hat_beanie': add(new THREE.SphereGeometry(0.68, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), it.color, 0, -0.05); add(new THREE.CylinderGeometry(0.69, 0.69, 0.22, 20), '#004d40', 0, 0); add(new THREE.SphereGeometry(0.18), '#ffffff', 0, 0.68); break;
+    case 'hat_bunnyears': {
+      for (const sx of [-1, 1]) {
+        const ear = add(new THREE.CapsuleGeometry(0.16, 0.85, 6, 12), '#9e9e9e', sx * 0.3, 0.85);
+        ear.rotation.z = sx * -0.16;
+        const inner = add(new THREE.CapsuleGeometry(0.08, 0.55, 6, 12), '#f8bbd0', sx * 0.31, 0.82, 0.1);
+        inner.rotation.z = sx * -0.16;
+      } break; }
+    case 'hat_ducktuft': {
+      for (let i = -1; i <= 1; i++) { const f = add(new THREE.ConeGeometry(0.16, 0.7, 8), '#212121', i * 0.26, 0.4); f.rotation.z = -i * 0.38; f.rotation.x = -0.25; }
+      break; }
   }
   return g;
 }
