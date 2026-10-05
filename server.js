@@ -183,7 +183,7 @@ app.get('/api/me', auth, async (req, res) => {
     } 
   }
   const { amount: daily } = await dailyTix(u);
-  res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever });
+  res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
 });
 
 app.post('/api/ping', auth, async (req, res) => { 
@@ -290,7 +290,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix }))));
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -336,6 +336,12 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     const earned = (Array.isArray(user.earnedBadges) ? user.earnedBadges : []).filter(id => id !== badgeId);
     updates = { earnedBadges: earned };
     message = `Removed ${BADGES[badgeId].name} badge from ${user.name}`;
+  } else if (command === 'grant_ai') {
+    updates = { aiAccess: true };
+    message = `Granted AI coder access to ${user.name}`;
+  } else if (command === 'revoke_ai') {
+    updates = { aiAccess: false };
+    message = `Revoked AI coder access from ${user.name}`;
   } else {
     return res.status(400).json({ error: 'Unknown admin command' });
   }
@@ -351,6 +357,7 @@ function groupView(group, username) {
     id: group.id,
     name: group.name,
     description: group.description || '',
+    icon: group.icon || '',
     creator,
     created: group.created,
     members: members.length,
@@ -371,7 +378,8 @@ app.post('/api/groups', auth, async (req, res) => {
   if (name.length < 3) return res.status(400).json({ error: 'Group name must be at least 3 characters' });
   const { data: existing } = await supabase.from('groups').select('id').ilike('name', name).maybeSingle();
   if (existing) return res.status(400).json({ error: 'That group name is already taken' });
-  const group = { id: `group_${crypto.randomUUID()}`, name, description, creator: req.user.name, members: [req.user.name], created: Date.now() };
+  const icon = String(req.body?.icon || '').slice(0, 4);
+  const group = { id: `group_${crypto.randomUUID()}`, name, description, icon, creator: req.user.name, members: [req.user.name], created: Date.now() };
   const { data, error } = await supabase.from('groups').insert(group).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(groupView(data, req.user.name));
@@ -391,6 +399,55 @@ app.post('/api/groups/:id/:action(join|leave)', auth, async (req, res) => {
     updatedMembers = members.filter(name => name !== req.user.name);
   }
   const { data, error } = await supabase.from('groups').update({ members: updatedMembers }).eq('id', group.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(groupView(data, req.user.name));
+});
+
+// Delete group (owner or admin only)
+app.delete('/api/groups/:id', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can delete it' });
+  const { error } = await supabase.from('groups').delete().eq('id', group.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, message: 'Group deleted' });
+});
+
+// Kick member (owner only)
+app.post('/api/groups/:id/kick', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can kick members' });
+  const target = key(String(req.body?.name || ''));
+  if (!target) return res.status(400).json({ error: 'Member name required' });
+  if (target === key(creator)) return res.status(400).json({ error: 'Cannot kick the owner' });
+  const members = (Array.isArray(group.members) ? group.members : []).filter(m => key(m) !== target);
+  const { error } = await supabase.from('groups').update({ members }).eq('id', group.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true, message: 'Member kicked' });
+});
+
+// Get group details with member list
+app.get('/api/groups/:id', auth, async (req, res) => {
+  const { data: group, error } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (error || !group) return res.status(404).json({ error: 'Group not found' });
+  const members = Array.isArray(group.members) ? group.members : [];
+  res.json({ ...groupView(group, req.user.name), memberList: members, icon: group.icon || '' });
+});
+
+// Update group (owner: icon, description)
+app.put('/api/groups/:id', auth, async (req, res) => {
+  const { data: group, error: findError } = await supabase.from('groups').select('*').eq('id', req.params.id).single();
+  if (findError || !group) return res.status(404).json({ error: 'Group not found' });
+  const creator = group.creator || group.owner;
+  if (creator !== req.user.name && !req.user.admin) return res.status(403).json({ error: 'Only the group owner can edit it' });
+  const updates = {};
+  if (req.body?.description !== undefined) updates.description = filter(String(req.body.description)).trim().slice(0, 240);
+  if (req.body?.icon !== undefined) updates.icon = String(req.body.icon).slice(0, 4);
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'Nothing to update' });
+  const { data, error } = await supabase.from('groups').update(updates).eq('id', group.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(groupView(data, req.user.name));
 });
@@ -897,6 +954,7 @@ onStart(() => {
   return scripts;
 }
 app.post('/api/ai/coder', auth, async (req, res) => {
+  if (!req.user.admin && !req.user.aiAccess) return res.status(403).json({ error: 'AI coder is restricted. Ask an admin for access.' });
   const prompt = String(req.body?.prompt || '').trim().slice(0, 500);
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   try {
