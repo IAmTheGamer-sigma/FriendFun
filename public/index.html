@@ -6,10 +6,13 @@
   <title>FriendFun</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg class=%22ff-logo%22 viewBox=%220 0 40 32%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg transform=%22rotate%28-10 12 15%29%22%3E%3Crect x=%223%22 y=%226%22 width=%2218%22 height=%2218%22 rx=%224%22 fill=%22%23fff%22/%3E%3Ccircle cx=%229%22 cy=%2213%22 r=%221.7%22 fill=%22%231b1d1f%22/%3E%3Ccircle cx=%2215%22 cy=%2213%22 r=%221.7%22 fill=%22%231b1d1f%22/%3E%3Cpath d=%22M8 17.5q4 4 8 0%22 fill=%22none%22 stroke=%22%231b1d1f%22 stroke-width=%221.8%22 stroke-linecap=%22round%22/%3E%3C/g%3E%3Cg transform=%22rotate%2810 28 17%29%22%3E%3Crect x=%2219%22 y=%228%22 width=%2218%22 height=%2218%22 rx=%224%22 fill=%22%23ffd400%22 stroke=%22%231b1d1f%22 stroke-width=%221.5%22/%3E%3Ccircle cx=%2225%22 cy=%2215%22 r=%221.7%22 fill=%22%231b1d1f%22/%3E%3Ccircle cx=%2231%22 cy=%2215%22 r=%221.7%22 fill=%22%231b1d1f%22/%3E%3Cpath d=%22M24 19.5q4 4 8 0%22 fill=%22none%22 stroke=%22%231b1d1f%22 stroke-width=%221.8%22 stroke-linecap=%22round%22/%3E%3C/g%3E%3C/svg%3E">
   <link rel="stylesheet" href="/css/style.css">
-  <script type="importmap">{ "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" } }</script>
+  <link rel="preload" href="/three/build/three.module.min.js" as="script" crossorigin>
+  <link rel="preload" href="/js/app.js" as="script" crossorigin>
+  <script type="importmap">{ "imports": { "three": "/three/build/three.module.min.js", "three/addons/": "/three/examples/jsm/" } }</script>
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app"><div class="ff-loader"><div class="ff-loader-spin"></div><p>Loading FriendFun...</p></div></div>
+  <style>.ff-loader{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#1b1d1f;color:#fff;font-family:system-ui,sans-serif}.ff-loader-spin{width:48px;height:48px;border:4px solid #3d3f42;border-top-color:#ffd400;border-radius:50%;animation:ffspin 0.8s linear infinite}@keyframes ffspin{to{transform:rotate(360deg)}}.ff-loader p{margin-top:16px;color:#aaa;font-size:14px}</style>
   <div id="toasts"></div>
   <script type="module" src="/js/app.js"></script>
 </body>
