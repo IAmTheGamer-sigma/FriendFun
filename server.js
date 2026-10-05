@@ -827,13 +827,83 @@ function teleportTo(x, y, z) {
 console.log('FriendFun AI script loaded');
 </script>`;
 }
+function aiGenerateScripts(prompt) {
+  const p = String(prompt || '').toLowerCase().slice(0, 500);
+  const scripts = [];
+  let n = 1;
+  const nid = () => 'ais' + (n++) + '_' + Math.random().toString(36).slice(2, 6);
+  const has = (...words) => words.some(w => p.includes(w));
+  const add = (name, code) => scripts.push({ id: nid(), name, folder: '', code });
+
+  if (has('welcome', 'greeting', 'hello', 'intro')) {
+    add('welcome.js',
+`// Welcome message when the game starts
+onStart(() => {
+  say(null, 'Welcome to the game! Have fun!');
+});`);
+  }
+  if (has('kill', 'lava', 'death', 'damage', 'die')) {
+    add('killOnTouch.js',
+`// Kill the player when they touch lava
+onTouch('Lava', () => {
+  say(null, 'Ouch! That was hot!');
+  kill();
+});`);
+  }
+  if (has('teleport', 'portal')) {
+    add('teleport.js',
+`// Teleport when touching the portal
+onTouch('Portal', () => {
+  teleport(null, 20, 15, 0);
+  say(null, 'Teleported!');
+});`);
+  }
+  if (has('tix', 'coin', 'reward', 'money', 'prize')) {
+    add('reward.js',
+`// Give FunTix when touching a coin
+onTouch('Coin', () => {
+  giveTix(null, 10);
+  say(null, '+10 FunTix!');
+});`);
+  }
+  if (has('message', 'say', 'announce', 'dialog')) {
+    add('announce.js',
+`// Show a message when touching the sign
+onTouch('Sign', (player) => {
+  say(player, 'Hello traveler!');
+});`);
+  }
+  if (has('win', 'victory', 'finish')) {
+    add('win.js',
+`// Celebrate when reaching the win pad
+onTouch('Win Pad', () => {
+  say(null, 'You win! Congratulations!');
+  giveTix(null, 50);
+});`);
+  }
+  // Generic script request
+  if (has('script') && !scripts.length) {
+    add('custom.js',
+`// Custom script - edit me!
+onStart(() => {
+  console.log('Script loaded!');
+});
+
+// Uncomment to run when touching a part:
+// onTouch('PartName', () => {
+//   say(null, 'Touched!');
+// });`);
+  }
+  return scripts;
+}
 app.post('/api/ai/coder', auth, async (req, res) => {
   const prompt = String(req.body?.prompt || '').trim().slice(0, 500);
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   try {
     const parts = aiGenerateParts(prompt);
     const html = aiGenerateHtml(prompt);
-    res.json({ parts, html, message: `Generated ${parts.length} parts + HTML snippet. Click "Add to world" to insert parts.` });
+    const scripts = aiGenerateScripts(prompt);
+    res.json({ parts, html, scripts, message: `Generated ${parts.length} parts, ${scripts.length} scripts + HTML snippet.` });
   } catch (e) {
     res.status(500).json({ error: 'AI coder failed: ' + e.message });
   }
