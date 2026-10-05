@@ -427,6 +427,7 @@ export class Studio {
       for (const a of draft.actions) delete a._id;
       s.trigger = draft.trigger; s.actions = draft.actions;
       this.markDirty(); d.remove();
+      this.o.toast('Script saved');
     };
   }
   openScriptEditor(sid) {
@@ -452,7 +453,7 @@ export class Studio {
     d.querySelector('.btn-primary').onclick = () => {
       s.code = ta.value;
       this.markDirty(); d.remove();
-      toast('Script saved');
+      this.o.toast('Script saved');
     };
   }
   renderExplorerItem(p) { const el = this.explorer.querySelector(`[data-id="${p.id}"]`); if (el) el.innerHTML = `<i class="sw" style="background:${p.c}"></i>${esc(p.name)}`; }
