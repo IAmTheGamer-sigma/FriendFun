@@ -1,6 +1,52 @@
 import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
-import { avatarImage, buildCharacter } from './avatar3d.js';
 import { worldThumbnail } from './three-util.js';
+// avatar3d.js (with THREE) loads lazily after login - not needed for login page
+let _avatar3d = null;
+let _avatar3dLoading = null;
+async function ensureAvatar3d() {
+  if (_avatar3d) return _avatar3d;
+  if (!_avatar3dLoading) {
+    _avatar3dLoading = import('./avatar3d.js').then(m => {
+      _avatar3d = m;
+      refreshAvatars(); // swap placeholders for real avatars
+      return m;
+    });
+  }
+  return _avatar3dLoading;
+}
+function refreshAvatars() {
+  if (!_avatar3d) return;
+  document.querySelectorAll('img[data-av]').forEach(img => {
+    try {
+      const av = JSON.parse(img.dataset.av);
+      img.src = _avatar3d.avatarImage(av, img.dataset.mode || 'headshot');
+      img.removeAttribute('data-av');
+    } catch {}
+  });
+}
+function avatarImage(avatar, mode = 'headshot') {
+  if (_avatar3d) return _avatar3d.avatarImage(avatar, mode);
+  // Placeholder with data for later swap - kick off background load
+  ensureAvatar3d().catch(() => {});
+  const placeholder = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="35" r="20" fill="#888"/><rect x="25" y="60" width="50" height="35" rx="10" fill="#888"/></svg>');
+  // Return placeholder; refreshAvatars will swap it when 3D loads
+  // We embed avatar data in a way refreshAvatars can find via a queue
+  _pendingAvatars.push({ avatar, mode });
+  return placeholder;
+}
+const _pendingAvatars = [];
+// Patch: intercept img creation - instead, use data-av attribute approach
+function avatarImgTag(avatar, mode = 'headshot', cls = '', style = '') {
+  if (_avatar3d) return `<img class="${cls}"${style ? ` style="${style}"` : ''} src="${_avatar3d.avatarImage(avatar, mode)}">`;
+  ensureAvatar3d().catch(() => {});
+  const avJson = JSON.stringify(avatar || {}).replace(/"/g, '&quot;');
+  const placeholder = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="35" r="20" fill="#888"/><rect x="25" y="60" width="50" height="35" rx="10" fill="#888"/></svg>');
+  return `<img class="${cls}"${style ? ` style="${style}"` : ''} src="${placeholder}" data-av="${avJson}" data-mode="${mode}">`;
+}
+function buildCharacter(avatar) {
+  if (!_avatar3d) throw new Error('avatar3d not loaded yet');
+  return _avatar3d.buildCharacter(avatar);
+}
 import { CATALOG, ITEM, ECON, BADGES } from './catalog.js';
 import { templates } from './worlds.js';
 
@@ -73,7 +119,7 @@ function gameCard(g) {
 function userTile(u) {
   const st = u.gameId ? 'ingame' : u.online ? 'online' : '';
   return `<a class="user-tile" href="#/users/${encodeURIComponent(u.name)}" title="${u.gameName ? 'Playing ' + esc(u.gameName) : ''}">
-    <div class="ut-img ${st}"><img src="${avatarImage(u.avatar)}"></div><div class="ut-name">${esc(u.name)}</div>
+    <div class="ut-img ${st}">${avatarImgTag(u.avatar)}</div><div class="ut-name">${esc(u.name)}</div>
     ${u.gameName ? `<div class="ut-game">${esc(u.gameName)}</div>` : ''}</a>`;
 }
 
@@ -87,7 +133,7 @@ function shell(active, content) {
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
       <div class="tb-user-wrap">
-        <button class="tb-user" title="Account menu"><img src="${avatarImage(me.avatar)}"><span>${esc(me.name)}</span><span class="tb-caret">&#9662;</span></button>
+        <button class="tb-user" title="Account menu">${avatarImgTag(me.avatar)}<span>${esc(me.name)}</span><span class="tb-caret">&#9662;</span></button>
         <div class="tb-menu hidden">
           <a href="#/users/${encodeURIComponent(me.name)}" class="tb-menu-item"><span class="sb-ico">${icons.profile}</span>View Profile</a>
           <div class="tb-menu-sep"></div>
@@ -123,7 +169,7 @@ function mount(active, html, after) {
     if (!listEl) return;
     const accs = getAccounts().filter(a => a.name.toLowerCase() !== me.name.toLowerCase());
     listEl.innerHTML = accs.length
-      ? accs.map(a => `<button class="tb-menu-item tb-switch" data-name="${esc(a.name)}"><img style="width:24px;height:24px;border-radius:50%" src="${avatarImage(me.avatar)}">${esc(a.name)}</button>`).join('')
+      ? accs.map(a => `<button class="tb-menu-item tb-switch" data-name="${esc(a.name)}">${avatarImgTag(me.avatar, "headshot", "", "width:24px;height:24px;border-radius:50%")}${esc(a.name)}</button>`).join('')
       : '<div class="tb-menu-empty">No other accounts</div>';
     listEl.querySelectorAll('.tb-switch').forEach(b => b.onclick = () => switchAccount(b.dataset.name));
   };
@@ -199,6 +245,7 @@ function loginPage() {
       token = r.token; localStorage.setItem('ff_token', token);
       me = await api('GET', '/api/me');
       addAccount(me.name, token);
+      ensureAvatar3d().catch(() => {}); // preload 3D avatars in background
       location.hash = '#/home';
     } catch (err) { form.querySelector('.auth-err').textContent = err.message; }
   };
@@ -211,7 +258,7 @@ async function homePage() {
   const favs = me.favorites.map(id => byId[id]).filter(Boolean);
   const friends = fr.friends.sort((a, b) => (b.online - a.online) || (!!b.gameId - !!a.gameId));
   mount('home', `
-    <div class="home-head"><img class="home-avatar" src="${avatarImage(me.avatar)}"><h1>Hello, ${esc(me.name)}!</h1></div>
+    <div class="home-head">${avatarImgTag(me.avatar, "headshot", "home-avatar")}<h1>Hello, ${esc(me.name)}!</h1></div>
     <section><div class="sec-h"><h2>Friends (${friends.length})</h2><a href="#/friends">See All &rsaquo;</a></div>
       <div class="friends-row">${friends.length ? friends.map(userTile).join('') : `<a class="add-friends" href="#/friends"><span>+</span>Add Friends</a>`}</div></section>
     ${recent.length ? `<section><div class="sec-h"><h2>Continue</h2></div><div class="game-row">${recent.map(gameCard).join('')}</div></section>` : ''}
@@ -384,7 +431,7 @@ async function friendsPage() {
     <form class="user-search"><input name="q" placeholder="Search for people by username"><button class="btn-primary">Search</button></form>
     <div class="search-results"></div>
     ${fr.requests.length ? `<section><div class="sec-h"><h2>Friend Requests (${fr.requests.length})</h2></div><div class="req-list">${fr.requests.map(u => `
-      <div class="req"><img src="${avatarImage(u.avatar)}"><a href="#/users/${encodeURIComponent(u.name)}">${esc(u.name)}</a><button class="btn-primary" data-accept="${esc(u.name)}">Accept</button><button class="btn-secondary" data-decline="${esc(u.name)}">Ignore</button></div>`).join('')}</div></section>` : ''}
+      <div class="req">${avatarImgTag(u.avatar)}<a href="#/users/${encodeURIComponent(u.name)}">${esc(u.name)}</a><button class="btn-primary" data-accept="${esc(u.name)}">Accept</button><button class="btn-secondary" data-decline="${esc(u.name)}">Ignore</button></div>`).join('')}</div></section>` : ''}
     <section><div class="sec-h"><h2>My Friends (${fr.friends.length})</h2></div>
       <div class="friend-grid">${fr.friends.map(u => `<div class="friend-card">${userTile(u)}${u.gameId ? `<a class="btn-join" href="#/play/${u.gameId}">Join</a>` : `<span class="muted small">${u.online ? 'Online' : 'Offline'}</span>`}</div>`).join('') || '<p class="muted">No friends yet. Search for people above!</p>'}</div></section>`, () => {
     app.querySelectorAll('[data-accept]').forEach(b => b.onclick = async () => { await api('POST', '/api/friends/' + encodeURIComponent(b.dataset.accept)); toast('You are now friends with ' + b.dataset.accept); me = await api('GET', '/api/me'); friendsPage(); });
@@ -402,32 +449,93 @@ async function showGroupDetail(id, reload) {
     const g = await api('GET', '/api/groups/' + encodeURIComponent(id));
     const isOwner = g.isCreator || me.admin;
     const d = document.createElement('div'); d.className = 'modal-bg';
-    d.innerHTML = `<div class="modal"><h2>${g.icon ? esc(g.icon) + ' ' : ''}${esc(g.name)}</h2>
+    const fmtDate = ts => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    d.innerHTML = `<div class="modal modal-wide"><h2>${g.icon ? esc(g.icon) + ' ' : ''}${esc(g.name)}</h2>
       <p class="muted">${esc(g.description || 'No description yet.')}</p>
       <div class="group-meta"><span>${g.members} member${g.members === 1 ? '' : 's'}</span><span>by ${esc(g.creator)}</span></div>
-      ${isOwner ? `<label>Icon (emoji)<input class="group-icon-input" maxlength="4" value="${esc(g.icon || '')}" placeholder="🎮"></label>
-      <label>Description<textarea class="group-desc-input" maxlength="240" rows="3">${esc(g.description || '')}</textarea></label>` : ''}
-      <h3>Members (${g.memberList.length})</h3>
-      <div class="group-members">${g.memberList.map(m => `<div class="group-member"><span>${esc(m)}</span>${isOwner && m !== g.creator ? `<button class="btn-danger btn-sm group-kick" data-name="${esc(m)}">Kick</button>` : ''}${m === g.creator ? '<span class="owner-badge">Owner</span>' : ''}</div>`).join('')}</div>
-      <div class="modal-actions">
-        ${isOwner ? '<button class="btn-primary group-save">Save</button>' : ''}
-        <button class="btn-secondary group-close">Close</button>
-      </div></div>`;
+      ${isOwner ? `<div class="group-edit"><label>Icon (emoji)<input class="group-icon-input" maxlength="4" value="${esc(g.icon || '')}" placeholder="🎮"></label>
+      <label>Description<textarea class="group-desc-input" maxlength="240" rows="2">${esc(g.description || '')}</textarea></label>
+      <button class="btn-primary btn-sm group-save">Save</button></div>` : ''}
+      <div class="group-tabs">
+        <button class="group-tab active" data-tab="ann">📢 Announcements (${(g.announcements || []).length})</button>
+        <button class="group-tab" data-tab="games">🎮 Games (${(g.games || []).length})</button>
+        <button class="group-tab" data-tab="members">👥 Members (${g.memberList.length})</button>
+      </div>
+      <div class="group-tabpane" data-pane="ann">
+        ${isOwner ? `<button class="btn-primary btn-sm group-ann-new">+ New Announcement</button>` : ''}
+        <div class="group-anns">${(g.announcements || []).length ? g.announcements.map(a => `
+          <div class="group-ann"><div class="group-ann-head"><b>${esc(a.title)}</b>${isOwner ? `<button class="btn-danger btn-sm ann-del" data-aid="${esc(a.id)}">Delete</button>` : ''}</div>
+          <p>${esc(a.content)}</p><div class="muted small">by ${esc(a.author)} · ${fmtDate(a.created)}</div></div>`).join('') : '<p class="muted">No announcements yet.</p>'}</div>
+      </div>
+      <div class="group-tabpane hidden" data-pane="games">
+        ${isOwner ? `<button class="btn-primary btn-sm group-game-add">+ Add Game</button>` : ''}
+        <div class="group-games">${(g.games || []).length ? g.games.map(gm => `
+          <a class="group-game" href="#/games/${esc(gm.id)}"><b>${esc(gm.name)}</b><span class="muted small">by ${esc(gm.creator)} · ${gm.visits} plays</span>${isOwner ? `<button class="btn-danger btn-sm game-rm" data-gid="${esc(gm.id)}">Remove</button>` : ''}</a>`).join('') : '<p class="muted">No games yet.</p>'}</div>
+      </div>
+      <div class="group-tabpane hidden" data-pane="members">
+        <div class="group-members">${g.memberList.map(m => `<div class="group-member"><span>${esc(m)}</span>${isOwner && m !== g.creator ? `<button class="btn-danger btn-sm group-kick" data-name="${esc(m)}">Kick</button>` : ''}${m === g.creator ? '<span class="owner-badge">Owner</span>' : ''}</div>`).join('')}</div>
+      </div>
+      <div class="modal-actions"><button class="btn-secondary group-close">Close</button></div></div>`;
     document.body.appendChild(d);
+    const refresh = () => { d.remove(); showGroupDetail(id, reload); reload(); };
     d.querySelector('.group-close').onclick = () => d.remove();
     d.onclick = e => { if (e.target === d) d.remove(); };
+    // Tabs
+    d.querySelectorAll('.group-tab').forEach(t => t.onclick = () => {
+      d.querySelectorAll('.group-tab').forEach(x => x.classList.toggle('active', x === t));
+      d.querySelectorAll('.group-tabpane').forEach(p => p.classList.toggle('hidden', p.dataset.pane !== t.dataset.tab));
+    });
+    // Kick
     d.querySelectorAll('.group-kick').forEach(b => b.onclick = async () => {
       if (!confirm(`Kick ${b.dataset.name}?`)) return;
-      try { await api('POST', `/api/groups/${encodeURIComponent(id)}/kick`, { name: b.dataset.name }); toast('Kicked.'); d.remove(); showGroupDetail(id, reload); reload(); }
+      try { await api('POST', `/api/groups/${encodeURIComponent(id)}/kick`, { name: b.dataset.name }); toast('Kicked.'); refresh(); }
       catch (e) { toast(e.message, true); }
     });
+    // Save edits
     const saveBtn = d.querySelector('.group-save');
     if (saveBtn) saveBtn.onclick = async () => {
       try {
         await api('PUT', `/api/groups/${encodeURIComponent(id)}`, { icon: d.querySelector('.group-icon-input').value, description: d.querySelector('.group-desc-input').value });
-        toast('Group updated.'); d.remove(); reload();
+        toast('Group updated.'); refresh();
       } catch (e) { toast(e.message, true); }
     };
+    // New announcement
+    const annBtn = d.querySelector('.group-ann-new');
+    if (annBtn) annBtn.onclick = () => {
+      const title = prompt('Announcement title:');
+      if (!title) return;
+      const content = prompt('Announcement content:');
+      if (!content) return;
+      api('POST', `/api/groups/${encodeURIComponent(id)}/announcements`, { title, content })
+        .then(() => { toast('Posted!'); refresh(); })
+        .catch(e => toast(e.message, true));
+    };
+    // Delete announcement
+    d.querySelectorAll('.ann-del').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this announcement?')) return;
+      try { await api('DELETE', `/api/groups/${encodeURIComponent(id)}/announcements/${encodeURIComponent(b.dataset.aid)}`); toast('Deleted.'); refresh(); }
+      catch (e) { toast(e.message, true); }
+    });
+    // Add game
+    const addGameBtn = d.querySelector('.group-game-add');
+    if (addGameBtn) addGameBtn.onclick = async () => {
+      try {
+        const myGames = await api('GET', '/api/mygames');
+        if (!myGames.length) { toast('You have no games to add. Create one first!', true); return; }
+        const pick = prompt('Enter the number of the game to add:\n' + myGames.map((gm, i) => `${i + 1}. ${gm.name}`).join('\n'));
+        const idx = parseInt(pick) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= myGames.length) return;
+        await api('POST', `/api/groups/${encodeURIComponent(id)}/games`, { gameId: myGames[idx].id });
+        toast('Game added!'); refresh();
+      } catch (e) { toast(e.message, true); }
+    };
+    // Remove game
+    d.querySelectorAll('.game-rm').forEach(b => b.onclick = async e => {
+      e.preventDefault(); e.stopPropagation();
+      if (!confirm('Remove this game from the group?')) return;
+      try { await api('DELETE', `/api/groups/${encodeURIComponent(id)}/games/${encodeURIComponent(b.dataset.gid)}`); toast('Removed.'); refresh(); }
+      catch (e2) { toast(e2.message, true); }
+    });
   } catch (e) { toast(e.message, true); }
 }
 function groupsPage() {
@@ -518,7 +626,7 @@ async function profilePage(name) {
   const isMe = u.name.toLowerCase() === me.name.toLowerCase();
   mount('users', `
     <div class="profile-head">
-      <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}"><img src="${avatarImage(u.avatar)}"></div>
+      <div class="ph-img ${u.gameId ? 'ingame' : u.online ? 'online' : ''}">${avatarImgTag(u.avatar)}</div>
       <div class="ph-info"><h1>${esc(u.name)}${badgeIcon(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
@@ -531,7 +639,7 @@ async function profilePage(name) {
         ${isMe && u.badges.length ? `<button class="badge-card none ${u.badge ? '' : 'on'}" data-badge="none"><b>None</b><span class="muted small">Don't show a badge</span>${u.badge ? '' : '<span class="badge-feat">Shown</span>'}</button>` : ''}</div>
       ${u.badges.length ? '' : '<p class="muted">No badges yet.</p>'}</section>
     <section class="profile-grid">
-      <div class="profile-avatar"><h2>Currently Wearing</h2><img src="${avatarImage(u.avatar, 'full')}"></div>
+      <div class="profile-avatar"><h2>Currently Wearing</h2>${avatarImgTag(u.avatar, "full")}</div>
       <div><h2>Friends (${u.friendsList.length})</h2><div class="friends-row wrap">${u.friendsList.map(userTile).join('') || '<p class="muted">No friends yet.</p>'}</div></div>
     </section>
     <section><div class="sec-h"><h2>Creations</h2></div><div class="game-row">${u.games.map(gameCard).join('') || '<p class="muted">No creations yet.</p>'}</div></section>`, () => {
@@ -591,7 +699,7 @@ async function leaderboardPage() {
     <div class="lb-me">${tix}<span>You have <b>${fmt(lb.funtix)}</b> FunTix</span><span class="lb-rank">Your rank <b>#${lb.rank}</b> of ${lb.total}</span></div>
     <div class="lbp">${lb.top.map((u, i) => `
       <a class="lbp-row${u.name === me.name ? ' me' : ''}${i < 3 ? ' top' + (i + 1) : ''}" href="#/users/${encodeURIComponent(u.name)}">
-        <span class="lbp-rank">${i + 1}</span><img src="${avatarImage(u.avatar)}">
+        <span class="lbp-rank">${i + 1}</span>${avatarImgTag(u.avatar)}
         <span class="lbp-name">${badgeIcon(u.badge)}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
 }
@@ -605,7 +713,7 @@ async function adminPage(q = '') {
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <div class="lbp">${users.map(u => `
       <div class="lbp-row admin-row-wrap">
-        <img src="${avatarImage(u.avatar)}"><a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
+        ${avatarImgTag(u.avatar)}<a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
         <span class="admin-status">${status(u)} &middot; ${tix} ${(u.funtix ?? 0).toLocaleString()}</span>
         <div class="admin-controls">
           ${u.admin ? '' : u.club
