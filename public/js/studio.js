@@ -294,7 +294,7 @@ export class Studio {
       const name = prompt('Script name:', 'script.js');
       if (!name) return;
       const id = 's' + Date.now().toString(36);
-      this.world.scripts.push({ id, name: name.trim().endsWith('.js') ? name.trim() : name.trim() + '.js', folder: '', code: '// Write your script here\n// Available: onStart(fn), onTouch(partName, fn), giveTix(player, n), teleport(player, x, y, z), say(player, msg)\n\nonStart(() => {\n  \n});\n' });
+      this.world.scripts.push({ id, name: name.trim().endsWith('.js') ? name.trim() : name.trim() + '.js', folder: '', code: '// Write your script here\n// Events: onStart(fn), onTouch(name, fn), onDeath(fn), onChat((name,text)=>{}), onTick((dt)=>{})\n// Actions: giveTix(p,n), teleport(p,x,y,z), say(p,msg), sayAll(msg), kill(p), heal(p,n), damage(p,n)\n// World: setCheckpoint(x,y,z), spawnPart({name,size,color,x,y,z}), movePart(name,x,y,z), hidePart(name), showPart(name)\n// Data: setScore(n), getScore(), addScore(n), getPos(), getHealth(), playSound(name)\n\nonStart(() => {\n  \n});\n' });
       this.markDirty(); this.renderExplorer(); this.openScriptEditor(id);
     } else if (act === 'rename-folder') {
       const fid = btn.closest('.ex-folder').dataset.fid;
