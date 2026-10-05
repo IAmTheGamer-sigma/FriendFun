@@ -346,3 +346,18 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .group-member:last-child { border-bottom: 0; }
 .owner-badge { background: #ffd400; color: #1b1d1f; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
 .group-icon-input { width: 80px; font-size: 20px; text-align: center; }
+
+/* ---------- group tabs, games, announcements ---------- */
+.group-tabs { display: flex; gap: 8px; margin: 16px 0 12px; border-bottom: 2px solid #3d3f42; }
+.group-tab { background: none; border: 0; color: #aaa; font-weight: 600; font-size: 14px; padding: 10px 12px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+.group-tab.active { color: #fff; border-bottom-color: #ffd400; }
+.group-tab:hover { color: #fff; }
+.group-edit { background: #2a2c2f; border-radius: 8px; padding: 12px; margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.group-anns { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.group-ann { background: #2a2c2f; border-radius: 8px; padding: 12px; }
+.group-ann-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.group-ann p { margin: 6px 0; line-height: 1.5; }
+.group-games { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.group-game { display: flex; align-items: center; gap: 12px; background: #2a2c2f; border-radius: 8px; padding: 10px 12px; text-decoration: none; color: #fff; }
+.group-game:hover { background: #3d3f42; }
+.group-game b { flex: 1; }
