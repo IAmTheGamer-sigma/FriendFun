@@ -15,8 +15,8 @@ function faceTexture(id) {
     case 'face_wink': g.beginPath(); g.ellipse(44, 50, 7, 9, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.moveTo(74, 52); g.lineTo(94, 50); g.stroke(); g.beginPath(); g.arc(64, 70, 24, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); break;
     case 'face_shock': eyes(22); g.beginPath(); g.ellipse(64, 90, 10, 14, 0, 0, Math.PI * 2); g.fill(); break;
     case 'face_mad': eyes(14); g.beginPath(); g.moveTo(32, 32); g.lineTo(54, 42); g.moveTo(96, 32); g.lineTo(74, 42); g.stroke(); g.beginPath(); g.arc(64, 104, 22, 1.2 * Math.PI, 1.8 * Math.PI); g.stroke(); break;
-    case 'face_buckteeth': eyes(); g.beginPath(); g.moveTo(34, 74); g.quadraticCurveTo(64, 108, 94, 74); g.closePath(); g.fill(); g.fillStyle = '#fff'; g.fillRect(52, 80, 10, 20); g.fillRect(66, 80, 10, 20); g.strokeStyle = '#111'; g.lineWidth = 3; g.strokeRect(52, 80, 10, 20); g.strokeRect(66, 80, 10, 20); break;
-    case 'face_beak': eyes(); g.fillStyle = '#ff9800'; g.beginPath(); g.ellipse(64, 88, 26, 14, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#e65100'; g.lineWidth = 4; g.beginPath(); g.moveTo(40, 88); g.lineTo(88, 88); g.stroke(); break;
+    case 'face_buckteeth': eyes(); g.beginPath(); g.moveTo(30, 72); g.quadraticCurveTo(64, 114, 98, 72); g.closePath(); g.fill(); g.fillStyle = '#fff'; g.fillRect(50, 78, 13, 28); g.fillRect(65, 78, 13, 28); g.fillStyle = '#e8e8e8'; g.fillRect(50, 78, 13, 7); g.fillRect(65, 78, 13, 7); g.strokeStyle = '#111'; g.lineWidth = 3; g.strokeRect(50, 78, 13, 28); g.strokeRect(65, 78, 13, 28); g.beginPath(); g.moveTo(64, 78); g.lineTo(64, 106); g.stroke(); break;
+    case 'face_beak': eyes(); g.fillStyle = '#ff9800'; g.beginPath(); g.ellipse(64, 84, 31, 14, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#fb8c00'; g.beginPath(); g.ellipse(64, 91, 31, 8, 0, 0, Math.PI); g.fill(); g.strokeStyle = '#e65100'; g.lineWidth = 4; g.beginPath(); g.moveTo(35, 86); g.quadraticCurveTo(64, 93, 93, 86); g.stroke(); g.fillStyle = '#e65100'; g.beginPath(); g.ellipse(52, 78, 3.2, 4.5, 0, 0, Math.PI * 2); g.fill(); g.beginPath(); g.ellipse(76, 78, 3.2, 4.5, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffe0b2'; g.beginPath(); g.ellipse(48, 76, 6, 3, -0.4, 0, Math.PI * 2); g.fill(); break;
     default: eyes(); g.beginPath(); g.arc(64, 66, 26, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke();
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
@@ -56,13 +56,17 @@ function buildHat(id) {
     case 'hat_beanie': add(new THREE.SphereGeometry(0.68, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), it.color, 0, -0.05); add(new THREE.CylinderGeometry(0.69, 0.69, 0.22, 20), '#004d40', 0, 0); add(new THREE.SphereGeometry(0.18), '#ffffff', 0, 0.68); break;
     case 'hat_bunnyears': {
       for (const sx of [-1, 1]) {
-        const ear = add(new THREE.CapsuleGeometry(0.16, 0.85, 6, 12), '#9e9e9e', sx * 0.3, 0.85);
-        ear.rotation.z = sx * -0.16;
-        const inner = add(new THREE.CapsuleGeometry(0.08, 0.55, 6, 12), '#f8bbd0', sx * 0.31, 0.82, 0.1);
-        inner.rotation.z = sx * -0.16;
+        const base = add(new THREE.CapsuleGeometry(0.17, 0.7, 6, 12), '#9e9e9e', sx * 0.3, 0.55);
+        base.rotation.z = sx * -0.13;
+        const tip = add(new THREE.CapsuleGeometry(0.15, 0.55, 6, 12), '#9e9e9e', sx * 0.44, 1.22);
+        tip.rotation.z = sx * -0.42;
+        const inner = add(new THREE.CapsuleGeometry(0.075, 0.85, 6, 12), '#f8bbd0', sx * 0.37, 0.88, 0.1);
+        inner.rotation.z = sx * -0.27;
       } break; }
     case 'hat_ducktuft': {
-      for (let i = -1; i <= 1; i++) { const f = add(new THREE.ConeGeometry(0.16, 0.7, 8), '#212121', i * 0.26, 0.4); f.rotation.z = -i * 0.38; f.rotation.x = -0.25; }
+      for (let i = -2; i <= 2; i++) { const f = add(new THREE.ConeGeometry(0.15, 0.75, 8), '#212121', i * 0.22, 0.42 - Math.abs(i) * 0.06); f.rotation.z = -i * 0.34; f.rotation.x = -0.3; }
+      const ring = add(new THREE.TorusGeometry(0.72, 0.12, 10, 28), '#ffffff', 0, -1.02);
+      ring.rotation.x = Math.PI / 2;
       break; }
   }
   return g;
