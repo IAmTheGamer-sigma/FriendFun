@@ -115,6 +115,7 @@ export class Studio {
         if (!r.ok) throw new Error(data.error || 'Generation failed');
         this._aiParts = data.parts || [];
         this._aiHtml = data.html || '';
+        this._aiScripts = data.scripts || [];
         const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         // Automatically add parts to the world
         this.pushUndo();
@@ -122,16 +123,29 @@ export class Studio {
           part.id = this.newId();
           this.world.parts.push(part);
         }
+        // Automatically add scripts to the world
+        if (!Array.isArray(this.world.scripts)) this.world.scripts = [];
+        for (const script of this._aiScripts) {
+          script.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+          this.world.scripts.push(script);
+        }
         this.rebuildAll();
+        this.renderExplorer();
         this.markDirty();
-        resultEl.innerHTML = `<div class="ai-msg">Done! Added ${this._aiParts.length} parts automatically. Edit them like any other parts. <button class="rb-btn ai-undo" style="margin-left:8px">Undo</button></div>
+        const scriptNames = this._aiScripts.map(s => escHtml(s.name)).join(', ');
+        resultEl.innerHTML = `<div class="ai-msg">Done! Added ${this._aiParts.length} parts${this._aiScripts.length ? ` and ${this._aiScripts.length} script${this._aiScripts.length > 1 ? 's' : ''} (${scriptNames})` : ''} automatically. <button class="rb-btn ai-undo" style="margin-left:8px">Undo</button></div>
+          ${this._aiScripts.length ? `<div class="ai-sec">Scripts</div>
+          ${this._aiScripts.map(s => `<div class="ai-script-item"><span>📝 ${escHtml(s.name)}</span><button class="rb-btn ai-view-script" data-sid="${s.id}">Edit</button></div>`).join('')}` : ''}
           ${this._aiHtml ? `<div class="ai-sec">HTML Script</div>
           <pre class="ai-code">${escHtml(this._aiHtml.slice(0, 2000))}</pre>
           <button class="rb-btn ai-copy">Copy HTML</button>` : ''}`;
         resultEl.querySelector('.ai-undo').onclick = () => {
           this.undo();
           resultEl.querySelector('.ai-msg').textContent = 'Undid AI insertion.';
-        };
+        });
+        resultEl.querySelectorAll('.ai-view-script').forEach(btn => {
+          btn.onclick = () => this.openScriptEditor(btn.dataset.sid);
+        });
         const copyBtn = resultEl.querySelector('.ai-copy');
         if (copyBtn) copyBtn.onclick = async () => {
           try { await navigator.clipboard.writeText(this._aiHtml); copyBtn.textContent = 'Copied!'; }
