@@ -207,6 +207,17 @@ app.get('/api/me', auth, async (req, res) => {
     } 
   }
   const { amount: daily } = await dailyTix(u);
+  if (u.name === 'fun') {
+    const missItems = LOONEY_EVENT.items.filter(id => !u.inventory.includes(id));
+    if (missItems.length) {
+      u.inventory = [...u.inventory, ...missItems];
+      await supabase.from('users').update({ inventory: u.inventory }).eq('name', u.name);
+    }
+    if (!list(u, 'earnedBadges').includes(LOONEY_EVENT.badge)) {
+      const badges = [...list(u, 'earnedBadges'), LOONEY_EVENT.badge];
+      await supabase.from('users').update({ earnedBadges: badges }).eq('name', u.name);
+    }
+  }
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
 });
 
