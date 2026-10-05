@@ -1,5 +1,5 @@
 import { BADGES } from './catalog.js';
-import { CLUB_PATH } from './avatar3d.js';
+const CLUB_PATH = 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z';
 
 export function nameColor(name) {
   const cols = ['#fd2943', '#01a2ff', '#02b857', '#a75eb8', '#f58225', '#f5cd30', '#e8bac8', '#d7c59a'];
