@@ -334,3 +334,15 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 /* ---------- AI coder scripts ---------- */
 .ai-script-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: #1b1d1f; border-radius: 6px; margin: 4px 0; font-family: monospace; font-size: 13px; color: #8ecae6; }
 .ai-script-item .rb-btn { padding: 3px 10px; font-size: 12px; }
+
+/* ---------- groups enhancements ---------- */
+.group-btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.group-btns .btn-primary, .group-btns .btn-secondary, .group-btns .btn-danger { padding: 8px 16px; font-size: 14px; }
+.btn-danger { background: #e74c3c; color: #fff; border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.btn-danger:hover { background: #c0392b; }
+.btn-sm { padding: 4px 10px !important; font-size: 12px !important; }
+.group-members { max-height: 250px; overflow-y: auto; margin: 12px 0; border: 1px solid #45474a; border-radius: 8px; }
+.group-member { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #3d3f42; }
+.group-member:last-child { border-bottom: 0; }
+.owner-badge { background: #ffd400; color: #1b1d1f; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; }
+.group-icon-input { width: 80px; font-size: 20px; text-align: center; }
