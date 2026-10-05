@@ -22,6 +22,32 @@ const PRESETS = {
 const MATERIALS = ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'metal', 'baseplate', 'spawn'];
 const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed'];
 const toHex = c => '#' + new THREE.Color(c).getHexString();
+// ---------- Visual (no-code) script specs ----------
+const VS_TRIGGERS = [
+  { type: 'start', label: 'When the game starts' },
+  { type: 'touch', label: 'When a player touches a part', params: [['part', 'part', 'Part', '']] },
+  { type: 'death', label: 'When the player is defeated' },
+  { type: 'chat', label: 'When a player chats', params: [['word', 'text', 'Contains word', '']] },
+  { type: 'tick', label: 'Every frame (repeats)' },
+];
+const VS_ACTIONS = [
+  { type: 'giveTix', label: 'Give FunTix', params: [['amount', 'number', 'Amount', 5]] },
+  { type: 'say', label: 'Show message to player', params: [['text', 'text', 'Message', 'Hello!']] },
+  { type: 'sayAll', label: 'Shout to everyone', params: [['text', 'text', 'Message', 'Hello!']] },
+  { type: 'teleport', label: 'Teleport player to', params: [['x', 'number', 'X', 0], ['y', 'number', 'Y', 10], ['z', 'number', 'Z', 0]] },
+  { type: 'kill', label: 'Defeat player', params: [] },
+  { type: 'heal', label: 'Heal player', params: [['amount', 'number', 'Amount', 25]] },
+  { type: 'damage', label: 'Damage player', params: [['amount', 'number', 'Amount', 10]] },
+  { type: 'setCheckpoint', label: 'Set checkpoint at', params: [['x', 'number', 'X', 0], ['y', 'number', 'Y', 10], ['z', 'number', 'Z', 0]] },
+  { type: 'spawnPart', label: 'Create part', params: [['name', 'text', 'Name', 'Part'], ['color', 'color', 'Color', '#a3a2a5'], ['sx', 'number', 'W', 4], ['sy', 'number', 'H', 1], ['sz', 'number', 'D', 4], ['x', 'number', 'X', 0], ['y', 'number', 'Y', 10], ['z', 'number', 'Z', 0]] },
+  { type: 'movePart', label: 'Move part', params: [['part', 'part', 'Part', ''], ['x', 'number', 'X', 0], ['y', 'number', 'Y', 0], ['z', 'number', 'Z', 0]] },
+  { type: 'hidePart', label: 'Hide part', params: [['part', 'part', 'Part', '']] },
+  { type: 'showPart', label: 'Show part', params: [['part', 'part', 'Part', '']] },
+  { type: 'playSound', label: 'Play sound', params: [['sound', 'sound', 'Sound', 'coin']] },
+  { type: 'setScore', label: 'Set score to', params: [['n', 'number', 'Score', 0]] },
+  { type: 'addScore', label: 'Add score points', params: [['n', 'number', 'Points', 1]] },
+];
+const VS_SOUNDS = ['coin', 'jump', 'oof', 'checkpoint', 'bounce', 'win', 'chat'];
 
 export class Studio {
   constructor(container, o) {
@@ -291,10 +317,10 @@ export class Studio {
       this.world.folders.push({ id, name: name.trim(), parent: '' });
       this.markDirty(); this.renderExplorer();
     } else if (act === 'new-script') {
-      const name = prompt('Script name:', 'script.js');
+      const name = prompt('Script name:', 'My script');
       if (!name) return;
       const id = 's' + Date.now().toString(36);
-      this.world.scripts.push({ id, name: name.trim().endsWith('.js') ? name.trim() : name.trim() + '.js', folder: '', code: '// Write your script here\n// Events: onStart(fn), onTouch(name, fn), onDeath(fn), onChat((name,text)=>{}), onTick((dt)=>{})\n// Actions: giveTix(p,n), teleport(p,x,y,z), say(p,msg), sayAll(msg), kill(p), heal(p,n), damage(p,n)\n// World: setCheckpoint(x,y,z), spawnPart({name,size,color,x,y,z}), movePart(name,x,y,z), hidePart(name), showPart(name)\n// Data: setScore(n), getScore(), addScore(n), getPos(), getHealth(), playSound(name)\n\nonStart(() => {\n  \n});\n' });
+      this.world.scripts.push({ id, name: name.trim() || 'My script', folder: '', kind: 'visual', trigger: { type: 'start' }, actions: [] });
       this.markDirty(); this.renderExplorer(); this.openScriptEditor(id);
     } else if (act === 'rename-folder') {
       const fid = btn.closest('.ex-folder').dataset.fid;
@@ -315,9 +341,98 @@ export class Studio {
       this.markDirty(); this.renderExplorer();
     }
   }
+  // ---------- Visual script builder (HTML only, no code) ----------
+  vsParamInput(key, kind, label, val) {
+    const v = esc(String(val ?? ''));
+    const attr = `data-p="${key}"`;
+    let input;
+    if (kind === 'number') input = `<input type="number" ${attr} value="${v}">`;
+    else if (kind === 'color') input = `<input type="color" ${attr} value="${v || '#a3a2a5'}">`;
+    else if (kind === 'part') input = `<input type="text" list="vs-parts" ${attr} value="${v}" placeholder="Part name">`;
+    else if (kind === 'sound') input = `<select ${attr}>${VS_SOUNDS.map(x => `<option value="${x}"${x === val ? ' selected' : ''}>${x}</option>`).join('')}</select>`;
+    else input = `<input type="text" ${attr} value="${v}">`;
+    return `<label class="vs-p"><span>${esc(label)}</span>${input}</label>`;
+  }
+  vsTriggerParams(s) {
+    const spec = VS_TRIGGERS.find(t => t.type === s.trigger.type);
+    if (!spec || !spec.params) return '';
+    return spec.params.map(([key, kind, label, def]) => this.vsParamInput(key, kind, label, s.trigger[key] ?? def)).join('');
+  }
+  vsActionRow(a) {
+    const spec = VS_ACTIONS.find(x => x.type === a.type) || VS_ACTIONS[0];
+    const params = (spec.params || []).map(([key, kind, label, def]) => this.vsParamInput(key, kind, label, a.params?.[key] ?? def)).join('');
+    return `<div class="vs-action" data-aid="${a._id}">
+      <select class="vs-atype">${VS_ACTIONS.map(x => `<option value="${x.type}"${x.type === spec.type ? ' selected' : ''}>${x.label}</option>`).join('')}</select>
+      ${params}<button class="btn-danger btn-small vs-del" title="Remove">✕</button></div>`;
+  }
+  openVisualEditor(sid) {
+    const s = this.world.scripts.find(x => x.id === sid);
+    if (!s) return;
+    const draft = JSON.parse(JSON.stringify({ trigger: s.trigger || { type: 'start' }, actions: Array.isArray(s.actions) ? s.actions : [] }));
+    for (const a of draft.actions) { if (!a._id) a._id = 'a' + Math.random().toString(36).slice(2, 8); if (!a.params) a.params = {}; }
+    const partNames = [...new Set((this.world.parts || []).map(p => p.name).filter(Boolean))];
+    const d = document.createElement('div'); d.className = 'modal-bg';
+    d.innerHTML = `<div class="modal modal-wide"><h2>📝 ${esc(s.name)}</h2>
+      <style>
+        .vs-block{background:rgba(255,255,255,.04);border:1px solid #3a3a3a;border-radius:8px;padding:12px;margin:12px 0}
+        .vs-when{font-weight:800;letter-spacing:.15em;color:#ffd400;font-size:12px;margin-bottom:8px}
+        .vs-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+        .vs-tparams{display:flex;gap:8px;flex-wrap:wrap}
+        .vs-action{display:flex;gap:10px;align-items:center;background:rgba(0,0,0,.3);border:1px solid #444;border-radius:6px;padding:8px 10px;margin:8px 0;flex-wrap:wrap}
+        .vs-atype{min-width:180px}
+        .vs-p{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#bbb}
+        .vs-p input[type=text],.vs-p input[type=number]{width:92px}
+        .vs-p input[type=color]{width:40px;height:26px;padding:0;border:none;background:none}
+      </style>
+      <p class="muted small">Build with blocks — no code needed. It runs automatically when the game plays.</p>
+      <div class="vs-block"><div class="vs-when">WHEN</div><div class="vs-row">
+        <select class="vs-trigger">${VS_TRIGGERS.map(t => `<option value="${t.type}"${draft.trigger.type === t.type ? ' selected' : ''}>${t.label}</option>`).join('')}</select>
+        <span class="vs-tparams">${this.vsTriggerParams(draft)}</span>
+      </div></div>
+      <div class="vs-block"><div class="vs-when">THEN DO</div><div class="vs-list"></div>
+        <button class="btn-secondary btn-small vs-add">+ Add action</button></div>
+      <datalist id="vs-parts">${partNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary vs-close">Close</button>
+        <button type="button" class="btn-primary vs-save">Save Script</button>
+      </div></div>`;
+    document.body.appendChild(d);
+    const list = d.querySelector('.vs-list');
+    const tparams = d.querySelector('.vs-tparams');
+    const renderActions = () => {
+      list.innerHTML = draft.actions.length ? draft.actions.map(a => this.vsActionRow(a)).join('') : '<p class="muted small">No actions yet — add one below.</p>';
+    };
+    renderActions();
+    d.querySelector('.vs-trigger').onchange = e => { draft.trigger = { type: e.target.value }; tparams.innerHTML = this.vsTriggerParams(draft); };
+    tparams.onchange = e => { const k = e.target.dataset.p; if (k) draft.trigger[k] = e.target.value; };
+    d.querySelector('.vs-add').onclick = () => {
+      draft.actions.push({ _id: 'a' + Math.random().toString(36).slice(2, 8), type: 'giveTix', params: {} });
+      renderActions();
+    };
+    list.onchange = e => {
+      const row = e.target.closest('.vs-action'); if (!row) return;
+      const a = draft.actions.find(x => x._id === row.dataset.aid); if (!a) return;
+      if (e.target.classList.contains('vs-atype')) { a.type = e.target.value; a.params = {}; renderActions(); return; }
+      const k = e.target.dataset.p; if (k) a.params[k] = e.target.value;
+    };
+    list.onclick = e => {
+      const btn = e.target.closest('.vs-del'); if (!btn) return;
+      const row = btn.closest('.vs-action');
+      draft.actions = draft.actions.filter(x => x._id !== row.dataset.aid);
+      renderActions();
+    };
+    d.querySelector('.vs-close').onclick = () => d.remove();
+    d.onclick = e => { if (e.target === d) d.remove(); };
+    d.querySelector('.vs-save').onclick = () => {
+      for (const a of draft.actions) delete a._id;
+      s.trigger = draft.trigger; s.actions = draft.actions;
+      this.markDirty(); d.remove();
+    };
+  }
   openScriptEditor(sid) {
     const s = this.world.scripts.find(x => x.id === sid);
     if (!s) return;
+    if (s.kind === 'visual') return this.openVisualEditor(sid);
     const d = document.createElement('div'); d.className = 'modal-bg';
     d.innerHTML = `<div class="modal modal-wide"><h2>📝 ${esc(s.name)}</h2>
       <p class="muted small">Script API: <code>onStart(fn)</code> · <code>onTouch(partName, fn)</code> · <code>giveTix(player, n)</code> · <code>teleport(player, x, y, z)</code> · <code>say(player, msg)</code> · <code>kill(player)</code></p>
