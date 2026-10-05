@@ -166,7 +166,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -196,6 +196,24 @@ function mount(active, html, after) {
   app.querySelector('.tb-logout-all').onclick = () => { if (confirm('Log out of all accounts?')) logoutAll(); };
   const sbLogout = app.querySelector('.sidebar-logout');
   if (sbLogout) sbLogout.onclick = () => logout();
+  const bell = app.querySelector('.tb-bell'), panel = app.querySelector('.tb-notif');
+  if (bell && panel) {
+    bell.onclick = async e => {
+      e.stopPropagation();
+      if (panel.classList.contains('hidden')) {
+        try {
+          const n = await api('GET', '/api/notifications');
+          panel.innerHTML = `<div class="tb-notif-head"><b>Notifications</b><button class="link notif-clear">Mark all read</button></div>` +
+            (n.list.length ? n.list.map(x => `<a class="tb-notif-item ${x.read ? '' : 'unread'}" data-id="${x.id}" href="${esc(x.link || '#/home')}"><span>${esc(x.text)}</span><i>${timeAgo(x.created)}</i></a>`).join('') : '<p class="muted small" style="padding:10px">Nothing yet.</p>');
+          panel.querySelector('.notif-clear').onclick = async ev => { ev.stopPropagation(); await api('POST', '/api/notifications/read'); refreshNotif(); bell.onclick(e); };
+          panel.querySelectorAll('.tb-notif-item').forEach(a => a.onclick = () => { api('POST', '/api/notifications/read', { ids: [+a.dataset.id] }).catch(() => {}); });
+        } catch { panel.innerHTML = '<p class="muted small" style="padding:10px">Could not load.</p>'; }
+      }
+      panel.classList.toggle('hidden');
+    };
+    panel.onclick = e => e.stopPropagation();
+    document.addEventListener('click', () => panel.classList.add('hidden'), { once: true });
+  }
   document.body.classList.remove('nav-open');
   after?.(); fillThumbs();
 }
@@ -441,6 +459,43 @@ function confirmModal(title, html, ok, onOk) {
   d.onclick = e => { if (e.target === d) d.remove(); };
 }
 
+async function messagesPage() {
+  const convos = await api('GET', '/api/dms');
+  mount('messages', `<h1>Messages</h1>
+    <div class="dm-list">${convos.map(c => `
+      <a class="dm-convo" href="#/messages/${encodeURIComponent(c.name)}">
+        <b>${esc(c.name)}</b>
+        <span class="muted small dm-snip">${esc(c.lastText.slice(0, 60))}</span>
+        <span class="muted small">${timeAgo(c.lastCreated)}</span>
+        ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
+      </a>`).join('') || '<p class="muted">No messages yet. Visit a friend\'s profile to say hi!</p>'}</div>`);
+}
+async function dmPage(name) {
+  let msgs = await api('GET', '/api/dm/' + encodeURIComponent(name));
+  mount('messages', `<h1 class="dm-head"><a href="#/messages">&larr; Messages</a> &middot; ${esc(name)}</h1>
+    <div class="dm-thread"></div>
+    <form class="dm-form"><input maxlength="500" placeholder="Message ${esc(name)}..." autocomplete="off"><button class="btn-primary">Send</button></form>`, () => {
+    const thread = app.querySelector('.dm-thread');
+    const render = () => {
+      thread.innerHTML = msgs.map(m => `<div class="dm-msg ${m.sender === me.name ? 'me' : ''}"><span>${esc(m.text)}</span><i>${timeAgo(m.created)}</i></div>`).join('');
+      thread.scrollTop = thread.scrollHeight;
+    };
+    render();
+    const t = setInterval(async () => {
+      try { const nm = await api('GET', '/api/dm/' + encodeURIComponent(name)); if (nm.length !== msgs.length || (nm[nm.length - 1]?.id !== msgs[msgs.length - 1]?.id)) { msgs = nm; render(); } } catch {}
+    }, 5000);
+    cleanup = () => clearInterval(t);
+    app.querySelector('.dm-form').onsubmit = async e => {
+      e.preventDefault();
+      const inp = e.target.querySelector('input');
+      const text = inp.value.trim(); if (!text) return;
+      inp.value = '';
+      try { const m = await api('POST', '/api/dm/' + encodeURIComponent(name), { text }); msgs.push(m); render(); }
+      catch (err) { toast(err.message, true); }
+    };
+  });
+  refreshNotif();
+}
 async function friendsPage() {
   const fr = await api('GET', '/api/friends');
   mount('friends', `
@@ -450,7 +505,7 @@ async function friendsPage() {
     ${fr.requests.length ? `<section><div class="sec-h"><h2>Friend Requests (${fr.requests.length})</h2></div><div class="req-list">${fr.requests.map(u => `
       <div class="req">${avatarImgTag(u.avatar)}<a href="#/users/${encodeURIComponent(u.name)}">${esc(u.name)}</a><button class="btn-primary" data-accept="${esc(u.name)}">Accept</button><button class="btn-secondary" data-decline="${esc(u.name)}">Ignore</button></div>`).join('')}</div></section>` : ''}
     <section><div class="sec-h"><h2>My Friends (${fr.friends.length})</h2></div>
-      <div class="friend-grid">${fr.friends.map(u => `<div class="friend-card">${userTile(u)}${u.gameId ? `<a class="btn-join" href="#/play/${u.gameId}">Join</a>` : `<span class="muted small">${u.online ? 'Online' : 'Offline'}</span>`}</div>`).join('') || '<p class="muted">No friends yet. Search for people above!</p>'}</div></section>`, () => {
+      <div class="friend-grid">${fr.friends.map(u => `<div class="friend-card">${userTile(u)}<div class="friend-card-actions"><a class="btn-secondary btn-small" href="#/messages/${encodeURIComponent(u.name)}">Message</a>${u.gameId ? `<a class="btn-join" href="#/play/${u.gameId}">Join</a>` : `<span class="muted small">${u.online ? 'Online' : 'Offline'}</span>`}</div></div>`).join('') || '<p class="muted">No friends yet. Search for people above!</p>'}</div></section>`, () => {
     app.querySelectorAll('[data-accept]').forEach(b => b.onclick = async () => { await api('POST', '/api/friends/' + encodeURIComponent(b.dataset.accept)); toast('You are now friends with ' + b.dataset.accept); me = await api('GET', '/api/me'); friendsPage(); });
     app.querySelectorAll('[data-decline]').forEach(b => b.onclick = async () => { await api('DELETE', '/api/friends/' + encodeURIComponent(b.dataset.decline)); me = await api('GET', '/api/me'); friendsPage(); });
     app.querySelector('.user-search').onsubmit = async e => {
@@ -647,7 +702,7 @@ async function profilePage(name) {
       <div class="ph-info"><h1>${esc(u.name)}${badgeIcon2(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
-      <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
+      <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `<a class="btn-secondary" href="#/messages/${encodeURIComponent(u.name)}">Message</a>${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
     </div>
     <section><div class="sec-h"><h2>About</h2>${isMe ? '<button class="link edit-bio">Edit</button>' : ''}</div><p class="bio">${esc(u.bio || (isMe ? 'Tell people about yourself!' : 'This user has no bio.'))}</p></section>
     <section><div class="sec-h"><h2>Badges (${u.badges.length})</h2></div>
@@ -939,6 +994,7 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
+      case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
       case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
@@ -956,9 +1012,19 @@ async function route() {
 }
 addEventListener('hashchange', route);
 loadBadgeDefs();
+async function refreshNotif() {
+  if (!token || !me) return;
+  try {
+    const n = await api('GET', '/api/notifications');
+    const b = document.querySelector('.tb-bell-n');
+    if (b) { b.textContent = n.unread > 99 ? '99+' : n.unread; b.classList.toggle('hidden', !n.unread); }
+  } catch {}
+}
 setInterval(async () => {
   if (!token || !me) return;
   try { const r = await api('POST', '/api/ping'); setMoney(r); dailyToast(r); if (r.requests !== me.requests.length) { me = await api('GET', '/api/me'); } } catch {}
+  refreshNotif();
 }, 20000);
+refreshNotif();
 
 route();
