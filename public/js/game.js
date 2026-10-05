@@ -150,10 +150,12 @@ export class Game {
     this.meshes = buildWorld(this.scene, this.world);
     this.solids = []; this.triggers = [];
     for (const p of this.world.parts) {
-      const box = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2] };
-      if (p.k === 'coin') { box.min = box.min.map(v => v - 0.3); box.max = box.max.map(v => v + 0.3); this.triggers.push(box); continue; }
-      if (p.cc !== false) this.solids.push(box);
-      if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) this.triggers.push(box);
+      const box = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2], _arrs: [] };
+      const addBox = arr => { arr.push(box); box._arrs.push(arr); };
+      (p._boxes ||= []).push(box);
+      if (p.k === 'coin') { box.min = box.min.map(v => v - 0.3); box.max = box.max.map(v => v + 0.3); addBox(this.triggers); continue; }
+      if (p.cc !== false) addBox(this.solids);
+      if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) addBox(this.triggers);
     }
     this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
     this.char = buildCharacter(this.me.avatar);
@@ -188,7 +190,7 @@ export class Game {
       giveTix: (player, n) => {
         const amt = Math.max(1, Math.min(100, Math.floor(Number(n) || 5)));
         this.showBig(`+${amt} FunTix!`, 2000);
-        this.send({ t: 'coin', part: 'script_tix_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) });
+        this.send({ t: 'scriptTix', amount: amt });
       },
       teleport: (player, x, y, z) => { this.pos.set(Number(x) || 0, Number(y) || 10, Number(z) || 0); this.vel.set(0, 0, 0); },
       say: (player, msg) => this.showBig(String(msg).slice(0, 120), 2500),
@@ -219,21 +221,32 @@ export class Game {
         mesh.userData.part = p;
         this.scene.add(mesh);
         this.meshes.set(p.id, mesh);
-        this.solids.push({ p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2] });
+        const sbox = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2], _arrs: [this.solids] };
+        this.solids.push(sbox);
+        (p._boxes ||= []).push(sbox);
         return p.id;
       },
       movePart: (name, x, y, z) => {
         const m = findMesh(name);
-        if (m) { m.position.set(Number(x), Number(y), Number(z)); m.userData.part.p = [Number(x), Number(y), Number(z)]; }
+        if (!m) return;
+        const p = m.userData.part;
+        p.p = [Number(x), Number(y), Number(z)];
+        m.position.set(p.p[0], p.p[1], p.p[2]);
+        this.syncPartBoxes(p);
       },
-      hidePart: name => { const m = findMesh(name); if (m) m.visible = false; },
-      showPart: name => { const m = findMesh(name); if (m) m.visible = true; },
+      hidePart: name => { const m = findMesh(name); if (m) { m.visible = false; this.setPartActive(m.userData.part, false); } },
+      showPart: name => { const m = findMesh(name); if (m) { m.visible = true; this.setPartActive(m.userData.part, true); } },
       playSound: name => { if (sfx[name]) sfx[name](); },
       setScore: n => { st.score = Number(n) || 0; },
       getScore: () => st.score,
       addScore: n => { st.score += Number(n) || 0; return st.score; },
       getPos: () => ({ x: this.pos.x, y: this.pos.y, z: this.pos.z }),
       getHealth: () => this.health,
+      getPlayers: () => {
+        const list = [{ name: this.me.name, x: this.pos.x, y: this.pos.y, z: this.pos.z, me: true }];
+        for (const pl of this.players.values()) list.push({ name: pl.name, x: pl.char.position.x, y: pl.char.position.y, z: pl.char.position.z });
+        return list;
+      },
       world: this.world,
       game: this,
     };
@@ -243,6 +256,19 @@ export class Game {
         const fn = new Function(...names, s.code || '');
         fn(...names.map(k => api[k]));
       } catch (e) { console.warn('Script error in ' + s.name + ':', e); }
+    }
+  }
+  syncPartBoxes(p) {
+    for (const b of (p._boxes || [])) {
+      b.min = [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2];
+      b.max = [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2];
+    }
+  }
+  setPartActive(p, on) {
+    for (const b of (p._boxes || [])) for (const arr of (b._arrs || [])) {
+      const i = arr.indexOf(b);
+      if (on && i === -1) arr.push(b);
+      if (!on && i !== -1) arr.splice(i, 1);
     }
   }
   fireScriptTouch(partName) {
@@ -261,6 +287,7 @@ export class Game {
     const p = this.checkpoint ? this.checkpoint.clone() : findSpawn(this.world);
     this.pos.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 2, 0.2, (Math.random() - 0.5) * 2));
     this.vel.set(0, 0, 0); this.dead = false; this.health = 100;
+    this.jumpBuf = 0; this.coyote = 0; this.jumping = false;
     if (this.debris) { for (const d of this.debris) this.scene.remove(d.m); this.debris = null; }
     this.scene.remove(this.char);
     this.char = buildCharacter(this.me.avatar); this.scene.add(this.char);
@@ -291,7 +318,10 @@ export class Game {
       }
       if (down && e.key === 'Shift' && !e.repeat) this.toggleShiftLock();
       this.keys[e.code] = down;
-      if (down && e.code === 'Space') e.preventDefault();
+      if (e.code === 'Space') {
+        if (down) { if (!e.repeat) this.jumpBuf = 0.15; e.preventDefault(); }
+        else this.cutJump();
+      }
     };
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
     this.onResize = () => this.resize(); addEventListener('resize', this.onResize);
@@ -342,8 +372,8 @@ export class Game {
     };
     zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
     const jb = this.c.querySelector('.jump-btn');
-    jb.addEventListener('pointerdown', e => { e.preventDefault(); this.touchJump = true; jb.classList.add('down'); });
-    const jup = () => { this.touchJump = false; jb.classList.remove('down'); };
+    jb.addEventListener('pointerdown', e => { e.preventDefault(); this.touchJump = true; this.jumpBuf = 0.15; jb.classList.add('down'); });
+    const jup = () => { this.touchJump = false; this.cutJump(); jb.classList.remove('down'); };
     jb.addEventListener('pointerup', jup); jb.addEventListener('pointercancel', jup); jb.addEventListener('pointerleave', jup);
     jb.addEventListener('contextmenu', e => e.preventDefault());
   }
@@ -390,6 +420,10 @@ export class Game {
   }
 
   // ---------- physics ----------
+  cutJump() {
+    if (this.jumping && this.vel.y > 20) this.vel.y = 20;
+    this.jumping = false;
+  }
   overlaps(b, x, y, z) {
     return x + HW > b.min[0] && x - HW < b.max[0] && y + H > b.min[1] && y < b.max[1] && z + HW > b.min[2] && z - HW < b.max[2];
   }
@@ -419,7 +453,12 @@ export class Game {
     if (move.lengthSq() > 1) move.normalize();
     const speed = this.speedTimer > 0 ? WALK * 2 : WALK;
     this.vel.x = move.x * speed; this.vel.z = move.z * speed;
-    if ((k.Space || this.touchJump) && this.onGround) { this.vel.y = JUMP; this.onGround = false; sfx.jump(); }
+    if (this.onGround) { this.coyote = 0.12; this.jumping = false; }
+    else this.coyote = Math.max(0, (this.coyote || 0) - dt);
+    this.jumpBuf = Math.max(0, (this.jumpBuf || 0) - dt);
+    if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
+      this.vel.y = JUMP; this.onGround = false; this.coyote = 0; this.jumpBuf = 0; this.jumping = true; sfx.jump();
+    }
     this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
     this.wasGround = this.onGround; this.onGround = false; this.ground = null;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z)) * dt / 0.4));
@@ -471,7 +510,7 @@ export class Game {
           } else if (sc.action === 'tix') {
             const amt = Math.max(1, Math.min(100, Math.floor(Number(sc.amount) || 5)));
             this.showBig(`+${amt} FunTix!`, 2000);
-            this.send({ t: 'coin', part: 'script_' + p.id });
+            this.send({ t: 'scriptTix', amount: amt });
           }
         }
       }
