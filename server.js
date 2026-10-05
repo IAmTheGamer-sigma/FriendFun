@@ -108,8 +108,8 @@ function filter(text) {
 // ---------- http ----------
 const app = express();
 app.use(express.json({ limit: '8mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/three', express.static(path.join(__dirname, 'node_modules/three')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+app.use('/three', express.static(path.join(__dirname, 'node_modules/three'), { maxAge: '1y', immutable: true }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 async function auth(req, res, next) {
@@ -849,7 +849,7 @@ body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #
 #hdr .meta { color: #aaa; font-size: 13px; }
 #c { display: block; width: 100vw; height: calc(100vh - 53px); }
 </style>
-<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.min.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
 <div id="hdr"><h1>${title}</h1><span class="meta">by ${creator} &middot; ${desc}</span><span class="meta" style="margin-left:auto">Exported from FriendFun</span></div>
