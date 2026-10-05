@@ -30,6 +30,8 @@ export const CATALOG = [
   { id: 'face_buckteeth', type: 'face', name: 'Buck Teeth', price: 0, limited: true },
   { id: 'hat_ducktuft', type: 'hat', name: 'Feather Tuft', price: 0, limited: true, color: '#212121' },
   { id: 'face_beak', type: 'face', name: 'Duck Bill', price: 0, limited: true },
+  { id: 'head_bugs', type: 'head', name: 'Bugs Bunny', price: 0, limited: true },
+  { id: 'head_daffy', type: 'head', name: 'Daffy Duck', price: 0, limited: true },
 ];
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2 };
