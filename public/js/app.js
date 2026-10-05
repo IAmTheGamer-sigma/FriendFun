@@ -145,7 +145,7 @@ function shell(active, content) {
   return `
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
-    <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">LooneyVerse</span></a>
+    <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">Funtopia</span></a>
     <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
@@ -255,8 +255,8 @@ function loginPage() {
   app.innerHTML = `
   <div class="landing-bg"></div>
   <div class="landing-inner">
-    <div class="landing-hero"><div class="logo big"><span class="logo-icon">${LOGO}</span><span class="logo-text">LooneyVerse</span></div>
-      <h1>Play, build and hang out with friends.</h1><p>Join millions of blocky adventurers. Jump into games, customize your avatar, and build your own worlds in LooneyVerse Studio.</p></div>
+    <div class="landing-hero"><div class="logo big"><span class="logo-icon">${LOGO}</span><span class="logo-text">Funtopia</span></div>
+      <h1>Play, build and hang out with friends.</h1><p>Join millions of blocky adventurers. Jump into games, customize your avatar, and build your own worlds in Funtopia Studio.</p></div>
     <div class="auth-card">
       <div class="auth-tabs"><button data-m="signup" class="active">Sign Up</button><button data-m="login">Log In</button></div>
       <form class="auth-form">
@@ -742,7 +742,7 @@ function groupsPage() {
 
   mount('groups', `
     <div class="groups-head">
-      <div><h1>Groups</h1><p class="muted">Find people who like the same games and create communities on LooneyVerse.</p></div>
+      <div><h1>Groups</h1><p class="muted">Find people who like the same games and create communities on Funtopia.</p></div>
       <button class="btn-primary" id="create-group">Create Group</button>
     </div>
     <form class="groups-search-row">
@@ -826,7 +826,7 @@ async function createPage() {
       <a class="tpl" href="#/studio/new/${k}"><div class="gc-thumb"><img data-tpl="${k}" src="${PLACEHOLDER}"></div><b>${n}</b><span class="muted small">${d}</span></a>`).join('')}</div></section>
     <section><div class="sec-h"><h2>My Experiences (${mine.length})</h2></div>
       <div class="my-games">${mine.map(g => `<div class="my-game"><img ${g.thumbnail ? `src="${g.thumbnail}"` : `src="${PLACEHOLDER}" data-thumb="${g.id}"`}><div class="mg-info"><b>${esc(g.name)}</b><span class="muted small">${g.unpublished ? 'Private (not published)' : 'Public'} &middot; ${fmt(g.visits)} visits &middot; ${fmt(g.playing)} playing</span></div>
-        <a class="btn-secondary" href="#/studio/${g.id}">Edit</a><a class="btn-secondary" href="#/games/${g.id}">View</a><button class="btn-danger" data-del="${g.id}">Delete</button></div>`).join('') || '<p class="muted">You haven\'t made anything yet. Pick a template above to open LooneyVerse Studio!</p>'}</div></section>`, () => {
+        <a class="btn-secondary" href="#/studio/${g.id}">Edit</a><a class="btn-secondary" href="#/games/${g.id}">View</a><button class="btn-danger" data-del="${g.id}">Delete</button></div>`).join('') || '<p class="muted">You haven\'t made anything yet. Pick a template above to open Funtopia Studio!</p>'}</div></section>`, () => {
     setTimeout(() => app.querySelectorAll('img[data-tpl]').forEach(img => { img.src = tplThumb(img.dataset.tpl); }), 30);
     app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmModal('Delete Experience', 'This cannot be undone. Delete it?', 'Delete', async () => { await api('DELETE', '/api/games/' + b.dataset.del); createPage(); }));
   });
@@ -1025,7 +1025,7 @@ function clubPage() {
   mount('club', `
     <div class="club-hero">
       <div class="club-logo">${LOGO}${CLUB}</div>
-      <div class="club-info"><h1>FriendClub</h1><p class="muted">The membership for true LooneyVerse fans.</p>
+      <div class="club-info"><h1>FriendClub</h1><p class="muted">The membership for true Funtopia fans.</p>
         <div class="club-status ${active ? 'on' : ''}">${me.clubForever ? `${CLUB} You have free FriendClub forever${me.admin ? ' (admin)' : ''}!` : active ? `${CLUB} You're a member! ${days} day${days === 1 ? '' : 's'} left` : 'You are not a member yet.'}</div>
         ${me.clubForever ? '' : `<button class="btn-primary club-join" ${short > 0 ? 'disabled' : ''}>${active ? 'Renew' : 'Join'} for ${tix} ${ECON.CLUB_PRICE} &middot; ${ECON.CLUB_DAYS} days</button>`}
         ${!me.clubForever && short > 0 ? `<div class="muted small">You need ${short} more FunTix. <a href="#/funtix">How to earn</a></div>` : ''}
