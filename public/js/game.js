@@ -160,6 +160,39 @@ export class Game {
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.ray = new THREE.Raycaster();
     this.resize();
+    this.runWorldScripts();
+  }
+  runWorldScripts() {
+    const scripts = this.world.scripts || [];
+    if (!scripts.length) return;
+    // Script API available to world scripts
+    const api = {
+      onStart: fn => { try { fn(); } catch (e) { console.warn('Script onStart error:', e); } },
+      onTouch: (partName, fn) => {
+        if (!this._scriptTouch) this._scriptTouch = [];
+        this._scriptTouch.push({ partName: String(partName), fn });
+      },
+      giveTix: (player, n) => { /* handled via touch system */ console.log('giveTix', n); },
+      teleport: (player, x, y, z) => { this.pos.set(Number(x) || 0, Number(y) || 10, Number(z) || 0); this.vel.set(0, 0, 0); },
+      say: (player, msg) => this.showBig(String(msg).slice(0, 120), 2500),
+      kill: player => this.die(),
+      world: this.world,
+      game: this,
+    };
+    const names = Object.keys(api);
+    for (const s of scripts) {
+      try {
+        const fn = new Function(...names, s.code || '');
+        fn(...names.map(k => api[k]));
+      } catch (e) { console.warn('Script error in ' + s.name + ':', e); }
+    }
+  }
+  fireScriptTouch(partName) {
+    for (const t of (this._scriptTouch || [])) {
+      if (t.partName.toLowerCase() === String(partName).toLowerCase()) {
+        try { t.fn(); } catch (e) { console.warn('Script onTouch error:', e); }
+      }
+    }
   }
   resize() {
     const w = this.c.clientWidth || innerWidth, h = this.c.clientHeight || innerHeight;
@@ -362,6 +395,7 @@ export class Game {
         this.send({ t: 'coin', part: p.id });
         if (this.o.test) this.txCount.textContent = this.collected.size + ' coins';
       }
+      this.fireScriptTouch(p.name);
       const sc = p.script?.onTouch;
       if (sc && sc.action && sc.action !== 'none') {
         const now = performance.now();
