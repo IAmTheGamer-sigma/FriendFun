@@ -49,11 +49,11 @@ async function seed() {
     ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, max_players, created: now, updated: now, thumbnail: null });
   
   const games = [
-    g('g1', 'Mega Fun Obby', 'Funtopia', 'Jump, dodge and bounce through 10 stages of obstacles!', 'obby', 1543210, 8912, 412),
-    g('g2', 'Hangout Town', 'Funtopia', 'Chill with friends in a little town.', 'hangout', 987654, 5321, 210),
-    g('g3', 'Sky Tower Climb', 'Funtopia', 'Climb the spiral around the giant tower.', 'tower', 654321, 4210, 380),
-    g('g4', 'Coin Rush Islands', 'Funtopia', 'Hop between floating islands and grab every coin!', 'coinRush', 432100, 3999, 155),
-    g('g5', 'Classic Baseplate', 'Funtopia', 'The classic. A big grey baseplate.', 'baseplate', 210987, 1500, 90),
+    g('g1', 'Mega Fun Obby', 'LooneyVerse', 'Jump, dodge and bounce through 10 stages of obstacles!', 'obby', 1543210, 8912, 412),
+    g('g2', 'Hangout Town', 'LooneyVerse', 'Chill with friends in a little town.', 'hangout', 987654, 5321, 210),
+    g('g3', 'Sky Tower Climb', 'LooneyVerse', 'Climb the spiral around the giant tower.', 'tower', 654321, 4210, 380),
+    g('g4', 'Coin Rush Islands', 'LooneyVerse', 'Hop between floating islands and grab every coin!', 'coinRush', 432100, 3999, 155),
+    g('g5', 'Classic Baseplate', 'LooneyVerse', 'The classic. A big grey baseplate.', 'baseplate', 210987, 1500, 90),
   ];
   
   for (const game of games) {
@@ -1127,7 +1127,7 @@ function aiGenerateHtml(prompt) {
 <script>
 function buyItem(item) {
   console.log('Buying', item);
-  // Connect to Funtopia API: POST /api/buy/<item-id>
+  // Connect to LooneyVerse API: POST /api/buy/<item-id>
   alert('Added ' + item + ' to cart!');
 }
 </script>`;
@@ -1169,17 +1169,17 @@ function addCoins(n) { aiCoins += n; document.getElementById('ai-coins').textCon
 <script>
 function teleportTo(x, y, z) {
   console.log('Teleport to', x, y, z);
-  // In Funtopia: set player position via game API
+  // In LooneyVerse: set player position via game API
 }
 </script>`;
   }
   return `<!-- AI-generated HTML snippet -->
 <!-- Prompt: ${String(prompt).slice(0, 80).replace(/</g, '&lt;')} -->
 <div style="padding:16px;background:#f0f0f0;border-radius:8px">
-  <p>Custom HTML for your Funtopia game. Edit me!</p>
+  <p>Custom HTML for your LooneyVerse game. Edit me!</p>
 </div>
 <script>
-console.log('Funtopia AI script loaded');
+console.log('LooneyVerse AI script loaded');
 </script>`;
 }
 function aiGenerateScripts(prompt) {
@@ -1360,7 +1360,7 @@ app.get('/g/:id.html', async (req, res) => {
   if (!g || g.unpublished) return res.status(404).send('Game not found');
   const world = g.world || { sky: '#8fc8ff', parts: [] };
   const worldJson = JSON.stringify(world).replace(/</g, '\\u003c');
-  const title = escapeHtml(g.name || 'Funtopia Game');
+  const title = escapeHtml(g.name || 'LooneyVerse Game');
   const desc = escapeHtml(g.description || '');
   const creator = escapeHtml(g.creator || 'Unknown');
   const html = `<!doctype html>
@@ -1368,7 +1368,7 @@ app.get('/g/:id.html', async (req, res) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} - Funtopia</title>
+<title>${title} - LooneyVerse</title>
 <style>
 body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #fff; }
 #hdr { padding: 12px 16px; background: #1b1d1f; display: flex; align-items: center; gap: 12px; }
@@ -1379,7 +1379,7 @@ body { margin: 0; font-family: system-ui, sans-serif; background: #111; color: #
 <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.min.js", "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }</script>
 </head>
 <body>
-<div id="hdr"><h1>${title}</h1><span class="meta">by ${creator} &middot; ${desc}</span><span class="meta" style="margin-left:auto">Exported from Funtopia</span></div>
+<div id="hdr"><h1>${title}</h1><span class="meta">by ${creator} &middot; ${desc}</span><span class="meta" style="margin-left:auto">Exported from LooneyVerse</span></div>
 <canvas id="c"></canvas>
 <script type="module">
 import * as THREE from 'three';
@@ -1952,7 +1952,7 @@ async function seedLooneyGames() {
       const id = 'g_looney' + String(i + 1).padStart(2, '0');
       const cfg = LOONEY_GAMES[i];
       const game = {
-        id, name: cfg.name, creator: 'Funtopia', description: '🥕 ' + cfg.desc,
+        id, name: cfg.name, creator: 'LooneyVerse', description: '🥕 ' + cfg.desc,
         world: sanitizeWorld(looneyWorld(i)), event: 'looney',
         visits: 0, likes: 0, dislikes: 0, max_players: 30,
         created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false,
@@ -1994,6 +1994,6 @@ seedLooneyGames().then(r => console.log('Looney games seeded:', r.created));
     }
   } catch (e) { console.log('Looney @fun unlock failed:', e.message); }
 })();
-server.listen(PORT, () => console.log(`Funtopia running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`LooneyVerse running on http://localhost:${PORT}`));
 
 export default app;
