@@ -293,3 +293,19 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
   .groups-head .btn-primary { width:100%; }
   .group-grid { grid-template-columns:1fr; }
 }
+
+/* ---------- account menu ---------- */
+.tb-user-wrap { position: relative; }
+.tb-user { display: flex; align-items: center; gap: 8px; background: none; border: 0; color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+.tb-user:hover { background: #2a2c2f; }
+.tb-user img { width: 32px; height: 32px; border-radius: 50%; background: #3d3f42; }
+.tb-caret { font-size: 10px; color: #aaa; }
+.tb-menu { position: absolute; top: 100%; right: 0; margin-top: 8px; min-width: 240px; background: #2c2e31; border: 1px solid #45474a; border-radius: 12px; padding: 8px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.tb-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; text-decoration: none; }
+.tb-menu-item:hover { background: #3d3f42; }
+.tb-menu-sep { height: 1px; background: #45474a; margin: 8px 4px; }
+.tb-menu-head { font-size: 12px; color: #aaa; font-weight: 700; text-transform: uppercase; padding: 4px 12px; }
+.tb-menu-empty { padding: 8px 12px; color: #888; font-size: 13px; }
+.tb-accounts { max-height: 200px; overflow-y: auto; }
+.sidebar-logout { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-weight: 600; font-size: 16px; color: #ff6b63; background: none; border: 0; cursor: pointer; margin-top: auto; width: 100%; text-align: left; }
+.sidebar-logout:hover { background: #2a2c2f; }
