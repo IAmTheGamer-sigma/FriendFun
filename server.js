@@ -33,7 +33,7 @@ async function loadCustomBadges() {
 function badgeDefs() {
   const defs = {};
   for (const [id, b] of Object.entries(BADGES)) defs[id] = { id, name: b.name, desc: b.desc, color: b.color, path: b.path, custom: false };
-  for (const [id, b] of Object.entries(CUSTOM_BADGES)) defs[id] = { id, name: b.name, desc: b.desc || '', color: b.color || '#888', icon: b.icon || '🏅', custom: true };
+  for (const [id, b] of Object.entries(CUSTOM_BADGES)) defs[id] = { id, name: b.name, desc: b.desc || '', color: b.color || '#888', icon: b.icon || '🏅', image: b.image || '', custom: true };
   return defs;
 }
 
@@ -342,9 +342,11 @@ app.post('/api/admin/badges', auth, adminOnly, async (req, res) => {
   const icon = String(req.body?.icon || '🏅').slice(0, 4);
   const color = String(req.body?.color || '#888888').slice(0, 7);
   const desc = String(req.body?.desc || '').trim().slice(0, 100);
+  let image = String(req.body?.image || '').slice(0, 300000);
+  if (image && !image.startsWith('data:image/')) image = '';
   if (!name) return res.status(400).json({ error: 'Name required' });
   const id = 'custom_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const badge = { id, name, icon, color, desc, createdBy: req.user.name, created: Date.now() };
+  const badge = { id, name, icon, color, desc, image, createdBy: req.user.name, created: Date.now() };
   const { error } = await supabase.from('badges').insert(badge);
   if (error) return res.status(500).json({ error: 'Failed to create badge' });
   await loadCustomBadges();
