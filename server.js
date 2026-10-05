@@ -21,6 +21,22 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ---- Custom badges (admin-created) ----
+let CUSTOM_BADGES = {};
+async function loadCustomBadges() {
+  try {
+    const { data } = await supabase.from('badges').select('*');
+    CUSTOM_BADGES = {};
+    (data || []).forEach(b => { CUSTOM_BADGES[b.id] = b; });
+  } catch (e) { console.error('Failed to load custom badges:', e.message); }
+}
+function badgeDefs() {
+  const defs = {};
+  for (const [id, b] of Object.entries(BADGES)) defs[id] = { id, name: b.name, desc: b.desc, color: b.color, path: b.path, custom: false };
+  for (const [id, b] of Object.entries(CUSTOM_BADGES)) defs[id] = { id, name: b.name, desc: b.desc || '', color: b.color || '#888', icon: b.icon || '🏅', custom: true };
+  return defs;
+}
+
 // ---------- helper functions ----------
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const key = n => n.toLowerCase();
@@ -75,7 +91,7 @@ function badgesOf(u) {
     collector_5: list(u, 'inventory').length >= 5, collector_15: list(u, 'inventory').length >= 15,
     collector_all: CATALOG.every(item => list(u, 'inventory').includes(item.id)), creator: false,
   };
-  const earned = list(u, 'earnedBadges').filter(id => BADGES[id]);
+  const earned = list(u, 'earnedBadges').filter(id => BADGES[id] || CUSTOM_BADGES[id]);
   return [...new Set([...Object.keys(BADGES).filter(b => has[b]), ...earned])];
 }
 function badgeOf(u) {
@@ -317,6 +333,40 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   res.json({ ...await publicUser(updated), clubForever: isAdmin(updated) || !!updated.clubForever, clubUntil: updated.clubUntil || 0, funtix: updated.funtix });
 });
 
+// ---- Custom badges ----
+app.get('/api/badges', async (req, res) => {
+  res.json(badgeDefs());
+});
+app.post('/api/admin/badges', auth, adminOnly, async (req, res) => {
+  const name = String(req.body?.name || '').trim().slice(0, 30);
+  const icon = String(req.body?.icon || '🏅').slice(0, 4);
+  const color = String(req.body?.color || '#888888').slice(0, 7);
+  const desc = String(req.body?.desc || '').trim().slice(0, 100);
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  const id = 'custom_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const badge = { id, name, icon, color, desc, createdBy: req.user.name, created: Date.now() };
+  const { error } = await supabase.from('badges').insert(badge);
+  if (error) return res.status(500).json({ error: 'Failed to create badge' });
+  await loadCustomBadges();
+  res.json({ ok: true, badge: badgeDefs()[id] });
+});
+app.delete('/api/admin/badges/:id', auth, adminOnly, async (req, res) => {
+  const id = req.params.id;
+  if (!CUSTOM_BADGES[id]) return res.status(404).json({ error: 'Custom badge not found' });
+  await supabase.from('badges').delete().eq('id', id);
+  // Remove from all users
+  const { data: users } = await supabase.from('users').select('name, earnedBadges, badge').neq('earnedBadges', null);
+  for (const u of (users || [])) {
+    const earned = (Array.isArray(u.earnedBadges) ? u.earnedBadges : []).filter(b => b !== id);
+    const upd = { earnedBadges: earned };
+    if (u.badge === id) upd.badge = 'none';
+    if (earned.length !== (u.earnedBadges || []).length || u.badge === id) {
+      await supabase.from('users').update(upd).eq('name', u.name);
+    }
+  }
+  await loadCustomBadges();
+  res.json({ ok: true });
+});
 app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => {
   const { data: user, error: findError } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
   if (findError || !user) return res.status(404).json({ error: 'User not found' });
@@ -334,16 +384,18 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     message = `Reset ${user.name}'s daily reward`;
   } else if (command === 'grant_badge') {
     const badgeId = String(req.body?.badge || '').trim();
-    if (!BADGES[badgeId]) return res.status(400).json({ error: 'Unknown badge' });
+    const def = badgeDefs()[badgeId];
+    if (!def) return res.status(400).json({ error: 'Unknown badge' });
     const earned = [...new Set([...(Array.isArray(user.earnedBadges) ? user.earnedBadges : []), badgeId])];
     updates = { earnedBadges: earned };
-    message = `Gave ${BADGES[badgeId].name} badge to ${user.name}`;
+    message = `Gave ${def.name} badge to ${user.name}`;
   } else if (command === 'revoke_badge') {
     const badgeId = String(req.body?.badge || '').trim();
-    if (!BADGES[badgeId]) return res.status(400).json({ error: 'Unknown badge' });
+    const def = badgeDefs()[badgeId];
+    if (!def) return res.status(400).json({ error: 'Unknown badge' });
     const earned = (Array.isArray(user.earnedBadges) ? user.earnedBadges : []).filter(id => id !== badgeId);
     updates = { earnedBadges: earned };
-    message = `Removed ${BADGES[badgeId].name} badge from ${user.name}`;
+    message = `Removed ${def.name} badge from ${user.name}`;
   } else if (command === 'grant_ai') {
     updates = { aiAccess: true };
     message = `Granted AI coder access to ${user.name}`;
@@ -903,6 +955,55 @@ function aiGenerateParts(prompt) {
     add('Message Sign', 'part', [6, 3, 1], '#ffffff', 'plastic', 0, 12, 0,
       { script: { onTouch: { action: 'message', text: msg || 'Hello!' } } });
   }
+  if (has('house', 'home', 'cabin')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 12);
+    add('Floor', 'part', [14, 1, 12], '#8b6f4e', 'plastic', 0, 10, 0);
+    add('Wall Back', 'part', [14, 8, 1], '#c9a96a', 'plastic', 0, 14, -6);
+    add('Wall Left', 'part', [1, 8, 12], '#c9a96a', 'plastic', -7, 14, 0);
+    add('Wall Right', 'part', [1, 8, 12], '#c9a96a', 'plastic', 7, 14, 0);
+    add('Roof', 'part', [16, 1, 14], '#a33d2e', 'plastic', 0, 18.5, 0);
+    add('Door', 'part', [4, 6, 0.5], '#5b3a1e', 'plastic', 0, 13, 6);
+  }
+  if (has('maze')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', -18, 10.8, -18);
+    const walls = [[0,-10,20,1],[10,0,1,20],[-10,5,1,15],[0,10,15,1],[-5,-5,10,1]];
+    walls.forEach(([x, z, sx, sz], i) => add('Maze Wall ' + (i+1), 'part', [sx, 6, sz], '#7a7a8a', 'concrete', x, 13, z));
+    add('Win Pad', 'win', [6, 0.5, 6], '#ffffff', 'neon', 18, 10.8, 18);
+  }
+  if (has('bridge')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', -20, 10.8, 0);
+    for (let i = 0; i < 8; i++) add('Plank ' + (i+1), 'part', [4, 0.5, 6], '#8b6f4e', 'plastic', -16 + i * 4.5, 10, 0);
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 22, 10.8, 0);
+    add('Lava Below', 'kill', [50, 1, 20], '#ff4500', 'neon', 0, 4, 0);
+  }
+  if (has('stairs', 'staircase')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 10);
+    for (let i = 0; i < 8; i++) add('Step ' + (i+1), 'part', [8, 1, 4], '#a3a2a5', 'concrete', 0, 10 + i * 1.2, 6 - i * 4);
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 0, 20, -24);
+  }
+  if (has('castle', 'fort')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 20);
+    for (const [x, z] of [[-10,-10],[10,-10],[-10,10],[10,10]])
+      add('Tower', 'part', [6, 20, 6], '#9a9aa5', 'concrete', x, 18, z);
+    add('Wall N', 'part', [26, 10, 2], '#9a9aa5', 'concrete', 0, 15, -10);
+    add('Wall S', 'part', [26, 10, 2], '#9a9aa5', 'concrete', 0, 15, 10);
+    add('Gate', 'part', [8, 8, 1], '#5b3a1e', 'plastic', 0, 14, 10);
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffd400', 'neon', 0, 10.8, 0);
+  }
+  if (has('shop', 'store')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 15);
+    add('Shop Floor', 'part', [20, 1, 16], '#d4c5a0', 'plastic', 0, 10, 0);
+    add('Counter', 'part', [10, 3, 2], '#8b6f4e', 'plastic', 0, 11.5, -4,
+      { script: { onTouch: { action: 'message', text: 'Welcome to the shop!' } } });
+  }
+  if (has('race', 'track') && !has('speed')) {
+    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', -25, 10.8, 0);
+    for (let i = 0; i < 10; i++) {
+      add('Track ' + (i+1), 'part', [6, 0.5, 10], i % 2 ? '#cc3333' : '#eeeeee', 'plastic', -22 + i * 6, 10, 0);
+      if (i % 3 === 1) add('Boost ' + (i+1), 'speed', [4, 0.5, 4], '#ff9800', 'neon', -22 + i * 6, 10.5, 0);
+    }
+    add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 38, 10.8, 0);
+  }
   if (!parts.length) {
     // Default: a starter platform with a message script
     add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 0);
@@ -1034,6 +1135,92 @@ onTouch('Win Pad', () => {
   giveTix(null, 50);
 });`);
   }
+  if (has('score', 'points', 'counter')) {
+    add('score.js',
+`// Score system - touch coins to score points
+let target = 100;
+onStart(() => {
+  setScore(0);
+  say(null, 'Score 100 points to win!');
+});
+onTouch('Coin', () => {
+  const s = addScore(10);
+  say(null, 'Score: ' + s);
+  if (s >= target) {
+    say(null, 'You reached ' + target + ' points!');
+    giveTix(null, 50);
+  }
+});`);
+  }
+  if (has('checkpoint')) {
+    add('checkpoints.js',
+`// Custom checkpoint logic
+onTouch('Checkpoint', () => {
+  const pos = getPos();
+  setCheckpoint(pos.x, pos.y + 1, pos.z);
+});`);
+  }
+  if (has('health', 'damage', 'heal', 'poison')) {
+    add('hazard.js',
+`// Damage zone - standing in poison hurts
+onTick((dt) => {
+  const pos = getPos();
+  // Damage if below y=5 (in the poison zone)
+  if (pos.y < 5 && getHealth() > 0) {
+    damage(null, 20 * dt);
+  }
+});
+onTouch('Medkit', () => {
+  heal(null, 50);
+  say(null, '+50 health!');
+  hidePart('Medkit');
+});`);
+  }
+  if (has('chat', 'command')) {
+    add('chatCommands.js',
+`// Chat commands - type !tix or !spawn in chat
+onChat((name, text) => {
+  if (text === '!tix') {
+    giveTix(null, 5);
+    sayAll(name + ' used !tix');
+  } else if (text === '!spawn') {
+    teleport(null, 0, 15, 0);
+    say(null, 'Teleported to spawn!');
+  }
+});
+onStart(() => {
+  say(null, 'Type !tix or !spawn in chat!');
+});`);
+  }
+  if (has('day', 'night', 'sky')) {
+    add('skyCycle.js',
+`// Day/night sky cycle
+let time = 0;
+onTick((dt) => {
+  time += dt * 0.05;
+  // Note: sky color API coming soon - for now show time
+  if (Math.floor(time) !== Math.floor(time - dt * 0.05)) {
+    // Every second update
+  }
+});
+onStart(() => {
+  say(null, 'Survive the night!');
+});`);
+  }
+  if (has('hide', 'seek', 'secret', 'door')) {
+    add('secretDoor.js',
+`// Secret door - say the password in chat
+onChat((name, text) => {
+  if (text.toLowerCase() === 'open sesame') {
+    showPart('Secret Door');
+    sayAll(name + ' opened the secret door!');
+    hidePart('Secret Door');
+  }
+});
+onStart(() => {
+  say(null, 'Say "open sesame" in chat...');
+});`);
+  }
   // Generic script request
   if (has('script') && !scripts.length) {
     add('custom.js',
@@ -1136,6 +1323,7 @@ addEventListener('resize', () => {
   res.send(html);
 });
 
+loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
 server.listen(PORT, () => console.log(`FriendFun running on http://localhost:${PORT}`));
 
 export default app;
