@@ -739,12 +739,81 @@ function aiGenerateParts(prompt) {
   }
   return parts.slice(0, 50);
 }
+function aiGenerateHtml(prompt) {
+  const p = String(prompt || '').toLowerCase();
+  const has = (...words) => words.some(w => p.includes(w));
+  if (has('shop', 'store', 'buy')) {
+    return `<!-- AI-generated Shop UI - paste into your game's HTML -->
+<div id="ai-shop" style="position:fixed;top:20px;right:20px;background:#1b1d1f;color:#fff;padding:16px;border-radius:12px;min-width:200px;z-index:9999">
+  <h3 style="margin:0 0 12px">Shop</h3>
+  <button onclick="buyItem('sword')" style="display:block;width:100%;margin:6px 0;padding:8px;background:#2f8cff;border:none;border-radius:8px;color:#fff;cursor:pointer">Buy Sword (100 Tix)</button>
+  <button onclick="buyItem('shield')" style="display:block;width:100%;margin:6px 0;padding:8px;background:#2f8cff;border:none;border-radius:8px;color:#fff;cursor:pointer">Buy Shield (150 Tix)</button>
+</div>
+<script>
+function buyItem(item) {
+  console.log('Buying', item);
+  // Connect to FriendFun API: POST /api/buy/<item-id>
+  alert('Added ' + item + ' to cart!');
+}
+</script>`;
+  }
+  if (has('dialog', 'npc', 'talk', 'chat')) {
+    return `<!-- AI-generated Dialog Box -->
+<div id="ai-dialog" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#fff;color:#111;padding:16px 24px;border-radius:12px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:9999;display:none">
+  <b id="ai-dialog-name">NPC</b>
+  <p id="ai-dialog-text" style="margin:8px 0"></p>
+  <button onclick="document.getElementById('ai-dialog').style.display='none'" style="padding:6px 16px;background:#2f8cff;color:#fff;border:none;border-radius:8px;cursor:pointer">Close</button>
+</div>
+<script>
+function showDialog(name, text) {
+  document.getElementById('ai-dialog-name').textContent = name;
+  document.getElementById('ai-dialog-text').textContent = text;
+  document.getElementById('ai-dialog').style.display = 'block';
+}
+// Example: showDialog('Merchant', 'Welcome to my shop!');
+</script>`;
+  }
+  if (has('hud', 'leaderboard', 'score')) {
+    return `<!-- AI-generated HUD -->
+<div id="ai-hud" style="position:fixed;top:20px;left:20px;background:rgba(0,0,0,0.7);color:#fff;padding:12px 16px;border-radius:12px;z-index:9999;font-family:system-ui">
+  <div>Score: <b id="ai-score">0</b></div>
+  <div>Coins: <b id="ai-coins">0</b></div>
+</div>
+<script>
+let aiScore = 0, aiCoins = 0;
+function addScore(n) { aiScore += n; document.getElementById('ai-score').textContent = aiScore; }
+function addCoins(n) { aiCoins += n; document.getElementById('ai-coins').textContent = aiCoins; }
+</script>`;
+  }
+  if (has('button', 'teleport')) {
+    return `<!-- AI-generated Teleport Buttons -->
+<div style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;gap:8px">
+  <button onclick="teleportTo(0,20,0)" style="padding:10px 16px;background:#8a4bd8;color:#fff;border:none;border-radius:8px;cursor:pointer">Spawn</button>
+  <button onclick="teleportTo(50,20,0)" style="padding:10px 16px;background:#8a4bd8;color:#fff;border:none;border-radius:8px;cursor:pointer">Arena</button>
+</div>
+<script>
+function teleportTo(x, y, z) {
+  console.log('Teleport to', x, y, z);
+  // In FriendFun: set player position via game API
+}
+</script>`;
+  }
+  return `<!-- AI-generated HTML snippet -->
+<!-- Prompt: ${String(prompt).slice(0, 80).replace(/</g, '&lt;')} -->
+<div style="padding:16px;background:#f0f0f0;border-radius:8px">
+  <p>Custom HTML for your FriendFun game. Edit me!</p>
+</div>
+<script>
+console.log('FriendFun AI script loaded');
+</script>`;
+}
 app.post('/api/ai/coder', auth, async (req, res) => {
   const prompt = String(req.body?.prompt || '').trim().slice(0, 500);
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   try {
     const parts = aiGenerateParts(prompt);
-    res.json({ parts, message: `Generated ${parts.length} parts. Click "Add to world" to insert them.` });
+    const html = aiGenerateHtml(prompt);
+    res.json({ parts, html, message: `Generated ${parts.length} parts + HTML snippet. Click "Add to world" to insert parts.` });
   } catch (e) {
     res.status(500).json({ error: 'AI coder failed: ' + e.message });
   }
