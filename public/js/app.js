@@ -911,11 +911,11 @@ async function adminPage(q = '') {
               ? `<button class="btn-primary ban-revoke" data-name="${esc(u.name)}" title="Unban this user">Unban</button><span class="banned-tag" title="${esc(u.banReason || 'Banned')}">🚫 BANNED${u.bannedUntil ? ' until ' + new Date(u.bannedUntil).toLocaleDateString() : ''}</span>`
               : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
           </span>
-          <span class="admin-inline">
+          ${['fun','bro'].includes(me.name.toLowerCase()) ? `<span class="admin-inline">
             ${u.envAdmin ? '<span class="muted small">Env Admin</span>' : u.admin
               ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
               : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
-          </span>
+          </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
         </div>
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
