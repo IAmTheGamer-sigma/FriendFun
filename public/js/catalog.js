@@ -32,13 +32,22 @@ export const CATALOG = [
   { id: 'face_beak', type: 'face', name: 'Duck Bill', price: 0, limited: true },
   { id: 'head_bugs', type: 'head', name: 'Bugs Bunny', price: 0, limited: true },
   { id: 'head_daffy', type: 'head', name: 'Daffy Duck', price: 0, limited: true },
+  { id: 'pet_none', type: 'pet', name: 'No Pet', price: 0, free: true, emoji: '❌' },
+  { id: 'pet_puppy', type: 'pet', name: 'Puppy', price: 200, emoji: '🐶', color: '#c98f4e' },
+  { id: 'pet_kitty', type: 'pet', name: 'Kitty', price: 200, emoji: '🐱', color: '#9aa0a6' },
+  { id: 'pet_bunny', type: 'pet', name: 'Bunny', price: 250, emoji: '🐰', color: '#f5f5f5' },
+  { id: 'pet_ducky', type: 'pet', name: 'Duckling', price: 250, emoji: '🐤', color: '#ffeb3b' },
+  { id: 'pet_frog', type: 'pet', name: 'Froggy', price: 350, emoji: '🐸', color: '#66bb6a' },
+  { id: 'pet_fox', type: 'pet', name: 'Fox', price: 400, emoji: '🦊', color: '#ff924c' },
+  { id: 'pet_robo', type: 'pet', name: 'Robo Pup', price: 600, emoji: '🤖', color: '#90a4ae' },
+  { id: 'pet_dragon', type: 'pet', name: 'Dragon', price: 800, emoji: '🐲', color: '#26c6da' },
 ];
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2, CLUB_COIN_BONUS: 1 };
 export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
 export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
-  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic',
+  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none',
 };
 
 export const BADGES = {
