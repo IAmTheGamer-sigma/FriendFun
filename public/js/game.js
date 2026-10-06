@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=2f4a2dca';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=ecbc1237';
 import { sfx } from './sound.js?v=89850e26';
-import { ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=a85c7a51';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
@@ -44,7 +44,14 @@ function buildGear(gearId) {
   g.scale.setScalar(0.5);
   return g;
 }
-const GEAR_COOLDOWN = { gear_sword: 0.8, gear_slingshot: 0.6, gear_grapple: 1.5, gear_rocket: 2.2 };
+const GEAR_COOLDOWN = { gear_sword: 0.8, gear_slingshot: 0.6, gear_grapple: 1.5, gear_rocket: 2.2,
+  gear_blaster: 0.5, gear_raygun: 0.7, gear_crossbow: 0.9, gear_freezeray: 1.0,
+  gear_hammer: 1.0, gear_axe: 0.9, gear_katana: 0.6, gear_spear: 0.9, gear_mace: 1.1,
+  gear_lasersword: 0.7, gear_cannon: 2.5, gear_bazooka: 2.8 };
+const GEAR_BEHAVIOR = { gear_sword: 'melee', gear_slingshot: 'pellet', gear_rocket: 'rocket', gear_grapple: 'grapple',
+  gear_blaster: 'pellet', gear_raygun: 'pellet', gear_crossbow: 'pellet', gear_freezeray: 'pellet',
+  gear_hammer: 'melee', gear_axe: 'melee', gear_katana: 'melee', gear_spear: 'melee', gear_mace: 'melee',
+  gear_lasersword: 'melee', gear_cannon: 'rocket', gear_bazooka: 'rocket' };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export class Game {
@@ -54,7 +61,7 @@ export class Game {
     this.keys = {}; this.joy = { x: 0, y: 0 }; this.touchJump = false; this.t = 0; this.players = new Map();
     this.projectiles = []; this.effects = []; this.gearSwingT = 0; this.lastGearUse = -9;
     this.camYaw = Math.PI; this.camPitch = 0.35; this.camDist = 18;
-    this.health = 100; this.dead = false; this.emote = null; this.speedTimer = 0;
+    this.health = 100; this.dead = false; this.emote = null; this.speedTimer = 0; this.kills = 0;
     this.collected = new Set(); this.won = false;
     this.buildDom(); this.build3D(); this.bind();
     this.spawn(true);
@@ -80,6 +87,8 @@ export class Game {
       </div>
       <div class="touch-ui"><div class="joy-zone"><div class="joy"><div class="joy-knob"></div></div></div><button class="jump-btn" aria-label="Jump"><svg viewBox="0 0 24 24" width="42" height="42"><path fill="currentColor" d="M12 4l8 9h-5v7H9v-7H4z"/></svg></button></div>
       <div class="hud-bottom"><div class="funbux-hud" title="FunTix">${tix} <span class="tx-count">${this.o.funtix ?? ''}</span></div>${this.o.test ? '<button class="stop-btn">Stop</button>' : ''}</div>
+      <div class="inv-bar" title="Your gear inventory (click or press 1-9)"></div>
+      <div class="kill-feed"></div>
       <div class="big-msg"></div>
       <div class="esc-menu hidden">
         <div class="esc-panel">
@@ -121,6 +130,52 @@ export class Game {
       if (e.key === 'Escape') this.chatInput.blur();
     });
     this.updateLeaderboard();
+    this.renderInv();
+  }
+  // ---------- in-game inventory (owned gear) ----------
+  ownedGears() {
+    const inv = this.me.inventory || [];
+    return CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none' && inv.includes(i.id));
+  }
+  renderInv() {
+    const bar = this.c.querySelector('.inv-bar');
+    if (!bar) return;
+    const gears = this.ownedGears();
+    const cur = this.me.avatar?.gear;
+    bar.innerHTML = gears.map((g, i) => `<button class="inv-item${g.id === cur ? ' active' : ''}" data-id="${g.id}" title="${esc(g.name)}${i < 9 ? ' (' + (i + 1) + ')' : ''}">${g.emoji || '📦'}</button>`).join('');
+    bar.querySelectorAll('.inv-item').forEach(b => b.onclick = () => this.equipGear(b.dataset.id));
+    bar.style.display = gears.length ? 'flex' : 'none';
+  }
+  equipGearByIndex(i) {
+    const g = this.ownedGears()[i];
+    if (g) this.equipGear(g.id);
+  }
+  async equipGear(id) {
+    const it = ITEM[id];
+    if (!it || it.type !== 'gear' || this.o.test) return;
+    this.me.avatar = this.me.avatar || {};
+    this.me.avatar.gear = id;
+    this.setGear();
+    this.renderInv();
+    sfx.click?.();
+    try {
+      await fetch('/api/me/avatar', { method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + this.o.token },
+        body: JSON.stringify(this.me.avatar) });
+    } catch {}
+  }
+  onKill(name) {
+    this.kills++;
+    const feed = this.c.querySelector('.kill-feed');
+    if (feed) {
+      const d = document.createElement('div');
+      d.className = 'kill-item';
+      d.innerHTML = `<b>${esc(this.me.name)}</b> 💥 ${esc(name)}`;
+      feed.prepend(d);
+      while (feed.children.length > 5) feed.lastChild.remove();
+      setTimeout(() => d.remove(), 6000);
+    }
+    this.updateLeaderboard();
   }
   toggleMenu(v) {
     const show = v ?? this.escMenu.classList.contains('hidden');
@@ -133,7 +188,7 @@ export class Game {
   }
   updateLeaderboard() {
     const list = [this.me, ...this.players.values()];
-    this.lbList.innerHTML = list.map((p, i) => `<div class="lb-row ${i === 0 ? 'me' : ''}">${badgeIcon(p.badge)}${esc(p.name)}</div>`).join('');
+    this.lbList.innerHTML = list.map((p, i) => `<div class="lb-row ${i === 0 ? 'me' : ''}">${badgeIcon(p.badge)}${esc(p.name)}${i === 0 && this.kills ? ` <span class="lb-kills">💀${this.kills}</span>` : ''}</div>`).join('');
   }
   addChat(html) {
     const d = document.createElement('div'); d.className = 'chat-line'; d.innerHTML = html;
@@ -410,10 +465,11 @@ export class Game {
     this.lastGearUse = now;
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
-    if (id === 'gear_sword') this.swingSword();
-    else if (id === 'gear_slingshot') this.fireProjectile('pellet', dir, 70, 1.4);
-    else if (id === 'gear_rocket') this.fireProjectile('rocket', dir, 38, 5);
-    else if (id === 'gear_grapple') this.fireGrapple(dir);
+    const bh = GEAR_BEHAVIOR[id] || 'melee';
+    if (bh === 'melee') this.swingSword();
+    else if (bh === 'pellet') this.fireProjectile('pellet', dir, 70, 1.4);
+    else if (bh === 'rocket') this.fireProjectile('rocket', dir, 38, 5);
+    else if (bh === 'grapple') this.fireGrapple(dir);
   }
   swingSword() {
     this.gearSwingT = 0.35;
@@ -421,7 +477,7 @@ export class Game {
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.char.quaternion);
     for (const p of this.players.values()) {
       const d = p.char.position.clone().sub(this.pos); d.y = 0;
-      if (d.length() < 5.5 && d.normalize().dot(fwd) > 0.4) { this.send({ t: 'gearHit', id: p.id }); break; }
+      if (d.length() < 5.5 && d.normalize().dot(fwd) > 0.4) { this.send({ t: 'gearHit', id: p.id }); this.onKill(p.name); break; }
     }
   }
   fireProjectile(kind, dir, speed, radius) {
@@ -463,7 +519,7 @@ export class Game {
     sfx.boom?.() || sfx.click?.();
     for (const p of this.players.values()) {
       const d = p.char.position.clone().sub(at); d.y *= 0.4;
-      if (d.length() < radius + 1) { this.send({ t: 'gearHit', id: p.id }); break; }
+      if (d.length() < radius + 1) { this.send({ t: 'gearHit', id: p.id }); this.onKill(p.name); break; }
     }
   }
   addHalloweenDecor() {
@@ -555,6 +611,7 @@ export class Game {
         return;
       }
       if (down && e.key === 'Shift' && !e.repeat) this.toggleShiftLock();
+      if (down && !e.repeat && /^Digit[1-9]$/.test(e.code)) { this.equipGearByIndex(+e.code.slice(5) - 1); return; }
       this.keys[e.code] = down;
       if (e.code === 'Space') {
         if (down) { if (!e.repeat) this.jumpBuf = 0.15; e.preventDefault(); }
@@ -809,7 +866,7 @@ export class Game {
       if (!hit && this.blockedAt(mp.x, mp.y, mp.z)) hit = true;
       if (!hit) for (const p of this.players.values()) {
         const d = p.char.position.clone(); d.y += 2.5;
-        if (d.distanceTo(mp) < 1.6 + (pr.kind === 'rocket' ? 0.8 : 0)) { this.send({ t: 'gearHit', id: p.id }); hit = true; break; }
+        if (d.distanceTo(mp) < 1.6 + (pr.kind === 'rocket' ? 0.8 : 0)) { this.send({ t: 'gearHit', id: p.id }); this.onKill(p.name); hit = true; break; }
       }
       if (hit) {
         this.scene.remove(pr.mesh);
