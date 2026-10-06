@@ -41,6 +41,14 @@ export const CATALOG = [
   { id: 'pet_fox', type: 'pet', name: 'Fox', price: 400, emoji: '🦊', color: '#ff924c' },
   { id: 'pet_robo', type: 'pet', name: 'Robo Pup', price: 600, emoji: '🤖', color: '#90a4ae' },
   { id: 'pet_dragon', type: 'pet', name: 'Dragon', price: 800, emoji: '🐲', color: '#26c6da' },
+  { id: 'hat_witch', type: 'hat', name: 'Witch Hat', price: 250, color: '#7b1fa2' },
+  { id: 'face_fangs', type: 'face', name: 'Vampire Fangs', price: 0, free: true },
+  { id: 'face_stitches', type: 'face', name: 'Stitched Grin', price: 150 },
+  { id: 'head_pumpkin', type: 'head', name: 'Pumpkin Head', price: 500 },
+  { id: 'head_ghost', type: 'head', name: 'Ghost Sheet', price: 400 },
+  { id: 'shirt_vampcape', type: 'shirt', name: 'Vampire Cape', price: 350, color: '#7b1e1e' },
+  { id: 'shirt_mummy', type: 'shirt', name: 'Mummy Wraps', price: 300, color: '#e8e0c8' },
+  { id: 'pet_bat', type: 'pet', name: 'Bat Buddy', price: 300, emoji: '🦇', color: '#5d4037' },
 ];
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2, CLUB_COIN_BONUS: 1 };
