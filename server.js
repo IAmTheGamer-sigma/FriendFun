@@ -1395,6 +1395,14 @@ app.post('/api/ai/coder', auth, async (req, res) => {
   }
 });
 
+// ---------- iknow easter egg (horror link) ----------
+app.get('/iknow', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+app.get('/iknow/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // HTML export for games
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
