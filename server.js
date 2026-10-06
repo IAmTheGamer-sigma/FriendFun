@@ -855,7 +855,10 @@ function sanitizeWorld(w) {
     folder: String(s.folder || '').slice(0, 20),
     code: String(s.code || '').slice(0, 20000),
   })) : [];
+  const gears = Array.isArray(w?.gears) ? [...new Set(w.gears.filter(id => typeof id === 'string' && /^gear_[a-z0-9_]+$/.test(id)))].slice(0, 10) : [];
   return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts,
+    ...(w?.shooter === true ? { shooter: true } : {}),
+    ...(gears.length ? { gears } : {}),
     ...(htmlScripts.length ? { htmlScripts } : {}),
     ...(folders.length ? { folders } : {}),
     ...(scripts.length ? { scripts } : {}) };
