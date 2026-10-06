@@ -66,6 +66,7 @@ function buildCharacter(avatar) {
 }
 import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
 import { templates } from './worlds.js?v=63010f18';
+import { startSpooky, stopSpooky } from './sound.js?v=89850e26';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1088,6 +1089,22 @@ async function addonsPage() {
     });
 }
 
+// ---------- spooky menu music ----------
+let audioUnlocked = false;
+function maybeSpooky() {
+  const seg = (location.hash.slice(1).split('?')[0] || '/home').split('/').filter(Boolean);
+  const inGame = seg[0] === 'play' || seg[0] === 'studio';
+  if (inGame || !halloweenActive()) { try { stopSpooky(); } catch {} return; }
+  if (audioUnlocked) { try { startSpooky(); } catch {} }
+}
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  maybeSpooky();
+}
+addEventListener('pointerdown', unlockAudio);
+addEventListener('keydown', unlockAudio);
+
 // ---------- router ----------
 let routing = 0;
 async function route() {
@@ -1126,7 +1143,7 @@ async function route() {
     mount('', `<div class="error-page"><h1>Oops!</h1><p>${esc(e.message)}</p><a class="btn-primary" href="#/home">Go Home</a></div>`);
   }
 }
-addEventListener('hashchange', route);
+addEventListener('hashchange', () => { route(); maybeSpooky(); });
 loadBadgeDefs();
 async function refreshNotif() {
   if (!token || !me) return;
@@ -1143,4 +1160,4 @@ setInterval(async () => {
 }, 20000);
 refreshNotif();
 
-route();
+route(); maybeSpooky();
