@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=2f4a2dca';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=ecbc1237';
-import { sfx } from './sound.js?v=0741c43e';
+import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
