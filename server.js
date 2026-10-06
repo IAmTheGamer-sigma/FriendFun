@@ -485,10 +485,12 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     updates = { banned: false, banReason: '', bannedUntil: 0 };
     message = `Unbanned ${user.name}`;
   } else if (command === 'grant_admin') {
+    if (!['fun', 'bro'].includes(req.user.name.toLowerCase())) return res.status(403).json({ error: 'Only @fun and @bro can grant admin' });
     if (isAdmin(user)) return res.status(400).json({ error: 'Already an admin' });
     updates = { admin: true };
     message = `Granted full admin to ${user.name}`;
   } else if (command === 'revoke_admin') {
+    if (!['fun', 'bro'].includes(req.user.name.toLowerCase())) return res.status(403).json({ error: 'Only @fun and @bro can revoke admin' });
     if (ADMINS.includes(user.name.toLowerCase())) return res.status(400).json({ error: 'Cannot revoke env-based admin' });
     updates = { admin: false };
     message = `Revoked admin from ${user.name}`;
