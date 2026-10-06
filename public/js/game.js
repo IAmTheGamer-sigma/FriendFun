@@ -8,7 +8,7 @@ const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
 
 // ---------- Halloween in-game decor (Oct 24 - Nov 2) ----------
-const HALLOWEEN_DATES = { starts: Date.parse('2026-10-24T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
+const HALLOWEEN_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
 const halloweenNow = () => { const n = Date.now(); return n >= HALLOWEEN_DATES.starts && n <= HALLOWEEN_DATES.ends; };
 
 // ---------- pets ----------
