@@ -137,20 +137,27 @@ export class Game {
     const inv = this.me.inventory || [];
     return CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none' && inv.includes(i.id));
   }
+  toolbarGears() {
+    const gears = this.ownedGears().map(g => ({ id: g.id, name: g.name, emoji: g.emoji || '📦', temp: false }));
+    if (this.o.shooter && !gears.some(g => g.id === 'gear_blaster'))
+      gears.unshift({ id: 'gear_blaster', name: 'Arena Blaster', emoji: '🔫', temp: true });
+    return gears;
+  }
   renderInv() {
     const bar = this.c.querySelector('.inv-bar');
     if (!bar) return;
-    const gears = this.ownedGears();
+    const gears = this.toolbarGears();
     const cur = this.me.avatar?.gear;
-    bar.innerHTML = gears.map((g, i) => `<button class="inv-item${g.id === cur ? ' active' : ''}" data-id="${g.id}" title="${esc(g.name)}${i < 9 ? ' (' + (i + 1) + ')' : ''}">${g.emoji || '📦'}</button>`).join('');
-    bar.querySelectorAll('.inv-item').forEach(b => b.onclick = () => this.equipGear(b.dataset.id));
-    bar.style.display = gears.length ? 'flex' : 'none';
+    bar.innerHTML = gears.length ? gears.map((g, i) => `<button class="inv-item${g.id === cur ? ' active' : ''}" data-id="${g.id}" data-temp="${g.temp ? 1 : 0}" title="${esc(g.name)}${i < 9 ? ' (' + (i + 1) + ')' : ''}">${i < 9 ? `<span class="inv-key">${i + 1}</span>` : ''}<span class="inv-emoji">${g.emoji}</span><span class="inv-name">${esc(g.name)}</span></button>`).join('')
+      : `<div class="inv-empty">No gears yet — <a href="#/catalog/gear">get some in the Marketplace</a></div>`;
+    bar.querySelectorAll('.inv-item').forEach(b => b.onclick = () => this.equipGear(b.dataset.id, b.dataset.temp === '1'));
+    bar.style.display = 'flex';
   }
   equipGearByIndex(i) {
-    const g = this.ownedGears()[i];
-    if (g) this.equipGear(g.id);
+    const g = this.toolbarGears()[i];
+    if (g) this.equipGear(g.id, g.temp);
   }
-  async equipGear(id) {
+  async equipGear(id, temp = false) {
     const it = ITEM[id];
     if (!it || it.type !== 'gear' || this.o.test) return;
     this.me.avatar = this.me.avatar || {};
@@ -158,6 +165,7 @@ export class Game {
     this.setGear();
     this.renderInv();
     sfx.click?.();
+    if (temp) return; // arena loaner: don't save an unowned gear to the avatar
     try {
       await fetch('/api/me/avatar', { method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + this.o.token },
@@ -583,6 +591,7 @@ export class Game {
     if (this.debris) { for (const d of this.debris) this.scene.remove(d.m); this.debris = null; }
     this.scene.remove(this.char);
     this.char = buildCharacter(this.me.avatar, { pet: false, gear: false }); this.scene.add(this.char);
+    this.setGear();
     this.char.position.copy(this.pos);
     if (this.pet) { this.pet.position.copy(this.pos); this.pet.visible = true; }
     if (first) this.camYaw = Math.PI;
