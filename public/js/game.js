@@ -2,10 +2,129 @@ import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js';
 import { sfx } from './sound.js';
-import { ECON, BADGES } from './catalog.js';
+import { ECON, BADGES } from './catalog.js?v=22ba228f';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
+
+// ---------- Halloween in-game decor (Oct 24 - Nov 2) ----------
+const HALLOWEEN_DATES = { starts: Date.parse('2026-10-24T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
+const halloweenNow = () => { const n = Date.now(); return n >= HALLOWEEN_DATES.starts && n <= HALLOWEEN_DATES.ends; };
+
+// ---------- pets ----------
+// boxes: [x, y, z, w, h, d, color, rotZ?]. Origin at ground, faces +z.
+const PET_MODELS = {
+  pet_puppy: { boxes: [
+    [0, 0.5, -0.1, 0.7, 0.6, 1.0, '#c98f4e'],
+    [0, 1.05, 0.45, 0.62, 0.55, 0.55, '#c98f4e'],
+    [0, 0.95, 0.78, 0.3, 0.25, 0.18, '#e8c48a'],
+    [0, 1.02, 0.88, 0.14, 0.12, 0.06, '#333333'],
+    [-0.18, 1.15, 0.72, 0.1, 0.1, 0.05, '#222222'], [0.18, 1.15, 0.72, 0.1, 0.1, 0.05, '#222222'],
+    [-0.36, 1.2, 0.4, 0.16, 0.42, 0.14, '#8a5a2b'], [0.36, 1.2, 0.4, 0.16, 0.42, 0.14, '#8a5a2b'],
+    [-0.22, 0.18, 0.25, 0.18, 0.36, 0.18, '#a5713d'], [0.22, 0.18, 0.25, 0.18, 0.36, 0.18, '#a5713d'],
+    [-0.22, 0.18, -0.45, 0.18, 0.36, 0.18, '#a5713d'], [0.22, 0.18, -0.45, 0.18, 0.36, 0.18, '#a5713d'],
+    [0, 0.68, -0.65, 0.14, 0.14, 0.35, '#8a5a2b'],
+  ] },
+  pet_kitty: { boxes: [
+    [0, 0.45, -0.1, 0.62, 0.55, 0.9, '#9aa0a6'],
+    [0, 0.95, 0.4, 0.58, 0.5, 0.5, '#9aa0a6'],
+    [-0.2, 1.32, 0.35, 0.18, 0.3, 0.12, '#9aa0a6'], [0.2, 1.32, 0.35, 0.18, 0.3, 0.12, '#9aa0a6'],
+    [-0.2, 1.3, 0.4, 0.08, 0.16, 0.04, '#f8bbd0'], [0.2, 1.3, 0.4, 0.08, 0.16, 0.04, '#f8bbd0'],
+    [-0.15, 1.0, 0.65, 0.12, 0.14, 0.05, '#7fdb7f'], [0.15, 1.0, 0.65, 0.12, 0.14, 0.05, '#7fdb7f'],
+    [0, 0.88, 0.66, 0.1, 0.08, 0.05, '#f48fb1'],
+    [-0.2, 0.16, 0.22, 0.16, 0.32, 0.16, '#7e858a'], [0.2, 0.16, 0.22, 0.16, 0.32, 0.16, '#7e858a'],
+    [-0.2, 0.16, -0.4, 0.16, 0.32, 0.16, '#7e858a'], [0.2, 0.16, -0.4, 0.16, 0.32, 0.16, '#7e858a'],
+    [0.3, 0.75, -0.55, 0.13, 0.55, 0.13, '#9aa0a6'], [0.3, 1.0, -0.42, 0.13, 0.13, 0.3, '#9aa0a6'],
+  ] },
+  pet_bunny: { boxes: [
+    [0, 0.42, -0.05, 0.6, 0.55, 0.85, '#f5f5f5'],
+    [0, 0.9, 0.38, 0.5, 0.45, 0.45, '#f5f5f5'],
+    [-0.14, 1.45, 0.32, 0.14, 0.65, 0.1, '#f5f5f5'], [0.14, 1.45, 0.32, 0.14, 0.65, 0.1, '#f5f5f5'],
+    [-0.14, 1.42, 0.37, 0.06, 0.5, 0.03, '#f8bbd0'], [0.14, 1.42, 0.37, 0.06, 0.5, 0.03, '#f8bbd0'],
+    [-0.14, 0.95, 0.6, 0.09, 0.12, 0.05, '#333333'], [0.14, 0.95, 0.6, 0.09, 0.12, 0.05, '#333333'],
+    [0, 0.86, 0.61, 0.1, 0.08, 0.05, '#f8bbd0'],
+    [-0.18, 0.1, 0.3, 0.2, 0.2, 0.35, '#eeeeee'], [0.18, 0.1, 0.3, 0.2, 0.2, 0.35, '#eeeeee'],
+    [0, 0.45, -0.52, 0.22, 0.22, 0.18, '#ffffff'],
+  ] },
+  pet_ducky: { boxes: [
+    [0, 0.42, 0, 0.66, 0.6, 0.75, '#ffeb3b'],
+    [0, 0.95, 0.25, 0.5, 0.48, 0.48, '#ffeb3b'],
+    [0, 0.88, 0.55, 0.28, 0.14, 0.2, '#ff9800'],
+    [-0.15, 1.02, 0.49, 0.09, 0.11, 0.05, '#222222'], [0.15, 1.02, 0.49, 0.09, 0.11, 0.05, '#222222'],
+    [-0.38, 0.45, 0, 0.1, 0.35, 0.5, '#fdd835'], [0.38, 0.45, 0, 0.1, 0.35, 0.5, '#fdd835'],
+    [-0.15, 0.06, 0.1, 0.18, 0.12, 0.3, '#ff9800'], [0.15, 0.06, 0.1, 0.18, 0.12, 0.3, '#ff9800'],
+    [0, 0.5, -0.42, 0.2, 0.18, 0.15, '#fdd835'],
+  ] },
+  pet_frog: { boxes: [
+    [0, 0.32, 0, 0.7, 0.5, 0.7, '#66bb6a'],
+    [0, 0.28, 0.2, 0.5, 0.36, 0.4, '#c5e1a5'],
+    [-0.2, 0.65, 0.15, 0.22, 0.22, 0.22, '#66bb6a'], [0.2, 0.65, 0.15, 0.22, 0.22, 0.22, '#66bb6a'],
+    [-0.2, 0.68, 0.27, 0.1, 0.1, 0.05, '#222222'], [0.2, 0.68, 0.27, 0.1, 0.1, 0.05, '#222222'],
+    [0, 0.32, 0.36, 0.4, 0.06, 0.03, '#33691e'],
+    [-0.32, 0.12, 0.12, 0.18, 0.24, 0.3, '#558b2f'], [0.32, 0.12, 0.12, 0.18, 0.24, 0.3, '#558b2f'],
+    [-0.32, 0.12, -0.28, 0.18, 0.24, 0.18, '#558b2f'], [0.32, 0.12, -0.28, 0.18, 0.24, 0.18, '#558b2f'],
+  ] },
+  pet_fox: { boxes: [
+    [0, 0.48, -0.1, 0.62, 0.55, 0.95, '#ff924c'],
+    [0, 1.0, 0.42, 0.55, 0.5, 0.5, '#ff924c'],
+    [0, 0.9, 0.72, 0.28, 0.24, 0.2, '#ffffff'],
+    [0, 0.94, 0.83, 0.12, 0.1, 0.05, '#222222'],
+    [-0.16, 1.06, 0.66, 0.1, 0.12, 0.05, '#222222'], [0.16, 1.06, 0.66, 0.1, 0.12, 0.05, '#222222'],
+    [-0.2, 1.34, 0.35, 0.18, 0.3, 0.12, '#ff924c'], [0.2, 1.34, 0.35, 0.18, 0.3, 0.12, '#ff924c'],
+    [-0.2, 1.44, 0.35, 0.1, 0.12, 0.06, '#5d4037'], [0.2, 1.44, 0.35, 0.1, 0.12, 0.06, '#5d4037'],
+    [-0.2, 0.17, 0.24, 0.16, 0.34, 0.16, '#5d4037'], [0.2, 0.17, 0.24, 0.16, 0.34, 0.16, '#5d4037'],
+    [-0.2, 0.17, -0.42, 0.16, 0.34, 0.16, '#5d4037'], [0.2, 0.17, -0.42, 0.16, 0.34, 0.16, '#5d4037'],
+    [0, 0.55, -0.62, 0.25, 0.25, 0.5, '#ff924c'], [0, 0.55, -0.9, 0.2, 0.2, 0.15, '#ffffff'],
+  ] },
+  pet_robo: { boxes: [
+    [0, 0.5, 0, 0.7, 0.6, 0.9, '#90a4ae'],
+    [0, 0.42, 0.2, 0.5, 0.4, 0.55, '#78909c'],
+    [0, 1.05, 0.3, 0.6, 0.5, 0.55, '#546e7a'],
+    [-0.15, 1.08, 0.58, 0.12, 0.1, 0.05, '#40c4ff'], [0.15, 1.08, 0.58, 0.12, 0.1, 0.05, '#40c4ff'],
+    [0, 1.45, 0.3, 0.06, 0.3, 0.06, '#37474f'], [0, 1.64, 0.3, 0.12, 0.12, 0.12, '#ff5252'],
+    [-0.24, 0.16, 0.26, 0.18, 0.32, 0.18, '#546e7a'], [0.24, 0.16, 0.26, 0.18, 0.32, 0.18, '#546e7a'],
+    [-0.24, 0.16, -0.3, 0.18, 0.32, 0.18, '#546e7a'], [0.24, 0.16, -0.3, 0.18, 0.32, 0.18, '#546e7a'],
+    [0, 0.62, -0.52, 0.08, 0.08, 0.3, '#37474f'],
+  ] },
+  pet_bat: { boxes: [
+    [0, 0.5, 0, 0.45, 0.45, 0.5, '#5d4037'],
+    [0, 0.85, 0.15, 0.4, 0.38, 0.4, '#5d4037'],
+    [-0.12, 0.9, 0.36, 0.08, 0.1, 0.04, '#ff5252'], [0.12, 0.9, 0.36, 0.08, 0.1, 0.04, '#ff5252'],
+    [-0.12, 1.1, 0.1, 0.1, 0.18, 0.08, '#5d4037'], [0.12, 1.1, 0.1, 0.1, 0.18, 0.08, '#5d4037'],
+    [0, 0.78, 0.32, 0.1, 0.08, 0.1, '#ffffff'],
+    [-0.55, 0.62, -0.05, 0.65, 0.08, 0.45, '#4e342e', 0.35], [0.55, 0.62, -0.05, 0.65, 0.08, 0.45, '#4e342e', -0.35],
+    [-0.95, 0.75, -0.05, 0.25, 0.06, 0.3, '#4e342e', 0.5], [0.95, 0.75, -0.05, 0.25, 0.06, 0.3, '#4e342e', -0.5],
+    [-0.2, 0.16, 0.05, 0.12, 0.32, 0.12, '#4e342e'], [0.2, 0.16, 0.05, 0.12, 0.32, 0.12, '#4e342e'],
+  ] },
+  pet_dragon: { boxes: [
+    [0, 0.5, -0.1, 0.65, 0.6, 1.0, '#26c6da'],
+    [0, 0.42, 0.15, 0.45, 0.44, 0.6, '#b2ebf2'],
+    [0, 1.05, 0.45, 0.55, 0.5, 0.55, '#26c6da'],
+    [0, 0.95, 0.75, 0.32, 0.26, 0.2, '#4dd0e1'],
+    [-0.18, 1.38, 0.35, 0.1, 0.28, 0.1, '#ffffff'], [0.18, 1.38, 0.35, 0.1, 0.28, 0.1, '#ffffff'],
+    [-0.16, 1.12, 0.72, 0.1, 0.12, 0.05, '#ffeb3b'], [0.16, 1.12, 0.72, 0.1, 0.12, 0.05, '#ffeb3b'],
+    [-0.5, 0.85, -0.15, 0.55, 0.08, 0.45, '#00838f', 0.45], [0.5, 0.85, -0.15, 0.55, 0.08, 0.45, '#00838f', -0.45],
+    [0, 0.5, -0.68, 0.16, 0.16, 0.4, '#26c6da'], [0, 0.58, -0.9, 0.26, 0.26, 0.08, '#00838f'],
+    [-0.22, 0.17, 0.25, 0.18, 0.34, 0.18, '#00acc1'], [0.22, 0.17, 0.25, 0.18, 0.34, 0.18, '#00acc1'],
+    [-0.22, 0.17, -0.42, 0.18, 0.34, 0.18, '#00acc1'], [0.22, 0.17, -0.42, 0.18, 0.34, 0.18, '#00acc1'],
+  ] },
+};
+function buildPet(petId) {
+  const spec = PET_MODELS[petId];
+  if (!spec) return null;
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  for (const b of spec.boxes) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b[3], b[4], b[5]), new THREE.MeshStandardMaterial({ color: b[6], roughness: 0.75 }));
+    m.position.set(b[0], b[1], b[2]);
+    if (b[7]) m.rotation.z = b[7];
+    m.castShadow = true;
+    body.add(m);
+  }
+  g.add(body);
+  g.userData.body = body;
+  return g;
+}
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export class Game {
@@ -160,10 +279,12 @@ export class Game {
     this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
     this.char = buildCharacter(this.me.avatar);
     this.scene.add(this.char);
+    this.setPet();
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.ray = new THREE.Raycaster();
     this.resize();
     this.runWorldScripts();
+    if (halloweenNow()) this.addHalloweenDecor();
   }
   runWorldScripts() {
     const scripts = this.world.scripts || [];
@@ -325,6 +446,84 @@ export class Game {
     this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
 
+  setPet() {
+    if (this.pet) { this.scene.remove(this.pet); this.pet = null; }
+    const pet = buildPet(this.me.avatar?.pet);
+    if (pet) { this.pet = pet; pet.position.copy(this.pos); this.scene.add(pet); }
+  }
+  updatePet(pet, ownerPos, yaw, dt) {
+    if (!pet || !ownerPos) return;
+    const u = pet.userData;
+    const tx = ownerPos.x + Math.sin(yaw + 2.6) * 1.9;
+    const tz = ownerPos.z + Math.cos(yaw + 2.6) * 1.9;
+    const k = 1 - Math.exp(-6 * dt);
+    pet.position.x += (tx - pet.position.x) * k;
+    pet.position.z += (tz - pet.position.z) * k;
+    pet.position.y += (ownerPos.y - pet.position.y) * k;
+    if (!u.last) u.last = pet.position.clone();
+    const dx = pet.position.x - u.last.x, dz = pet.position.z - u.last.z;
+    const moving = Math.hypot(dx, dz) > 0.02;
+    u.last.copy(pet.position);
+    if (moving) {
+      let dy = Math.atan2(dx, dz) - pet.rotation.y;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      pet.rotation.y += dy * Math.min(1, dt * 10);
+    }
+    u.body.position.y = moving ? Math.abs(Math.sin(this.t * 11)) * 0.5 : Math.sin(this.t * 2.5) * 0.06 + 0.06;
+  }
+  addHalloweenDecor() {
+    const hw = this.hwDecor = { bats: [], ghosts: [], pumpkins: [] };
+    const spawn = findSpawn(this.world);
+    const M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85 });
+    this.scene.fog = new THREE.Fog(0x1a0f2e, 45, 170);
+    const glow = new THREE.MeshBasicMaterial({ color: '#ffca28' });
+    // jack-o-lanterns ringing the spawn
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.4, r = 9 + (i % 3) * 4;
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.9, 18, 14), M('#e67e22'));
+      body.scale.set(1, 0.9, 0.9); body.position.y = 0.85; body.castShadow = true; g.add(body);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.35, 8), M('#2e7d32'));
+      stem.position.y = 1.7; g.add(stem);
+      for (const sx of [-1, 1]) {
+        const e = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.28, 3), glow);
+        e.position.set(sx * 0.3, 1.05, 0.76); g.add(e);
+      }
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.16, 0.05), glow);
+      mouth.position.set(0, 0.55, 0.8); g.add(mouth);
+      g.position.set(spawn.x + Math.cos(a) * r, spawn.y, spawn.z + Math.sin(a) * r);
+      g.rotation.y = Math.atan2(-(Math.cos(a) * r), -(Math.sin(a) * r));
+      this.scene.add(g); hw.pumpkins.push(g);
+    }
+    // bats circling overhead
+    for (let i = 0; i < 5; i++) {
+      const b = new THREE.Group();
+      const bm = new THREE.MeshStandardMaterial({ color: '#2a2138', roughness: 0.9 });
+      b.add(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.5), bm));
+      const wings = [];
+      for (const sx of [-1, 1]) {
+        const pivot = new THREE.Group(); pivot.position.set(sx * 0.15, 0.1, 0);
+        const w = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.5), bm);
+        w.position.set(sx * 0.45, 0, 0); pivot.add(w); b.add(pivot); wings.push(pivot);
+      }
+      this.scene.add(b);
+      hw.bats.push({ g: b, wings, cx: spawn.x, cz: spawn.z, cy: spawn.y + 14 + (i % 3) * 3, r: 10 + i * 3, sp: 0.5 + Math.random() * 0.4, ph: Math.random() * 6.28 });
+    }
+    // floating ghosts
+    for (let i = 0; i < 3; i++) {
+      const g = new THREE.Group();
+      const gm = new THREE.MeshStandardMaterial({ color: '#f5f5f5', roughness: 0.9, transparent: true, opacity: 0.92 });
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 12), gm); head.position.y = 0.6; g.add(head);
+      const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.9, 16, 1, true), gm); skirt.position.y = -0.05; g.add(skirt);
+      const dm = new THREE.MeshBasicMaterial({ color: '#212121' });
+      for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), dm); e.position.set(sx * 0.2, 0.7, 0.48); g.add(e); }
+      const mo = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), dm); mo.scale.set(1, 1.5, 0.5); mo.position.set(0, 0.38, 0.5); g.add(mo);
+      const a = (i / 3) * Math.PI * 2 + 1.2;
+      g.position.set(spawn.x + Math.cos(a) * 14, spawn.y + 4, spawn.z + Math.sin(a) * 14);
+      this.scene.add(g);
+      hw.ghosts.push({ g, baseY: spawn.y + 4, ph: Math.random() * 6.28 });
+    }
+  }
   spawn(first = false) {
     const p = this.checkpoint ? this.checkpoint.clone() : findSpawn(this.world);
     this.pos.copy(p).add(new THREE.Vector3((Math.random() - 0.5) * 2, 0.2, (Math.random() - 0.5) * 2));
@@ -334,6 +533,7 @@ export class Game {
     this.scene.remove(this.char);
     this.char = buildCharacter(this.me.avatar); this.scene.add(this.char);
     this.char.position.copy(this.pos);
+    if (this.pet) { this.pet.position.copy(this.pos); this.pet.visible = true; }
     if (first) this.camYaw = Math.PI;
   }
 
@@ -343,6 +543,7 @@ export class Game {
     for (const fn of (this._scriptState?.deathFns || [])) { try { fn(); } catch (e) { console.warn('onDeath error:', e); } }
     this.debris = breakApart(this.scene, this.char, this.vel);
     this.char.visible = false;
+    if (this.pet) this.pet.visible = false;
     setTimeout(() => { if (!this.destroyed) this.spawn(); }, 3000);
   }
 
@@ -436,7 +637,7 @@ export class Game {
         for (const p of m.players) this.addPlayer(p);
         this.updateLeaderboard();
       } else if (m.t === 'joined') { this.addPlayer(m); this.updateLeaderboard(); }
-      else if (m.t === 'left') { const p = this.players.get(m.id); if (p) { this.scene.remove(p.char); this.players.delete(m.id); } this.updateLeaderboard(); }
+      else if (m.t === 'left') { const p = this.players.get(m.id); if (p) { this.scene.remove(p.char); if (p.pet) this.scene.remove(p.pet); this.players.delete(m.id); } this.updateLeaderboard(); }
       else if (m.t === 'S') {
         for (const s of m.p) { if (s[0] === this.myId) continue; const p = this.players.get(s[0]); if (p) p.target = s; }
       } else if (m.t === 'chat') this.onChat(m);
@@ -456,7 +657,9 @@ export class Game {
     if (this.players.has(p.id)) return;
     const char = buildCharacter(p.avatar); char.add(makeNameTag(p.name, p.badge));
     this.scene.add(char);
-    const pl = { id: p.id, name: p.name, avatar: p.avatar, club: p.club, badge: p.badge, char, target: p.s ? [p.id, ...p.s] : null, emote: null };
+    const pet = buildPet(p.avatar?.pet);
+    if (pet) { pet.position.copy(char.position); this.scene.add(pet); }
+    const pl = { id: p.id, name: p.name, avatar: p.avatar, club: p.club, badge: p.badge, char, pet: pet || null, target: p.s ? [p.id, ...p.s] : null, emote: null };
     if (pl.target) char.position.set(pl.target[1], pl.target[2], pl.target[3]);
     this.players.set(p.id, pl);
   }
@@ -574,6 +777,7 @@ export class Game {
       let dy = (this.facing ?? 0) - this.char.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       this.char.rotation.y += dy * Math.min(1, dt * 14);
       animateCharacter(this.char, this.anim, this.t, dt);
+      this.updatePet(this.pet, this.pos, this.facing ?? 0, dt);
     } else if (this.debris) stepDebris(this.debris, dt, this.solids);
     // remote players
     for (const p of this.players.values()) {
@@ -585,12 +789,29 @@ export class Game {
       let anim = ANIMS[s[5]] || 'idle';
       if (anim === 'idle' && p.emote) anim = p.emote; else if (anim !== 'idle') p.emote = null;
       ch.visible = anim !== 'dead';
+      if (p.pet) { p.pet.visible = ch.visible; if (ch.visible) this.updatePet(p.pet, ch.position, ch.rotation.y, dt); }
       animateCharacter(ch, anim, this.t, dt);
     }
     // bubbles & coins
     this.scene.traverse(o => {
       if (o.userData.bubble) { o.userData.bubbleT -= dt; if (o.userData.bubbleT <= 0) { o.remove(o.userData.bubble); o.userData.bubble = null; } }
     });
+    // halloween decor animation
+    const hw = this.hwDecor;
+    if (hw) {
+      for (const b of hw.bats) {
+        const a = this.t * b.sp + b.ph;
+        b.g.position.set(b.cx + Math.cos(a) * b.r, b.cy + Math.sin(this.t * 1.3 + b.ph) * 1.2, b.cz + Math.sin(a) * b.r);
+        b.g.rotation.y = -a;
+        const flap = Math.sin(this.t * 10 + b.ph) * 0.55;
+        b.wings[0].rotation.z = flap; b.wings[1].rotation.z = -flap;
+      }
+      for (const gh of hw.ghosts) {
+        gh.g.position.y = gh.baseY + Math.sin(this.t * 1.8 + gh.ph) * 0.9;
+        gh.g.rotation.y = Math.sin(this.t * 0.6 + gh.ph) * 0.6;
+      }
+      hw.pumpkins.forEach((p, i) => p.scale.setScalar(1 + Math.sin(this.t * 3 + i * 1.7) * 0.025));
+    }
     for (const m of this.meshes.values()) if (m.userData.spin) m.rotation.y += dt * 2.5;
     // network
     this.netT = (this.netT || 0) + dt;
