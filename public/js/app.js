@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=dcf4c58').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=c3912a1c').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES } from './catalog.js?v=22ba228f';
+import { CATALOG, ITEM, ECON, BADGES, PET_MODELS } from './catalog.js?v=0d7b27c0';
 import { templates } from './worlds.js';
 
 const app = document.getElementById('app');
@@ -353,7 +353,7 @@ async function playPage(id) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=ba05ce9f');
+  const { Game } = await import('./game.js?v=75d87f8e');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -403,9 +403,10 @@ function avatarPage(tab = 'body') {
         body.querySelector('input[type=color]').onchange = e => apply(e.target.value);
       } else {
         const owned = CATALOG.filter(i => i.type === tab && (me.inventory.includes(i.id) || i.id === tab + '_none'));
-        body.innerHTML = `<div class="item-grid">${owned.map(i => `<button class="item ${av[tab] === i.id ? 'worn' : ''}" data-id="${i.id}">${i.type === 'pet' ? `<span class="pet-emoji">${i.emoji}</span>` : `<img src="${itemImage(i)}">`}<span>${esc(i.name)}</span></button>`).join('')}
+        body.innerHTML = `<div class="item-grid">${owned.map(i => `<button class="item ${av[tab] === i.id ? 'worn' : ''}" data-id="${i.id}">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas>` : `<span class="pet-emoji">${i.emoji}</span>`) : `<img src="${itemImage(i)}">`}<span>${esc(i.name)}</span></button>`).join('')}
           <a class="item more" href="#/catalog/pet"><span class="plus">+</span><span>Get More</span></a></div>`;
         body.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { av[tab] = b.dataset.id; rebuild(); render(); save(); });
+        paintPetVoxels(body);
       }
     };
     app.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; app.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('active', x === b)); render(); });
@@ -424,9 +425,10 @@ async function catalogPage(filter = 'all') {
     <h1>Marketplace</h1>
     <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt', 'pet'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets' }[f]}</a>`).join('')}</div>
     <div class="cat-grid">${CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter)).map(i => `
-      <div class="cat-item">${i.type === 'pet' ? `<div class="cat-img pet-img">${i.emoji}</div>` : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
+      <div class="cat-item">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
         ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
+    paintPetVoxels(app);
     app.querySelectorAll('.btn-buy').forEach(b => b.onclick = () => {
       buyModal(ITEM[b.dataset.id], () => catalogPage(filter));
     });
@@ -440,10 +442,11 @@ function buyModal(it, onDone) {
   const opts = [['tix', tix, it.price, me.funtix ?? 0]];
   const d = document.createElement('div'); d.className = 'modal-bg';
   d.innerHTML = `<div class="modal"><h2>Buy Item</h2>
-    <div class="buy-row">${it.type === 'pet' ? `<div class="pet-img-lg">${it.emoji}</div>` : `<img src="${itemImage(it)}"`}><div><p>Would you like to buy <b>${esc(it.name)}</b>?</p>
+    <div class="buy-row">${it.type === 'pet' ? (PET_MODELS[it.id] ? `<div class="pet-img-lg"><canvas class="pet-voxel" width="160" height="160" data-pet="${it.id}"></canvas></div>` : `<div class="pet-img-lg">${it.emoji}</div>`) : `<img src="${itemImage(it)}"`}><div><p>Would you like to buy <b>${esc(it.name)}</b>?</p>
     <p class="muted small">You have ${tix} ${fmt(me.funtix ?? 0)}</p></div></div>
     <div class="modal-actions"><button class="btn-secondary">Cancel</button>${opts.map(([c, ic, p, bal]) => `<button class="btn-primary buy-with" data-c="${c}" ${bal < p ? 'disabled title="Not enough"' : ''}>Buy for ${ic} ${p}</button>`).join('')}</div></div>`;
   document.body.appendChild(d);
+  paintPetVoxels(d);
   d.querySelector('.btn-secondary').onclick = () => d.remove();
   d.onclick = e => { if (e.target === d) d.remove(); };
   d.querySelectorAll('[data-c]').forEach(b => b.onclick = async () => {
@@ -539,6 +542,12 @@ function drawVoxel(canvas, boxes) {
     ctx.fillStyle = shadeHex(col, 26);
     poly([P2(x0, y1, z0), P2(x1, y1, z0), P2(x1, y1, z1), P2(x0, y1, z1)]);
   }
+}
+function paintPetVoxels(root) {
+  (root || document).querySelectorAll('canvas.pet-voxel').forEach(cv => {
+    const m = PET_MODELS[cv.dataset.pet];
+    if (m) drawVoxel(cv, m.boxes);
+  });
 }
 const halloweenActive = () => { const n = Date.now(); return n >= HALLOWEEN_DATES.starts && n <= HALLOWEEN_DATES.ends; };
 const HALLOWEEN_EMOJI = { g_halloween01: '👻', g_halloween02: '🎃', g_halloween03: '🧙', g_halloween04: '💀', g_halloween05: '🦇' };
@@ -824,7 +833,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=ba05ce9f');
+      const { Game: GameClass } = await import('./game.js?v=75d87f8e');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
