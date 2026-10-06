@@ -252,7 +252,7 @@ app.put('/api/me/avatar', auth, async (req, res) => {
   const colors = {};
   for (const k of Object.keys(DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
   const pick = (slot) => (a[slot] && (a[slot] === slot + '_none' || req.user.inventory.includes(a[slot])) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
-  const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head, pet: pick('pet') || DEFAULT_AVATAR.pet };
+  const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head, pet: pick('pet') || DEFAULT_AVATAR.pet, gear: pick('gear') || DEFAULT_AVATAR.gear };
   await supabase.from('users').update({ avatar }).eq('name', req.user.name);
   res.json(avatar);
 });
@@ -1023,6 +1023,13 @@ wss.on('connection', (ws) => {
       broadcast(room, { t: 'chat', system: true, text: `${player.name} beat the game! (+${ECON.WIN_TIX} FunTix, ${winBadges(player.game).length} badge${winBadges(player.game).length === 1 ? '' : 's'} earned)` });
     }
     else if (m.t === 'emote' && ['wave', 'dance', 'sit'].includes(m.e)) broadcast(room, { t: 'emote', id: player.id, e: m.e }, ws);
+    else if (m.t === 'gearHit' && typeof m.id === 'number') {
+      const now = Date.now();
+      if (now - (player.lastGearHit || 0) < 500) return;
+      player.lastGearHit = now;
+      const target = room.players.get(m.id);
+      if (target && target.ws && target.id !== player.id) send(target.ws, { t: 'gearHit', from: player.name });
+    }
   });
   ws.on('close', () => {
     if (!player || !room) return;
