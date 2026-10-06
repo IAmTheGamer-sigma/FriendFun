@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { templates } from './public/js/worlds.js';
+import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase } from './public/js/worlds.js';
 import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1475,21 +1475,23 @@ const HALLOWEEN_EVENT = { id: 'halloween', name: 'Halloween',
 const halloweenActive = () => Date.now() >= HALLOWEEN_EVENT.starts && Date.now() <= HALLOWEEN_EVENT.ends;
 
 const HALLOWEEN_GAMES = [
-  { id: 'g_halloween01', name: 'Haunted Mansion Obby', desc: 'Escape the haunted mansion\u2019s 10 spooky stages! 👻', tpl: 'obby', sky: '#14141f' },
-  { id: 'g_halloween02', name: 'Pumpkin Patch Hunt', desc: 'Grab every candy corn in the moonlit pumpkin patch! 🎃', tpl: 'coinRush', sky: '#1b1030' },
-  { id: 'g_halloween03', name: 'Witch\u2019s Tower Climb', desc: 'Climb the witch\u2019s crooked tower... if you dare! 🧙', tpl: 'tower', sky: '#101826' },
-  { id: 'g_halloween04', name: 'Ghost Town Hangout', desc: 'Hang out with friendly ghosts in the old town. 💀', tpl: 'hangout', sky: '#16121e' },
-  { id: 'g_halloween05', name: 'Spooky Baseplate', desc: 'A haunted twist on the classic. 🦇', tpl: 'baseplate', sky: '#0f0f18' },
+  { id: 'g_hwmansion', name: 'Haunted Mansion Escape', desc: 'Escape the haunted mansion room by room... if you dare! 👻', build: hwMansion },
+  { id: 'g_hwpumpkin', name: 'Pumpkin Patch Hunt', desc: 'Hunt candy corn among giant pumpkins and the corn maze! 🎃', build: hwPumpkin },
+  { id: 'g_hwwitch', name: 'Witch\u2019s Crooked Tower', desc: 'Climb the crooked tower: potions, broomsticks and spellbooks! 🧙', build: hwWitch },
+  { id: 'g_hwghost', name: 'Ghost Town Hangout', desc: 'Hang out in the spooky old west town. Mind the graveyard... 💀', build: hwGhost },
+  { id: 'g_hwbase', name: 'Spooky Baseplate', desc: 'Build on a haunted baseplate with its own mini castle. 🦇', build: hwBase },
 ];
 
 async function seedHalloweenGames() {
   try {
     const { data: ex } = await supabase.from('games').select('id').eq('event', 'halloween');
-    if ((ex || []).length >= HALLOWEEN_GAMES.length && !process.env.HALLOWEEN_RESEED) return { created: 0 };
+    const haveIds = new Set((ex || []).map(g => g.id));
+    const wantIds = HALLOWEEN_GAMES.map(g => g.id);
+    if (!process.env.HALLOWEEN_RESEED && wantIds.every(id => haveIds.has(id))) return { created: 0 };
     await supabase.from('games').delete().eq('event', 'halloween');
     let created = 0;
     for (const cfg of HALLOWEEN_GAMES) {
-      const world = templates[cfg.tpl](); world.sky = cfg.sky;
+      const world = cfg.build();
       const { error } = await supabase.from('games').insert({ id: cfg.id, name: cfg.name, creator: 'Funtopia',
         description: cfg.desc, world: sanitizeWorld(world), event: 'halloween',
         visits: 0, likes: 0, dislikes: 0, max_players: 30, created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false });
