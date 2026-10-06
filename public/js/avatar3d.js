@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=a85c7a51';
 import { renderToDataURL } from './three-util.js?v=2f4a2dca';
 
 const faceCache = {}, shirtCache = {};
