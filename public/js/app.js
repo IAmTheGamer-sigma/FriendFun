@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=383e886').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=dcf4c58').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES } from './catalog.js?v=44a7e31';
+import { CATALOG, ITEM, ECON, BADGES } from './catalog.js?v=22ba228f';
 import { templates } from './worlds.js';
 
 const app = document.getElementById('app');
@@ -175,6 +175,7 @@ function shell(active, content) {
 }
 function mount(active, html, after) {
   document.body.classList.toggle('looney', looneyThemeActive());
+  document.body.classList.toggle('halloween', halloweenActive());
   app.className = ''; app.innerHTML = shell(active, html);
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
@@ -296,6 +297,7 @@ async function homePage() {
   const friends = fr.friends.sort((a, b) => (b.online - a.online) || (!!b.gameId - !!a.gameId));
   mount('home', `
     ${looneyActive() ? `<a class="looney-banner" href="#/looney">🥕 <b>Looney Tunes Event is live!</b> Earn 20 Looney Coins for Bugs Bunny, Daffy Duck & an exclusive badge &rsaquo;</a>` : ''}
+    ${halloweenActive() ? `<a class="halloween-banner" href="#/halloween">🎃 <b>Halloween is here!</b> Spooky games, costumes & double daily FunTix &rsaquo;</a>` : ''}
     <div class="home-head">${avatarImgTag(me.avatar, "headshot", "home-avatar")}<h1>Hello, ${esc(me.name)}!</h1></div>
     <section><div class="sec-h"><h2>Friends (${friends.length})</h2><a href="#/friends">See All &rsaquo;</a></div>
       <div class="friends-row">${friends.length ? friends.map(userTile).join('') : `<a class="add-friends" href="#/friends"><span>+</span>Add Friends</a>`}</div></section>
@@ -354,7 +356,7 @@ async function playPage(id) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=a94d9c0');
+  const { Game } = await import('./game.js?v=1d8bc4af');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -372,7 +374,7 @@ function avatarPage(tab = 'body') {
     <div class="av-wrap">
       <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Drag to rotate</div></div>
       <div class="av-panel">
-        <div class="av-tabs">${['body', 'head', 'hat', 'face', 'shirt'].map(t => `<button data-tab="${t}" class="${t === tab ? 'active' : ''}">${{ body: 'Body Colors', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[t]}</button>`).join('')}</div>
+        <div class="av-tabs">${['body', 'head', 'hat', 'face', 'shirt', 'pet'].map(t => `<button data-tab="${t}" class="${t === tab ? 'active' : ''}">${{ body: 'Body Colors', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets' }[t]}</button>`).join('')}</div>
         <div class="av-body"></div>
       </div>
     </div>`, () => {
@@ -403,9 +405,9 @@ function avatarPage(tab = 'body') {
         body.querySelectorAll('[data-c]').forEach(b => b.onclick = () => apply(b.dataset.c));
         body.querySelector('input[type=color]').onchange = e => apply(e.target.value);
       } else {
-        const owned = CATALOG.filter(i => i.type === tab && me.inventory.includes(i.id));
-        body.innerHTML = `<div class="item-grid">${owned.map(i => `<button class="item ${av[tab] === i.id ? 'worn' : ''}" data-id="${i.id}"><img src="${itemImage(i)}"><span>${esc(i.name)}</span></button>`).join('')}
-          <a class="item more" href="#/catalog"><span class="plus">+</span><span>Get More</span></a></div>`;
+        const owned = CATALOG.filter(i => i.type === tab && (me.inventory.includes(i.id) || i.id === tab + '_none'));
+        body.innerHTML = `<div class="item-grid">${owned.map(i => `<button class="item ${av[tab] === i.id ? 'worn' : ''}" data-id="${i.id}">${i.type === 'pet' ? `<span class="pet-emoji">${i.emoji}</span>` : `<img src="${itemImage(i)}">`}<span>${esc(i.name)}</span></button>`).join('')}
+          <a class="item more" href="#/catalog/pet"><span class="plus">+</span><span>Get More</span></a></div>`;
         body.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { av[tab] = b.dataset.id; rebuild(); render(); save(); });
       }
     };
@@ -423,9 +425,9 @@ function itemImage(item) {
 async function catalogPage(filter = 'all') {
   mount('catalog', `
     <h1>Marketplace</h1>
-    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts' }[f]}</a>`).join('')}</div>
+    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt', 'pet'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets' }[f]}</a>`).join('')}</div>
     <div class="cat-grid">${CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter)).map(i => `
-      <div class="cat-item"><div class="cat-img"><img src="${itemImage(i)}"></div><div class="cat-name">${esc(i.name)}</div>
+      <div class="cat-item">${i.type === 'pet' ? `<div class="cat-img pet-img">${i.emoji}</div>` : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
         ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
     app.querySelectorAll('.btn-buy').forEach(b => b.onclick = () => {
@@ -441,7 +443,7 @@ function buyModal(it, onDone) {
   const opts = [['tix', tix, it.price, me.funtix ?? 0]];
   const d = document.createElement('div'); d.className = 'modal-bg';
   d.innerHTML = `<div class="modal"><h2>Buy Item</h2>
-    <div class="buy-row"><img src="${itemImage(it)}"><div><p>Would you like to buy <b>${esc(it.name)}</b>?</p>
+    <div class="buy-row">${it.type === 'pet' ? `<div class="pet-img-lg">${it.emoji}</div>` : `<img src="${itemImage(it)}"`}><div><p>Would you like to buy <b>${esc(it.name)}</b>?</p>
     <p class="muted small">You have ${tix} ${fmt(me.funtix ?? 0)}</p></div></div>
     <div class="modal-actions"><button class="btn-secondary">Cancel</button>${opts.map(([c, ic, p, bal]) => `<button class="btn-primary buy-with" data-c="${c}" ${bal < p ? 'disabled title="Not enough"' : ''}>Buy for ${ic} ${p}</button>`).join('')}</div></div>`;
   document.body.appendChild(d);
@@ -501,6 +503,7 @@ async function dmPage(name) {
 }
 const LOONEY_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
 const LOONEY_THEME_DATES = { starts: Date.parse('2026-10-05T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
+const HALLOWEEN_DATES = { starts: Date.parse('2026-10-24T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
 // Voxel character art for the Looney Tunes event page (same box data as the in-game characters).
 // Each box: [dx,dy,dz,w,h,d,color]
 const LOONEY_CHAR_ART = {"bugs":[[0,2,0,3,4,2,"#9e9e9e"],[0,5.2,0,2.8,2.8,2.6,"#9e9e9e"],[0,4.9,1.4,1.6,1,0.5,"#ffffff"],[-0.35,4.3,1.45,0.5,0.7,0.3,"#ffffff"],[0.35,4.3,1.45,0.5,0.7,0.3,"#ffffff"],[-0.7,8,0,0.9,3.2,0.7,"#9e9e9e"],[0.7,8,0,0.9,3.2,0.7,"#9e9e9e"],[-0.7,8,0.28,0.45,2.2,0.25,"#f8bbd0"],[0.7,8,0.28,0.45,2.2,0.25,"#f8bbd0"],[-0.7,5.7,1.32,0.55,0.7,0.2,"#212121"],[0.7,5.7,1.32,0.55,0.7,0.2,"#212121"],[0,2.2,-1.35,1.3,1.3,0.8,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,2,"#9e9e9e"],[0.9,0.4,0.3,1.1,0.8,2,"#9e9e9e"],[-1.75,2.5,0,0.8,2.4,0.8,"#9e9e9e"],[1.75,2.5,0,0.8,2.4,0.8,"#9e9e9e"]],"daffy":[[0,2,0,3,4,2.2,"#212121"],[0,3.9,0,3.2,0.7,2.4,"#ffffff"],[0,5.3,0,2.6,2.6,2.4,"#212121"],[0,5.0,1.5,1.7,0.9,1.0,"#ff9800"],[-0.65,5.9,1.15,0.6,0.8,0.25,"#ffffff"],[0.65,5.9,1.15,0.6,0.8,0.25,"#ffffff"],[-0.65,5.9,1.28,0.25,0.35,0.1,"#212121"],[0.65,5.9,1.28,0.25,0.35,0.1,"#212121"],[0,7.1,0,1.2,1.0,1.2,"#212121"],[-0.9,0.35,0.4,1.2,0.7,2.2,"#ff9800"],[0.9,0.35,0.4,1.2,0.7,2.2,"#ff9800"],[-1.7,2.6,0,0.7,2.2,2.6,"#212121"],[1.7,2.6,0,0.7,2.2,2.6,"#212121"]],"tweety":[[0,1.8,0,2.6,3.2,2.2,"#ffeb3b"],[0,4.6,0,3.4,3.2,3.0,"#ffeb3b"],[-0.8,5.2,1.5,0.9,1.1,0.25,"#ffffff"],[0.8,5.2,1.5,0.9,1.1,0.25,"#ffffff"],[-0.8,5.2,1.62,0.4,0.5,0.1,"#1565c0"],[0.8,5.2,1.62,0.4,0.5,0.1,"#1565c0"],[0,4.3,1.6,1.0,0.7,0.7,"#ff9800"],[0,6.6,0,1.6,0.9,1.6,"#ffeb3b"],[-0.7,0.3,0.3,1.0,0.6,1.8,"#ff9800"],[0.7,0.3,0.3,1.0,0.6,1.8,"#ff9800"],[-1.5,2.2,0,0.6,1.8,1.2,"#ffeb3b"],[1.5,2.2,0,0.6,1.8,1.2,"#ffeb3b"]],"sylvester":[[0,2,0,3,4,2.2,"#212121"],[0,2,1.15,1.8,2.6,0.4,"#ffffff"],[0,5.3,0,2.8,2.8,2.6,"#212121"],[0,4.8,1.35,1.7,1.2,0.5,"#ffffff"],[0,5.15,1.6,0.5,0.4,0.3,"#e53935"],[-1.1,7,0,0.9,1.4,0.8,"#212121"],[1.1,7,0,0.9,1.4,0.8,"#212121"],[-0.7,5.8,1.32,0.55,0.7,0.2,"#ffffff"],[0.7,5.8,1.32,0.55,0.7,0.2,"#ffffff"],[0,2.2,-1.4,1.0,1.0,1.6,"#212121"],[-0.9,0.4,0.3,1.1,0.8,2,"#212121"],[0.9,0.4,0.3,1.1,0.8,2,"#212121"]],"porky":[[0,2,0,3.2,4,2.4,"#f48fb1"],[0,5.2,0,2.8,2.6,2.6,"#f48fb1"],[0,4.9,1.4,1.4,1.1,0.7,"#f06292"],[-0.35,4.9,1.78,0.25,0.25,0.15,"#4e342e"],[0.35,4.9,1.78,0.25,0.25,0.15,"#4e342e"],[-1,6.9,0,0.8,1.2,0.6,"#f48fb1"],[1,6.9,0,0.8,1.2,0.6,"#f48fb1"],[-0.75,5.7,1.32,0.55,0.7,0.2,"#ffffff"],[0.75,5.7,1.32,0.55,0.7,0.2,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,1.8,"#f48fb1"],[0.9,0.4,0.3,1.1,0.8,1.8,"#f48fb1"],[0,2.2,-1.5,0.4,0.4,1.2,"#f06292"]],"elmer":[[0,2,0,3,4,2,"#6d4c41"],[0,5.2,0,2.6,2.6,2.4,"#ffcc99"],[-0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0,4.7,1.25,1.2,0.35,0.25,"#8d6e63"],[0,6.9,0,3.4,0.7,3.2,"#4e342e"],[0,7.9,0,2.0,1.6,2.0,"#4e342e"],[-0.9,0.4,0.2,1.1,0.8,1.8,"#3e2723"],[0.9,0.4,0.2,1.1,0.8,1.8,"#3e2723"],[2.2,3.2,0.6,0.7,3.4,0.7,"#5d4037"]],"marvin":[[0,2,0,3,3.6,2,"#2e7d32"],[0,4.9,0,2.6,2.6,2.4,"#212121"],[-0.6,5.3,1.22,0.7,0.9,0.2,"#ffffff"],[0.6,5.3,1.22,0.7,0.9,0.2,"#ffffff"],[0,6.6,0,3.0,1.2,2.8,"#9e9e9e"],[0,7.6,0,1.8,1.2,1.8,"#9e9e9e"],[0,8.5,-0.2,0.7,0.9,2.2,"#e53935"],[-0.9,0.35,0.2,1.0,0.7,1.6,"#212121"],[0.9,0.35,0.2,1.0,0.7,1.6,"#212121"],[-1.7,2.4,0,0.7,1.8,0.7,"#2e7d32"],[1.7,2.4,0,0.7,1.8,0.7,"#2e7d32"]],"foghorn":[[0,2.2,0,3.4,4.4,2.6,"#ffffff"],[0,5.6,0,2.6,2.6,2.4,"#ffffff"],[0,6.3,1.3,1.2,0.9,0.9,"#ff9800"],[-0.65,6.1,1.22,0.55,0.7,0.2,"#212121"],[0.65,6.1,1.22,0.55,0.7,0.2,"#212121"],[0,7.3,0,1.8,1.0,0.6,"#e53935"],[0,4.9,1.35,0.8,1.2,0.4,"#e53935"],[-1.9,2.8,0,0.8,2.6,1.4,"#ffffff"],[1.9,2.8,0,0.8,2.6,1.4,"#ffffff"],[0,2.6,-1.8,1.6,2.4,1.0,"#2e7d32"],[-0.8,0.35,0.3,1.0,0.7,2.0,"#ff9800"],[0.8,0.35,0.3,1.0,0.7,2.0,"#ff9800"]],"pepe":[[0,2,0,3,4,2.2,"#212121"],[0,2,1.2,1.4,3.4,0.35,"#ffffff"],[0,5.2,0,2.6,2.6,2.4,"#212121"],[0,6.2,0.6,1.2,1.6,1.4,"#ffffff"],[0,4.9,1.3,0.9,0.7,0.6,"#212121"],[-0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0,3,-2.2,2.4,3.4,1.6,"#212121"],[0,3,-2.2,1.2,2.6,1.7,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,1.8,"#212121"],[0.9,0.4,0.3,1.1,0.8,1.8,"#212121"]],"speedy":[[0,1.2,0,1.8,2.2,1.4,"#8d6e63"],[0,2.9,0,1.6,1.6,1.4,"#8d6e63"],[0,2.7,0.75,0.7,0.5,0.4,"#d7ccc8"],[-0.4,3.2,0.72,0.3,0.35,0.15,"#212121"],[0.4,3.2,0.72,0.3,0.35,0.15,"#212121"],[-0.9,3.6,0,0.5,0.7,0.3,"#8d6e63"],[0.9,3.6,0,0.5,0.7,0.3,"#8d6e63"],[0,4.1,0,5.5,0.5,5.5,"#ffca3a"],[0,5.0,0,2.2,1.8,2.2,"#ffb300"],[-0.5,0.25,0.2,0.6,0.5,1.2,"#8d6e63"],[0.5,0.25,0.2,0.6,0.5,1.2,"#8d6e63"],[0,1.2,-1.0,0.3,0.3,1.4,"#d7ccc8"]],"granny":[[0,1.8,0,3.2,3.6,2.4,"#5c6bc0"],[0,4.6,0,2.4,2.4,2.2,"#ffcc99"],[0,6.0,-0.3,1.4,1.2,1.4,"#9e9e9e"],[-0.6,5.0,1.12,0.45,0.55,0.2,"#212121"],[0.6,5.0,1.12,0.45,0.55,0.2,"#212121"],[-0.9,5.9,0.6,1.2,0.5,0.5,"#eeeeee"],[0.9,5.9,0.6,1.2,0.5,0.5,"#eeeeee"],[0,4.3,1.15,0.9,0.3,0.2,"#8d6e63"],[-1.8,2.6,0,0.7,2.0,0.7,"#5c6bc0"],[1.8,2.6,0,0.7,2.0,0.7,"#5c6bc0"]],"wile":[[0,2.2,0,2.8,4.4,2.0,"#8d6e63"],[0,5.4,0.2,2.4,2.4,2.2,"#8d6e63"],[0,5.0,1.6,1.2,1.0,1.2,"#a1887f"],[0,5.0,2.25,0.4,0.3,0.2,"#212121"],[-1.0,7.0,0,0.8,1.6,0.7,"#8d6e63"],[1.0,7.0,0,0.8,1.6,0.7,"#8d6e63"],[-0.6,5.9,1.15,0.5,0.65,0.2,"#ffffff"],[0.6,5.9,1.15,0.5,0.65,0.2,"#ffffff"],[0,2.4,-1.6,1.0,1.0,1.8,"#8d6e63"],[-0.8,0.4,0.3,1.0,0.8,1.8,"#8d6e63"],[0.8,0.4,0.3,1.0,0.8,1.8,"#8d6e63"]],"roadrunner":[[0,2.4,0,2.2,3.6,1.8,"#1976d2"],[0,5.0,0.2,2.0,2.0,1.8,"#1976d2"],[0,4.8,1.3,0.9,0.6,0.9,"#ff9800"],[-0.5,5.4,0.95,0.4,0.5,0.2,"#ffffff"],[0.5,5.4,0.95,0.4,0.5,0.2,"#ffffff"],[0,6.3,-0.2,0.5,1.2,1.8,"#0d47a1"],[-0.7,1.0,0,0.5,2.0,0.5,"#ff9800"],[0.7,1.0,0,0.5,2.0,0.5,"#ff9800"],[-0.7,0.2,0.3,0.7,0.4,1.4,"#ff9800"],[0.7,0.2,0.3,0.7,0.4,1.4,"#ff9800"],[0,2.8,-1.4,1.2,1.6,1.2,"#0d47a1"],[-1.3,3.0,0,0.5,1.6,1.0,"#1976d2"],[1.3,3.0,0,0.5,1.6,1.0,"#1976d2"]],"taz":[[0,3,0,6,6,5,"#6d4c41"],[0,7.2,0,4.6,3.2,4.2,"#6d4c41"],[0,6.6,2.15,3.0,1.6,0.5,"#3e2723"],[0,2.6,2.55,3.4,3.4,0.4,"#d7ccc8"],[-1.6,9.2,0,0.9,1.2,0.9,"#6d4c41"],[1.6,9.2,0,0.9,1.2,0.9,"#6d4c41"],[-3.4,3.4,0,1.0,2.6,1.0,"#6d4c41"],[3.4,3.4,0,1.0,2.6,1.0,"#6d4c41"]],"sam":[[0,3,0,5,6,4,"#b71c1c"],[0,7.4,0,3,3,2.8,"#ffcc99"],[0,9.1,0,5.6,0.8,5.2,"#4e342e"],[0,10.3,0,3,2.4,3,"#4e342e"],[-0.8,6.9,1.5,1.2,0.5,0.3,"#ffffff"],[0.8,6.9,1.5,1.2,0.5,0.3,"#ffffff"],[0,7.4,1.55,0.6,0.7,0.5,"#e53935"],[-3,4,0,0.9,2.6,0.9,"#b71c1c"],[3,4,0,0.9,2.6,0.9,"#b71c1c"]]};
@@ -556,6 +559,7 @@ function paintLooneyChars(root) {
 
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_DATES.starts && n <= LOONEY_DATES.ends; };
 const looneyThemeActive = () => { const n = Date.now(); return n >= LOONEY_THEME_DATES.starts && n <= LOONEY_THEME_DATES.ends; };
+const halloweenActive = () => { const n = Date.now(); return n >= HALLOWEEN_DATES.starts && n <= HALLOWEEN_DATES.ends; };
 async function looneyPage() {
   const ev = await api('GET', '/api/event/looney');
   const pct = Math.min(100, Math.round(ev.coins / ev.need * 100));
@@ -585,6 +589,28 @@ async function looneyPage() {
           ${ev.wins.includes(g.id) ? '<span class="looney-check" title="Looney Coin earned!">🪙</span>' : ''}
         </a>`).join('') || '<p class="muted">Games are being prepared\u2026</p>'}</div></section>`);
   paintLooneyChars();
+}
+const HALLOWEEN_EMOJI = { g_halloween01: '👻', g_halloween02: '🎃', g_halloween03: '🧙', g_halloween04: '💀', g_halloween05: '🦇' };
+async function halloweenPage() {
+  let ev = null;
+  try { ev = await api('GET', '/api/event/halloween'); } catch { ev = { games: [], active: halloweenActive() }; }
+  const daysLeft = Math.max(0, Math.ceil((HALLOWEEN_DATES.ends - Date.now()) / 86400000));
+  mount('halloween', `
+    <div class="hw-hero">
+      <div class="hw-hero-emoji">🎃</div>
+      <div class="hw-hero-text">
+        <h1>Halloween in Funtopia</h1>
+        <p class="muted">${ev.active ? `Spooky games, creepy costumes & <b>double daily FunTix</b> — ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}!` : 'The spirits have returned to their graves. See you next year!'}</p>
+      </div>
+    </div>
+    <section><div class="sec-h"><h2>Spooky Games (${ev.games.length})</h2></div>
+      <div class="game-row">${ev.games.map(g => `
+        <a class="game-card" href="#/play/${g.id}">
+          <div class="gc-thumb hw-thumb">${HALLOWEEN_EMOJI[g.id] || '🎃'}</div>
+          <b>${esc(g.name)}</b><span class="muted small">${fmt(g.visits)} plays</span>
+        </a>`).join('') || '<p class="muted">The spirits are still preparing the games…</p>'}</div></section>
+    <section><div class="sec-h"><h2>Costumes</h2><a href="#/catalog">Shop all &rsaquo;</a></div>
+      <p class="muted">Witch hats, vampire fangs, pumpkin heads and more — find them in the <a href="#/catalog">Marketplace</a> and the Avatar Editor's new looks.</p></section>`);
 }
 async function friendsPage() {
   const fr = await api('GET', '/api/friends');
@@ -847,7 +873,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=a94d9c0');
+      const { Game: GameClass } = await import('./game.js?v=1d8bc4af');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1118,6 +1144,7 @@ async function route() {
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
       case 'looney': return await looneyPage();
+      case 'halloween': return await halloweenPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
       case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
