@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS } from './catalog.js';
-import { renderToDataURL } from './three-util.js';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
+import { renderToDataURL } from './three-util.js?v=2f4a2dca';
 
 const faceCache = {}, shirtCache = {};
 function faceTexture(id) {
@@ -224,6 +224,21 @@ export function buildCharacter(avatar) {
     pet.rotation.y = -0.4;
     root.add(pet);
     root.userData.pet = pet;
+  }
+  const gearSpec = GEAR_MODELS[avatar.gear];
+  if (gearSpec) {
+    const gear = new THREE.Group();
+    for (const b of gearSpec.boxes) {
+      const m = box(b[3], b[4], b[5], b[6]);
+      m.position.set(b[0], b[1], b[2]);
+      if (b[7]) m.rotation.z = b[7];
+      gear.add(m);
+    }
+    gear.scale.setScalar(0.5);
+    const rarmG = root.userData.limbs?.rarm;
+    gear.position.set(0, -2, 0.5);
+    (rarmG || root).add(gear);
+    root.userData.gear = gear;
   }
   return root;
 }
