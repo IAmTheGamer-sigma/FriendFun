@@ -37,7 +37,7 @@ function badgeDefs() {
   return defs;
 }
 
-// ---------- helper functions ----------
+// helper functions
 const hash = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const key = n => n.toLowerCase();
 const money = u => ({ funtix: Number(u.funtix) || 0 });
@@ -62,7 +62,7 @@ async function seed() {
   const now = Date.now();
   const g = (id, name, creator, desc, tpl, visits, likes, dislikes, max_players = 30) =>
     ({ id, name, creator, description: desc, world: templates[tpl](), visits, likes, dislikes, max_players, created: now, updated: now, thumbnail: null });
-  
+
   const games = [
     g('g1', 'Mega Fun Obby', 'Funtopia', 'Jump, dodge and bounce through 10 stages of obstacles!', 'obby', 1543210, 8912, 412),
     g('g2', 'Hangout Town', 'Funtopia', 'Chill with friends in a little town.', 'hangout', 987654, 5321, 210),
@@ -70,7 +70,7 @@ async function seed() {
     g('g4', 'Coin Rush Islands', 'Funtopia', 'Hop between floating islands and grab every coin!', 'coinRush', 432100, 3999, 155),
     g('g5', 'Classic Baseplate', 'Funtopia', 'The classic. A big grey baseplate.', 'baseplate', 210987, 1500, 90),
   ];
-  
+
   for (const game of games) {
     await supabase.from('games').upsert({ id: game.id, ...game });
   }
@@ -78,7 +78,7 @@ async function seed() {
 
 seed().catch(console.error);
 
-// ---------- presence ----------
+// presence
 const presence = new Map();
 function touch(name, gameId) {
   const p = presence.get(key(name)) || {};
@@ -94,7 +94,7 @@ async function statusOf(name) {
   return { online: true };
 }
 
-// ---------- helpers ----------
+// helpers
 function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
@@ -119,11 +119,11 @@ async function publicUser(u) {
   const games = publishedGames || [], visits = games.reduce((total, game) => total + (Number(game.visits) || 0), 0);
   const badges = [...new Set([...badgesOf(u), ...(games.length ? ['creator'] : []), ...(games.length >= 5 ? ['builder_5'] : []), ...(games.length >= 10 ? ['builder_10'] : []), ...(visits >= 100 ? ['popular_100'] : []), ...(visits >= 1000 ? ['popular_1000'] : [])])];
   const badge = u.badge === 'none' ? null : (badges.includes(u.badge) ? u.badge : badges[0] || null);
-  
-  return { 
-    name: u.name, club: isClub(u), admin: isAdmin(u), badges, badge, 
-    avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length, 
-    ...(await statusOf(u.name)) 
+
+  return {
+    name: u.name, club: isClub(u), admin: isAdmin(u), badges, badge,
+    avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length,
+    ...(await statusOf(u.name))
   };
 }
 function gameSummary(g) {
@@ -136,7 +136,7 @@ function filter(text) {
   return t;
 }
 
-// ---------- http ----------
+// http
 const app = express();
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
@@ -164,7 +164,7 @@ app.post('/api/signup', async (req, res) => {
   if (!password || password.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
   const { data: existing } = await supabase.from('users').select('name').eq('name', key(username)).maybeSingle();
   if (existing) return res.status(400).json({ error: 'That username is taken' });
-  
+
   const salt = crypto.randomBytes(8).toString('hex');
   const userData = {
     name: key(username), salt, pw: hash(password, salt), created: Date.now(), funtix: ECON.START_TIX,
@@ -173,7 +173,7 @@ app.post('/api/signup', async (req, res) => {
   };
   const { data: user, error: uErr } = await supabase.from('users').insert(userData).select().single();
   if (uErr) return res.status(500).json({ error: uErr.message });
-  
+
   const tok = crypto.randomBytes(24).toString('hex');
   await supabase.from('sessions').insert({ token: tok, username: user.name });
   res.json({ token: tok });
@@ -187,7 +187,7 @@ app.post('/api/login', async (req, res) => {
     const msg = u.banReason ? `Banned: ${u.banReason}` : 'Your account is banned';
     return res.status(403).json({ error: msg });
   }
-  
+
   const tok = crypto.randomBytes(24).toString('hex');
   await supabase.from('sessions').insert({ token: tok, username: u.name });
   res.json({ token: tok });
@@ -202,7 +202,7 @@ app.post('/api/logout', auth, async (req, res) => {
 async function dailyTix(u) {
   const day = new Date().toISOString().slice(0, 10);
   if (u.tixDay === day) return { amount: 0, user: u };
-  const amt = ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0);
+  const amt = (ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0)) * (halloweenActive() ? 2 : 1);
   const { data: updated, error } = await supabase.from('users').update({ tixDay: day, funtix: (Number(u.funtix) || 0) + amt }).eq('name', u.name).select().single();
   if (error) throw new Error(error.message);
   Object.assign(u, updated);
@@ -217,14 +217,14 @@ app.get('/api/me', auth, async (req, res) => {
     if (repaired) u.funtix = repaired.funtix;
   }
   u.inventory = list(u, 'inventory'); u.requests = list(u, 'requests'); u.friends = list(u, 'friends'); u.favorites = list(u, 'favorites'); u.recent = list(u, 'recent');
-  if (isClub(u)) { 
+  if (isClub(u)) {
     const entitledItems = isAdmin(u) ? CATALOG : CATALOG.filter(it => it.club);
-    const miss = entitledItems.filter(it => !u.inventory.includes(it.id)); 
-    if (miss.length) { 
+    const miss = entitledItems.filter(it => !u.inventory.includes(it.id));
+    if (miss.length) {
       const updatedInv = [...u.inventory, ...miss.map(it => it.id)];
       await supabase.from('users').update({ inventory: updatedInv }).eq('name', u.name);
       u.inventory = updatedInv;
-    } 
+    }
   }
   const { amount: daily } = await dailyTix(u);
   if (u.name === 'fun') {
@@ -241,10 +241,10 @@ app.get('/api/me', auth, async (req, res) => {
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
 });
 
-app.post('/api/ping', auth, async (req, res) => { 
-  touch(req.user.name, null); 
+app.post('/api/ping', auth, async (req, res) => {
+  touch(req.user.name, null);
   const { amount: daily } = await dailyTix(req.user);
-  res.json({ funtix: req.user.funtix, daily, requests: list(req.user, 'requests').length }); 
+  res.json({ funtix: req.user.funtix, daily, requests: list(req.user, 'requests').length });
 });
 
 app.put('/api/me/avatar', auth, async (req, res) => {
@@ -252,8 +252,8 @@ app.put('/api/me/avatar', auth, async (req, res) => {
   const hex = /^#[0-9a-fA-F]{6}$/;
   const colors = {};
   for (const k of Object.keys(DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
-  const pick = (slot) => (a[slot] && req.user.inventory.includes(a[slot]) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
-  const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head };
+  const pick = (slot) => (a[slot] && (a[slot] === slot + '_none' || req.user.inventory.includes(a[slot])) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
+  const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head, pet: pick('pet') || DEFAULT_AVATAR.pet };
   await supabase.from('users').update({ avatar }).eq('name', req.user.name);
   res.json(avatar);
 });
@@ -268,10 +268,10 @@ app.put('/api/me/badge', auth, async (req, res) => {
   res.json({ badge: badgeOf({ ...req.user, badge: b }) });
 });
 
-app.put('/api/me/bio', auth, async (req, res) => { 
-  const bio = filter(req.body?.bio || '').slice(0, 300); 
+app.put('/api/me/bio', auth, async (req, res) => {
+  const bio = filter(req.body?.bio || '').slice(0, 300);
   await supabase.from('users').update({ bio }).eq('name', req.user.name);
-  res.json({ ok: true }); 
+  res.json({ ok: true });
 });
 
 // ---------- add-ons ----------
@@ -296,8 +296,7 @@ app.post('/api/addons/:id', auth, async (req, res) => {
   res.json({ ok: true, settings: s });
 });
 
-// FunWorx reads the authenticated user's shared Funtopia identity.
-// Only returns what the user enabled in the FunWorx add-on settings.
+// FunWorx: returns only user-enabled shared identity data.
 app.get('/api/addons/funworx/me', auth, async (req, res) => {
   const u = req.user;
   const s = getAddonSettings(u).funworx || {};
@@ -321,7 +320,7 @@ app.post('/api/buy/:item', auth, async (req, res) => {
   if (it.club && !isClub(req.user)) return res.status(403).json({ error: 'FriendClub members only' });
   const price = it.free ? 0 : it.price;
   if (req.user.funtix < price) return res.status(400).json({ error: 'Not enough FunTix' });
-  
+
   const updatedInv = [...list(req.user, 'inventory'), it.id];
   const { data: updated, error } = await supabase.from('users').update({ funtix: req.user.funtix - price, inventory: updatedInv }).eq('name', req.user.name).select().single();
   if (error) return res.status(500).json({ error: error.message });
@@ -332,10 +331,10 @@ app.post('/api/club/join', auth, async (req, res) => {
   const u = req.user;
   if (isAdmin(u) || u.clubForever) return res.status(400).json({ error: 'You already have free FriendClub' });
   if (u.funtix < ECON.CLUB_PRICE) return res.status(400).json({ error: 'Not enough FunTix' });
-  
+
   const clubUntil = Math.max(Date.now(), u.clubUntil || 0) + ECON.CLUB_DAYS * 86400000;
   const updatedInv = [...list(u, 'inventory'), ...CATALOG.filter(it => it.club && !list(u, 'inventory').includes(it.id)).map(it => it.id)];
-  
+
   const { data: updated, error } = await supabase.from('users').update({ funtix: u.funtix - ECON.CLUB_PRICE, clubUntil, inventory: updatedInv }).eq('name', u.name).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ funtix: updated.funtix, club: true, clubUntil, inventory: updated.inventory });
@@ -346,9 +345,9 @@ app.get('/api/leaderboard', auth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   const userIndex = all.findIndex(u => u.name === req.user.name);
   res.json({
-    top: await Promise.all(all.slice(0, 50).map(async u => ({ 
-      name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), badge: badgeOf(u), 
-      ...await statusOf(u.name) 
+    top: await Promise.all(all.slice(0, 50).map(async u => ({
+      name: u.name, avatar: u.avatar, funtix: u.funtix, club: isClub(u), badge: badgeOf(u),
+      ...await statusOf(u.name)
     }))),
     rank: userIndex + 1, total: all.length, funtix: req.user.funtix,
   });
@@ -357,16 +356,16 @@ app.get('/api/leaderboard', auth, async (req, res) => {
 app.get('/api/users/:name', auth, async (req, res) => {
   const { data: u, error: uErr } = await supabase.from('users').select('*').eq('name', key(req.params.name)).single();
   if (uErr || !u) return res.status(404).json({ error: 'User not found' });
-  
+
   const { data: gamesData } = await supabase.from('games').select('*').eq('creator', key(u.name));
   const games = (gamesData || []).map(gameSummary);
-  
+
   const { data: friendsData } = await supabase.from('users').select('*').in('name', u.friends || []);
   const friends = await Promise.all((friendsData || []).map(publicUser));
-  
-  res.json({ 
-    ...await publicUser(u), games: games || [], friendsList: friends || [], 
-    isFriend: (req.user.friends || []).includes(key(u.name)), requested: (u.requests || []).includes(key(req.user.name)) 
+
+  res.json({
+    ...await publicUser(u), games: games || [], friendsList: friends || [],
+    isFriend: (req.user.friends || []).includes(key(u.name)), requested: (u.requests || []).includes(key(req.user.name))
   });
 });
 
@@ -396,7 +395,7 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   if (req.body?.on) {
     const updatedInv = [...(u.inventory || []), ...CATALOG.filter(it => it.club && !u.inventory?.includes(it.id)).map(it => it.id)];
     changes = { clubForever: true, inventory: updatedInv };
-  } else { 
+  } else {
     changes = { clubForever: false, clubUntil: 0 };
   }
   const { data: updated, error } = await supabase.from('users').update(changes).eq('name', u.name).select().single();
@@ -404,7 +403,7 @@ app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
   res.json({ ...await publicUser(updated), clubForever: isAdmin(updated) || !!updated.clubForever, clubUntil: updated.clubUntil || 0, funtix: updated.funtix });
 });
 
-// ---- Custom badges ----
+// Custom badges
 app.get('/api/badges', async (req, res) => {
   res.json(badgeDefs());
 });
@@ -786,11 +785,11 @@ app.post('/api/games/:id/favorite', auth, async (req, res) => {
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const f = req.user.favorites || [];
   let favoriteCount = g.favorite_count || 0;
-  if (f.includes(g.id)) { 
+  if (f.includes(g.id)) {
     const updatedF = f.filter(x => x !== g.id);
     await supabase.from('users').update({ favorites: updatedF }).eq('name', req.user.name);
     favoriteCount--;
-  } else { 
+  } else {
     const updatedF = [...f, g.id];
     await supabase.from('users').update({ favorites: updatedF }).eq('name', req.user.name);
     favoriteCount++;
@@ -802,7 +801,7 @@ app.post('/api/games/:id/favorite', auth, async (req, res) => {
 app.post('/api/games/:id/thumbnail', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
-  if (!g.thumbnail || key(g.creator) === key(req.user.name)) { 
+  if (!g.thumbnail || key(g.creator) === key(req.user.name)) {
     const thumb = validThumb(req.body?.thumbnail);
     await supabase.from('games').update({ thumbnail: thumb }).eq('id', g.id);
   }
@@ -876,7 +875,7 @@ function winBadges(game) {
 
 app.get('/api/catalog', (req, res) => res.json(CATALOG));
 
-// ---------- direct messages & notifications ----------
+// direct messages & notifications
 async function notify(username, type, text, link = '') {
   try { await supabase.from('notifications').insert({ username, type, text, link, created: Date.now() }); }
   catch (e) { console.warn('notify failed:', e.message); }
@@ -934,7 +933,7 @@ app.post('/api/notifications/read', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------- realtime ----------
+// realtime
 const rooms = new Map();
 let nextPid = 1;
 const server = http.createServer(app);
@@ -950,13 +949,13 @@ wss.on('connection', (ws) => {
     if (m.t === 'join' && !player) {
       const { data: session } = await supabase.from('sessions').select('username').eq('token', m.token).single();
       if (!session) return send(ws, { t: 'error', error: 'Could not join' });
-      
+
       const uname = session.username;
       const [userRes, gameRes] = await Promise.all([
         supabase.from('users').select('*').eq('name', uname).maybeSingle(),
         supabase.from('games').select('*').eq('id', m.gameId).maybeSingle(),
       ]);
-      
+
       const u = userRes.data;
       const g = gameRes.data;
 
@@ -966,17 +965,16 @@ wss.on('connection', (ws) => {
       if (room.players.size >= (g.max_players || 30)) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, game: g, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
-      
-      // SPEED UP: Background updates (no await)
+
       supabase.from('games').update({ visits: (g.visits || 0) + 1 }).eq('id', g.id).then(res => {
         if (res.error) console.error('Visit update failed:', res.error);
       });
-      
+
       const updatedRecent = [g.id, ... (u.recent || []).filter(x => x !== g.id)].slice(0, 12);
       supabase.from('users').update({ recent: updatedRecent }).eq('name', u.name).then(res => {
         if (res.error) console.error('Recent games update failed:', res.error);
       });
-      
+
       touch(u.name, g.id);
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
       room.players.set(player.id, player);
@@ -986,8 +984,7 @@ wss.on('connection', (ws) => {
     }
     if (!player) return;
     if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
-      // REMOVED: Repetitive FunTix add (playtime reward)
-    }
+          }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const text = filter(m.text.trim());
       broadcast(room, { t: 'chat', id: player.id, name: player.name, text, club: isClub(player.user), badge: badgeOf(player.user) });
@@ -1032,7 +1029,7 @@ wss.on('connection', (ws) => {
       const winUpdate = { funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges, inventory, looneyWins };
       let { data: updated, error } = await supabase.from('users').update(winUpdate).eq('name', player.user.name).select().single();
       if (error) {
-        // If the looneyWins column is missing (migration not run), still grant the win reward
+        // Win reward even if looneyWins column missing
         console.log('win update failed, retrying without looneyWins:', error.message);
         looneyCoin = false; looneyComplete = false;
         const retry = await supabase.from('users').update({ funtix: winUpdate.funtix, champ: true, earnedBadges, inventory }).eq('name', player.user.name).select().single();
@@ -1067,7 +1064,7 @@ setInterval(() => {
   }
 }, 66);
 
-// ---------- AI Coder (rule-based generator, swap for LLM later) ----------
+// AI Coder (rule-based)
 function aiGenerateParts(prompt) {
   const p = String(prompt || '').toLowerCase().slice(0, 500);
   const parts = [];
@@ -1173,8 +1170,7 @@ function aiGenerateParts(prompt) {
     add('Win Pad', 'win', [8, 0.5, 8], '#ffffff', 'neon', 38, 10.8, 0);
   }
   if (!parts.length) {
-    // Default: a starter platform with a message script
-    add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 0);
+        add('Spawn', 'spawn', [6, 0.5, 6], '#6b6b6b', 'spawn', 0, 10.8, 0);
     add('Starter Platform', 'part', [12, 1, 12], '#8b9a6b', 'grass', 0, 10, 0);
     add('Welcome Sign', 'part', [6, 3, 1], '#ffffff', 'plastic', 0, 13, -5,
       { script: { onTouch: { action: 'message', text: 'Welcome to my game!' } } });
@@ -1194,8 +1190,7 @@ function aiGenerateHtml(prompt) {
 <script>
 function buyItem(item) {
   console.log('Buying', item);
-  // Connect to Funtopia API: POST /api/buy/<item-id>
-  alert('Added ' + item + ' to cart!');
+    alert('Added ' + item + ' to cart!');
 }
 </script>`;
   }
@@ -1212,7 +1207,6 @@ function showDialog(name, text) {
   document.getElementById('ai-dialog-text').textContent = text;
   document.getElementById('ai-dialog').style.display = 'block';
 }
-// Example: showDialog('Merchant', 'Welcome to my shop!');
 </script>`;
   }
   if (has('hud', 'leaderboard', 'score')) {
@@ -1236,8 +1230,7 @@ function addCoins(n) { aiCoins += n; document.getElementById('ai-coins').textCon
 <script>
 function teleportTo(x, y, z) {
   console.log('Teleport to', x, y, z);
-  // In Funtopia: set player position via game API
-}
+  }
 </script>`;
   }
   return `<!-- AI-generated HTML snippet -->
@@ -1366,10 +1359,8 @@ onStart(() => {
 let time = 0;
 onTick((dt) => {
   time += dt * 0.05;
-  // Note: sky color API coming soon - for now show time
-  if (Math.floor(time) !== Math.floor(time - dt * 0.05)) {
-    // Every second update
-  }
+    if (Math.floor(time) !== Math.floor(time - dt * 0.05)) {
+      }
 });
 onStart(() => {
   say(null, 'Survive the night!');
@@ -1389,8 +1380,7 @@ onStart(() => {
   say(null, 'Say "open sesame" in chat...');
 });`);
   }
-  // Generic script request
-  if (has('script') && !scripts.length) {
+    if (has('script') && !scripts.length) {
     add('custom.js',
 `// Custom script - edit me!
 onStart(() => {
@@ -1418,7 +1408,7 @@ app.post('/api/ai/coder', auth, async (req, res) => {
   }
 });
 
-// ---------- HTML export for games ----------
+// HTML export for games
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -1491,7 +1481,7 @@ addEventListener('resize', () => {
   res.send(html);
 });
 
-// ---------- Looney Tunes event ----------
+// Looney Tunes event
 const LOONEY_EVENT = {
   id: 'looney',
   name: 'Looney Tunes Event',
@@ -1502,6 +1492,36 @@ const LOONEY_EVENT = {
   items: ['hat_bunnyears', 'face_buckteeth', 'hat_ducktuft', 'face_beak', 'head_bugs', 'head_daffy'],
 };
 const looneyActive = () => { const n = Date.now(); return n >= LOONEY_EVENT.starts && n <= LOONEY_EVENT.ends; };
+
+// ---------- Halloween event (Oct 24 - Nov 2) ----------
+const HALLOWEEN_EVENT = { id: 'halloween', name: 'Halloween',
+  starts: Date.parse('2026-10-24T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
+const halloweenActive = () => Date.now() >= HALLOWEEN_EVENT.starts && Date.now() <= HALLOWEEN_EVENT.ends;
+
+const HALLOWEEN_GAMES = [
+  { id: 'g_halloween01', name: 'Haunted Mansion Obby', desc: 'Escape the haunted mansion\u2019s 10 spooky stages! 👻', tpl: 'obby', sky: '#14141f' },
+  { id: 'g_halloween02', name: 'Pumpkin Patch Hunt', desc: 'Grab every candy corn in the moonlit pumpkin patch! 🎃', tpl: 'coinRush', sky: '#1b1030' },
+  { id: 'g_halloween03', name: 'Witch\u2019s Tower Climb', desc: 'Climb the witch\u2019s crooked tower... if you dare! 🧙', tpl: 'tower', sky: '#101826' },
+  { id: 'g_halloween04', name: 'Ghost Town Hangout', desc: 'Hang out with friendly ghosts in the old town. 💀', tpl: 'hangout', sky: '#16121e' },
+  { id: 'g_halloween05', name: 'Spooky Baseplate', desc: 'A haunted twist on the classic. 🦇', tpl: 'baseplate', sky: '#0f0f18' },
+];
+
+async function seedHalloweenGames() {
+  try {
+    const { data: ex } = await supabase.from('games').select('id').eq('event', 'halloween');
+    if ((ex || []).length >= HALLOWEEN_GAMES.length && !process.env.HALLOWEEN_RESEED) return { created: 0 };
+    await supabase.from('games').delete().eq('event', 'halloween');
+    let created = 0;
+    for (const cfg of HALLOWEEN_GAMES) {
+      const world = templates[cfg.tpl](); world.sky = cfg.sky;
+      const { error } = await supabase.from('games').insert({ id: cfg.id, name: cfg.name, creator: 'Funtopia',
+        description: cfg.desc, world: sanitizeWorld(world), event: 'halloween',
+        visits: 0, likes: 0, dislikes: 0, max_players: 30, created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false });
+      if (error) console.warn('hw fail', cfg.id, error.message); else created++;
+    }
+    return { created };
+  } catch (e) { console.warn('hw err', e.message); return { created: 0 }; }
+}
 
 const LOONEY_GAMES = [
   { name: "Bugs' Burrow Dash", desc: "Find all 12 hidden carrots in Bugs' burrow!", sky: '#9fd6ff', cols: ['#8ac926', '#ffca3a', '#ff924c'] },
@@ -1526,10 +1546,7 @@ const LOONEY_GAMES = [
   { name: "That's All, Folks! Finale", desc: "Pop 12 golden stars on the big stage!", sky: '#ffd54f', cols: ['#ffd700', '#e53935', '#ffffff'] },
 ];
 
-// ---------- Looney Tunes event: real mini-games (not obbies) ----------
-// Each game is a distinct genre, driven by world scripts:
-// hunt (treasure hunt), blitz (tag moving targets), maze, survival,
-// anvil rain, hot/cold seeker, boss battle, sprint time trial, king of the hill.
+// Looney mini-games: hunt, blitz, maze, survival, anvil rain, seeker, boss, sprint, KOTH.
 function scrHunt(n, item) {
   return "onStart(()=>{hidePart('WinPad');setScore(0);say('Find all " + n + " " + item + "!');});"
     + "onTouch('Coin',()=>{var c=addScore(1);if(c>=" + n + "){showPart('WinPad');say('All found! Touch the golden pad!');playSound('win');}else{say(c+' / " + n + " " + item + " found!');}});";
@@ -2006,7 +2023,7 @@ async function seedLooneyGames() {
   try {
     const { data: existing } = await supabase.from('games').select('id').eq('event', 'looney');
     const have = new Set((existing || []).map(g => g.id));
-    // Detect old (generic) worlds: new themed worlds contain decor parts like 'Carrot'
+    // Old generic worlds lack decor parts like 'Carrot'
     let isThemed = false;
     if (have.size >= LOONEY_GAMES.length) {
       const { data: sample } = await supabase.from('games').select('world').eq('id', 'g_looney01').maybeSingle();
@@ -2037,8 +2054,17 @@ app.post('/api/admin/event/seed', auth, async (req, res) => {
   res.json(await seedLooneyGames());
 });
 
-app.get('/api/event/looney', auth, async (req, res) => {
-  const { data: games } = await supabase.from('games').select('id,name,description,visits,thumbnail').eq('event', 'looney').order('id');
+app.post('/api/admin/event/seed-halloween', auth, async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
+  res.json(await seedHalloweenGames());
+});
+app.get('/api/event/halloween', auth, async (req, res) => {
+  const { data: games } = await supabase.from('games').select('id,name,description,visits,thumbnail').eq('event', 'halloween').order('id');
+  const e = HALLOWEEN_EVENT;
+  res.json({ id: e.id, name: e.name, starts: e.starts, ends: e.ends, active: halloweenActive(), games: games || [] });
+});
+
+app.get('/api/event/looney', auth, async (req, res) => {  const { data: games } = await supabase.from('games').select('id,name,description,visits,thumbnail').eq('event', 'looney').order('id');
   const wins = Array.isArray(req.user.looneyWins) ? req.user.looneyWins : [];
   res.json({
     id: LOONEY_EVENT.id, name: LOONEY_EVENT.name, need: LOONEY_EVENT.need,
@@ -2048,7 +2074,8 @@ app.get('/api/event/looney', auth, async (req, res) => {
 });
 
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
-seedLooneyGames().then(r => console.log('Looney games seeded:', r.created));
+seedLooneyGames().then(r => console.log('looney seed:', r.created));
+seedHalloweenGames().then(r => console.log('hw:', r.created));
 // Unlock the limited-edition Looney rewards for @fun
 (async () => {
   try {
