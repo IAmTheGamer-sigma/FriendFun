@@ -49,6 +49,11 @@ export const CATALOG = [
   { id: 'shirt_vampcape', type: 'shirt', name: 'Vampire Cape', price: 350, color: '#7b1e1e' },
   { id: 'shirt_mummy', type: 'shirt', name: 'Mummy Wraps', price: 300, color: '#e8e0c8' },
   { id: 'pet_bat', type: 'pet', name: 'Bat Buddy', price: 300, emoji: '🦇', color: '#5d4037' },
+  { id: 'gear_none', type: 'gear', name: 'No Gear', price: 0, free: true, emoji: '🚫' },
+  { id: 'gear_sword', type: 'gear', name: 'Sword', price: 300, emoji: '🗡️', color: '#cfd8dc' },
+  { id: 'gear_slingshot', type: 'gear', name: 'Slingshot', price: 400, emoji: '🎯', color: '#8d6e63' },
+  { id: 'gear_grapple', type: 'gear', name: 'Grappling Hook', price: 600, emoji: '🪝', color: '#78909c' },
+  { id: 'gear_rocket', type: 'gear', name: 'Rocket Launcher', price: 800, emoji: '🚀', color: '#e53935' },
 ];
 // boxes: [x, y, z, w, h, d, color, rotZ?]. Origin at ground, faces +z.
 // ---------- pet voxel models (shared by game.js 3D pets and app.js 2D previews) ----------
@@ -149,12 +154,47 @@ export const PET_MODELS = {
     [-0.22, 0.17, -0.42, 0.18, 0.34, 0.18, '#00acc1'], [0.22, 0.17, -0.42, 0.18, 0.34, 0.18, '#00acc1'],
   ] },
 };
+// ---------- gear voxel models (classic Roblox-style tools) ----------
+// boxes: [x, y, z, w, h, d, color, rotZ?]. Origin at grip, faces +z.
+export const GEAR_MODELS = {
+  gear_sword: { boxes: [
+    [0, 1.7, 0, 0.18, 2.4, 0.18, '#cfd8dc'],
+    [0, 3.0, 0, 0.12, 0.35, 0.12, '#90a4ae'],
+    [0, 0.45, 0, 0.75, 0.14, 0.28, '#8d6e63'],
+    [0, 0.12, 0, 0.17, 0.55, 0.17, '#5d4037'],
+    [0, -0.2, 0, 0.24, 0.14, 0.24, '#5d4037'],
+  ] },
+  gear_slingshot: { boxes: [
+    [0, 0.35, 0, 0.2, 1.0, 0.2, '#8d6e63'],
+    [-0.28, 1.05, 0, 0.17, 0.75, 0.17, '#8d6e63', 0.42],
+    [0.28, 1.05, 0, 0.17, 0.75, 0.17, '#8d6e63', -0.42],
+    [-0.42, 1.32, 0, 0.85, 0.07, 0.07, '#212121'],
+    [0, 1.32, 0, 0.18, 0.18, 0.18, '#8d6e63'],
+  ] },
+  gear_grapple: { boxes: [
+    [0, 0.5, 0, 0.22, 1.1, 0.22, '#78909c'],
+    [0, 1.1, 0, 0.55, 0.16, 0.16, '#546e7a'],
+    [-0.22, 1.35, 0, 0.13, 0.45, 0.13, '#37474f'],
+    [0.22, 1.35, 0, 0.13, 0.45, 0.13, '#37474f'],
+    [-0.22, 1.6, 0, 0.13, 0.13, 0.3, '#37474f'],
+    [0.22, 1.6, 0, 0.13, 0.13, 0.3, '#37474f'],
+    [0, 0.05, 0, 0.3, 0.2, 0.3, '#546e7a'],
+  ] },
+  gear_rocket: { boxes: [
+    [0, 0.7, 0, 0.55, 0.55, 2.4, '#e53935'],
+    [0, 0.7, 1.3, 0.62, 0.62, 0.35, '#b71c1c'],
+    [0, 0.7, -1.3, 0.4, 0.4, 0.25, '#78909c'],
+    [0, 0.28, -0.4, 0.22, 0.45, 0.55, '#5d4037'],
+    [0, 1.1, -0.9, 0.32, 0.22, 0.32, '#78909c'],
+    [0, 0.7, 0.4, 0.6, 0.12, 0.5, '#ff8f00'],
+  ] },
+};
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2, CLUB_COIN_BONUS: 1 };
 export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
 export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
-  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none',
+  hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none', gear: 'gear_none',
 };
 
 export const BADGES = {
