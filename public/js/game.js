@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { setupLighting, buildWorld, findSpawn } from './three-util.js';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js';
-import { sfx } from './sound.js';
-import { ECON, BADGES, PET_MODELS } from './catalog.js?v=0d7b27c0';
+import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=2f4a2dca';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=ecbc1237';
+import { sfx } from './sound.js?v=0741c43e';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
@@ -30,6 +30,21 @@ function buildPet(petId) {
   g.userData.body = body;
   return g;
 }
+function buildGear(gearId) {
+  const spec = GEAR_MODELS[gearId];
+  if (!spec) return null;
+  const g = new THREE.Group();
+  for (const b of spec.boxes) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b[3], b[4], b[5]), new THREE.MeshStandardMaterial({ color: b[6], roughness: 0.6 }));
+    m.position.set(b[0], b[1], b[2]);
+    if (b[7]) m.rotation.z = b[7];
+    m.castShadow = true;
+    g.add(m);
+  }
+  g.scale.setScalar(0.5);
+  return g;
+}
+const GEAR_COOLDOWN = { gear_sword: 0.8, gear_slingshot: 0.6, gear_grapple: 1.5, gear_rocket: 2.2 };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export class Game {
@@ -37,6 +52,7 @@ export class Game {
     this.c = container; this.o = opts;
     this.world = opts.world; this.me = opts.me;
     this.keys = {}; this.joy = { x: 0, y: 0 }; this.touchJump = false; this.t = 0; this.players = new Map();
+    this.projectiles = []; this.effects = []; this.gearSwingT = 0; this.lastGearUse = -9;
     this.camYaw = Math.PI; this.camPitch = 0.35; this.camDist = 18;
     this.health = 100; this.dead = false; this.emote = null; this.speedTimer = 0;
     this.collected = new Set(); this.won = false;
@@ -185,7 +201,7 @@ export class Game {
     this.char = buildCharacter(this.me.avatar);
     this.scene.add(this.char);
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
-    this.setPet();
+    this.setPet(); this.setGear();
     this.ray = new THREE.Raycaster();
     this.resize();
     this.runWorldScripts();
@@ -376,6 +392,80 @@ export class Game {
     }
     u.body.position.y = moving ? Math.abs(Math.sin(this.t * 11)) * 0.5 : Math.sin(this.t * 2.5) * 0.06 + 0.06;
   }
+  setGear() {
+    if (this.gearMesh) { this.gearMesh.parent?.remove(this.gearMesh); this.gearMesh = null; }
+    const g = buildGear(this.me.avatar?.gear);
+    if (g) {
+      const rarm = this.char.userData.limbs?.rarm;
+      g.position.set(0, -2, 0.5);
+      (rarm || this.char).add(g);
+      this.gearMesh = g;
+    }
+  }
+  useGear() {
+    const id = this.me.avatar?.gear;
+    if (!id || id === 'gear_none' || this.dead || this.o.test) return;
+    const now = this.t;
+    if (now - (this.lastGearUse || -9) < (GEAR_COOLDOWN[id] || 1)) return;
+    this.lastGearUse = now;
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    if (id === 'gear_sword') this.swingSword();
+    else if (id === 'gear_slingshot') this.fireProjectile('pellet', dir, 70, 1.4);
+    else if (id === 'gear_rocket') this.fireProjectile('rocket', dir, 38, 5);
+    else if (id === 'gear_grapple') this.fireGrapple(dir);
+  }
+  swingSword() {
+    this.gearSwingT = 0.35;
+    sfx.swing?.() || sfx.click?.();
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.char.quaternion);
+    for (const p of this.players.values()) {
+      const d = p.char.position.clone().sub(this.pos); d.y = 0;
+      if (d.length() < 5.5 && d.normalize().dot(fwd) > 0.4) { this.send({ t: 'gearHit', id: p.id }); break; }
+    }
+  }
+  fireProjectile(kind, dir, speed, radius) {
+    const isRocket = kind === 'rocket';
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(isRocket ? 0.55 : 0.28, 10, 8),
+      new THREE.MeshStandardMaterial({ color: isRocket ? '#e53935' : '#a1887f', emissive: isRocket ? '#ff5722' : '#000000', emissiveIntensity: 0.7, roughness: 0.5 }));
+    const start = this.pos.clone(); start.y += 3.2;
+    start.addScaledVector(dir, 1.5);
+    mesh.position.copy(start);
+    this.scene.add(mesh);
+    this.projectiles.push({ mesh, vel: dir.clone().multiplyScalar(speed), life: 3, kind, radius });
+    sfx.shoot?.() || sfx.click?.();
+  }
+  fireGrapple(dir) {
+    const ray = new THREE.Raycaster(this.camera.position.clone(), dir.clone(), 0.5, 70);
+    const hits = ray.intersectObjects([...this.meshes.values()], false);
+    if (!hits.length) return;
+    const pt = hits[0].point;
+    const pull = new THREE.Vector3(pt.x - this.pos.x, 0, pt.z - this.pos.z);
+    const dist = pull.length();
+    if (dist < 4) return;
+    pull.normalize().multiplyScalar(Math.min(dist * 5, 70));
+    this.vel.x = pull.x; this.vel.z = pull.z;
+    this.vel.y = Math.max(this.vel.y + 8, 22);
+    sfx.grapple?.() || sfx.click?.();
+    // visual: quick line flash
+    const lg = new THREE.BufferGeometry().setFromPoints([this.pos.clone().add(new THREE.Vector3(0, 3, 0)), pt]);
+    const line = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: '#90a4ae' }));
+    this.scene.add(line);
+    setTimeout(() => this.scene.remove(line), 350);
+  }
+  explode(at, radius) {
+    const flash = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10),
+      new THREE.MeshBasicMaterial({ color: '#ff9800', transparent: true, opacity: 0.85 }));
+    flash.position.copy(at); this.scene.add(flash);
+    const t0 = this.t;
+    this.effects.push({ mesh: flash, until: t0 + 0.35, kind: 'flash' });
+    sfx.boom?.() || sfx.click?.();
+    for (const p of this.players.values()) {
+      const d = p.char.position.clone().sub(at); d.y *= 0.4;
+      if (d.length() < radius + 1) { this.send({ t: 'gearHit', id: p.id }); break; }
+    }
+  }
   addHalloweenDecor() {
     const hw = this.hwDecor = { bats: [], ghosts: [], pumpkins: [] };
     const spawn = findSpawn(this.world);
@@ -477,6 +567,7 @@ export class Game {
     this.canvas.addEventListener('contextmenu', e => e.preventDefault());
     this.canvas.addEventListener('pointerdown', e => {
       this.chatInput.blur();
+      if (e.button === 0 && e.pointerType !== 'touch' && !this.o.test) { this.useGear(); return; }
       if (e.button !== 2 && e.pointerType !== 'touch') return;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.canvas.setPointerCapture(e.pointerId);
       if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
@@ -548,6 +639,7 @@ export class Game {
       } else if (m.t === 'chat') this.onChat(m);
       else if (m.t === 'money') { this.setMoney(m); if (m.reason === 'play') this.sys(`+${m.amount} FunTix for playing!`); if (m.looneyCoins != null) { this.showBig(`🪙 Looney Coin earned! (${m.looneyCoins}/20)`, 3500); sfx.win(); } }
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
+      else if (m.t === 'gearHit') { if (!this.dead) this.die(); }
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
@@ -564,6 +656,8 @@ export class Game {
     this.scene.add(char);
     const pet = buildPet(p.avatar?.pet);
     if (pet) { pet.position.copy(char.position); this.scene.add(pet); }
+    const gear = buildGear(p.avatar?.gear);
+    if (gear) { const rarm = char.userData.limbs?.rarm; gear.position.set(0, -2, 0.5); (rarm || char).add(gear); }
     const pl = { id: p.id, name: p.name, avatar: p.avatar, club: p.club, badge: p.badge, char, pet: pet || null, target: p.s ? [p.id, ...p.s] : null, emote: null };
     if (pl.target) char.position.set(pl.target[1], pl.target[2], pl.target[3]);
     this.players.set(p.id, pl);
@@ -697,6 +791,38 @@ export class Game {
       if (p.pet) { p.pet.visible = ch.visible; if (ch.visible) this.updatePet(p.pet, ch.position, ch.rotation.y, dt); }
       animateCharacter(ch, anim, this.t, dt);
     }
+    // gear swing animation
+    if (this.gearSwingT > 0 && !this.dead) {
+      this.gearSwingT -= dt;
+      const rarm = this.char.userData.limbs?.rarm;
+      if (rarm) rarm.rotation.x = -2.2 * Math.sin((0.35 - this.gearSwingT) / 0.35 * Math.PI);
+      if (this.gearSwingT <= 0 && rarm) rarm.rotation.x = 0;
+    }
+    // projectiles
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const pr = this.projectiles[i];
+      pr.life -= dt;
+      if (pr.kind === 'pellet') pr.vel.y -= 60 * dt;
+      pr.mesh.position.addScaledVector(pr.vel, dt);
+      let hit = pr.life <= 0;
+      const mp = pr.mesh.position;
+      if (!hit && this.blockedAt(mp.x, mp.y, mp.z)) hit = true;
+      if (!hit) for (const p of this.players.values()) {
+        const d = p.char.position.clone(); d.y += 2.5;
+        if (d.distanceTo(mp) < 1.6 + (pr.kind === 'rocket' ? 0.8 : 0)) { this.send({ t: 'gearHit', id: p.id }); hit = true; break; }
+      }
+      if (hit) {
+        this.scene.remove(pr.mesh);
+        this.projectiles.splice(i, 1);
+        if (pr.kind === 'rocket') this.explode(mp.clone(), pr.radius);
+      }
+    }
+    // effects (explosion flashes)
+    for (let i = this.effects.length - 1; i >= 0; i--) {
+      const ef = this.effects[i];
+      if (this.t >= ef.until) { this.scene.remove(ef.mesh); this.effects.splice(i, 1); }
+      else if (ef.kind === 'flash') ef.mesh.scale.setScalar(1 + (0.35 - (ef.until - this.t)) * 6);
+    }
     // bubbles & coins
     this.scene.traverse(o => {
       if (o.userData.bubble) { o.userData.bubbleT -= dt; if (o.userData.bubbleT <= 0) { o.remove(o.userData.bubble); o.userData.bubble = null; } }
@@ -742,7 +868,9 @@ export class Game {
     this.sun.position.copy(this.pos).add(new THREE.Vector3(60, 120, 40)); this.sun.target.position.copy(this.pos);
   }
 
-  exit() { this.destroy(); this.o.onExit?.(); }
+  exit() {
+    for (const pr of this.projectiles) this.scene.remove(pr.mesh);
+    this.projectiles = []; this.destroy(); this.o.onExit?.(); }
   destroy() {
     this.destroyed = true; cancelAnimationFrame(this.raf);
     removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); removeEventListener('resize', this.onResize);
