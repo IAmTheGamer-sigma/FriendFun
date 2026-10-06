@@ -396,43 +396,12 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .friend-card-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
 .friend-card-actions .btn-secondary { padding: 6px 12px; font-size: 13px; }
 
-/* ---------- looney tunes event ---------- */
-.looney-banner { display: block; background: linear-gradient(135deg, #ff6d00, #ffab40); color: #fff; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 18px #ff6d0088; }
-.looney-banner:hover { filter: brightness(1.08); }
-.looney-hero { background: linear-gradient(160deg, #4a148c, #ff6d00); border-radius: 18px; padding: 32px 24px; text-align: center; color: #fff; margin-bottom: 20px; }
-.looney-hero h1 { margin: 0 0 8px; font-size: 34px; }
-.looney-progress { position: relative; background: #00000055; border-radius: 12px; height: 34px; margin: 16px auto; max-width: 440px; overflow: hidden; }
-.looney-bar { height: 100%; background: linear-gradient(90deg, #ffd700, #ffab00); transition: width .5s; }
-.looney-progress span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; }
-.looney-claimed { font-size: 18px; font-weight: 700; }
-.looney-rewards { display: flex; gap: 14px; flex-wrap: wrap; }
-.looney-reward { background: #232527; border-radius: 14px; padding: 18px; text-align: center; min-width: 150px; flex: 1; display: flex; flex-direction: column; gap: 4px; align-items: center; }
-.lr-emoji { font-size: 44px; }
-.looney-check { position: absolute; top: 8px; right: 8px; font-size: 22px; filter: drop-shadow(0 2px 4px #000); }
-.game-card { position: relative; }
-
-/* ---------- looney tunes site theme (during event) ---------- */
-body.looney { --blue: #ff6d00; }
-body.looney .topbar { background: linear-gradient(180deg, #d32f2f, #9a0000); border-bottom: 3px solid #ffd400; }
-body.looney .sidebar { background: #26060a; }
-body.looney .sidebar a { color: #ffccbc; }
-body.looney .sidebar a:hover { background: #4a1010; }
-body.looney .sidebar a.active { background: #ff6d00; color: #fff; }
-body.looney .logo-text { color: #ffd400 !important; font-weight: 900; text-shadow: 2px 2px 0 #7f0000; }
-body.looney .logo-text::after { content: ' \1F955'; }
-body.looney h1, body.looney h2 { font-weight: 900; letter-spacing: .01em; }
-body.looney .btn-primary { background: #ff6d00; }
-body.looney .btn-primary:hover { background: #ff8f00; }
-body.looney::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .05;
-  background: repeating-radial-gradient(circle at 50% 130%, #ff6d00 0 70px, transparent 70px 140px); }
-body.looney .sec-h h2 { color: #ffb74d; }
-
 /* Pets */
 .pet-emoji { width: 100%; aspect-ratio: 1; display: grid; place-items: center; font-size: 52px; background: #393b3d; border-radius: 8px; }
 .cat-img.pet-img { display: grid; place-items: center; font-size: 64px; }
 .pet-img-lg { width: 84px; height: 84px; display: grid; place-items: center; font-size: 56px; background: #393b3d; border-radius: 10px; flex: none; }
 
-/* ---------- Halloween theme (Oct 24 - Nov 2) ---------- */
+/* ---------- Halloween theme (Oct 6 - Nov 2) ---------- */
 .halloween-banner { display: block; background: linear-gradient(135deg, #6a1b9a, #ff6d00); color: #fff; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 18px #6a1b9a88; }
 .halloween-banner:hover { filter: brightness(1.1); }
 body.halloween { --blue: #ff6d00; }
@@ -447,6 +416,11 @@ body.halloween .btn-primary { background: #ff6d00; }
 body.halloween .btn-primary:hover { background: #ff8f00; }
 body.halloween::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .06;
   background: repeating-radial-gradient(circle at 50% 130%, #ff6d00 0 70px, transparent 70px 140px); }
+body.halloween h1, body.halloween h2 { color: #ffb74d; text-shadow: 0 2px 12px #ff6d0044; }
+body.halloween .sec-h h2 { color: #ff9800; }
+body.halloween .game-card { background: #221532; border: 1px solid #4a2c6a; }
+body.halloween .game-card:hover { border-color: #ff6d00; box-shadow: 0 4px 20px #ff6d0033; }
+body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .hw-hero { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; background: linear-gradient(135deg, #2a1445, #4a1e00); border-radius: 16px; padding: 22px; margin-bottom: 18px; }
 .hw-hero-emoji { font-size: 72px; filter: drop-shadow(0 4px 12px #ff6d0088); }
 .hw-hero-text h1 { margin: 0 0 6px; color: #ffb74d; }
