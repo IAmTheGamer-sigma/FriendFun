@@ -43,6 +43,21 @@ const key = n => n.toLowerCase();
 const money = u => ({ funtix: Number(u.funtix) || 0 });
 const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
 
+// ---------- add-ons ----------
+const ADDONS = [
+  {
+    id: 'funworx',
+    name: 'FunWorx',
+    description: 'Connect your Funtopia identity to FunWorx. Share your avatar, name, and live game activity.',
+    permissions: [
+      { id: 'avatar', label: 'Avatar', description: 'Your Funtopia avatar' },
+      { id: 'name', label: 'Name', description: 'Your Funtopia username' },
+      { id: 'presence', label: 'Game Activity', description: 'What game you are currently playing' },
+    ],
+  },
+];
+const getAddonSettings = u => (u.addons && typeof u.addons === 'object') ? u.addons : {};
+
 async function seed() {
   const now = Date.now();
   const g = (id, name, creator, desc, tpl, visits, likes, dislikes, max_players = 30) =>
@@ -257,6 +272,45 @@ app.put('/api/me/bio', auth, async (req, res) => {
   const bio = filter(req.body?.bio || '').slice(0, 300); 
   await supabase.from('users').update({ bio }).eq('name', req.user.name);
   res.json({ ok: true }); 
+});
+
+// ---------- add-ons ----------
+app.get('/api/addons', auth, async (req, res) => {
+  const settings = getAddonSettings(req.user);
+  res.json({ addons: ADDONS.map(a => ({ ...a, settings: { enabled: false, avatar: true, name: true, presence: true, ...(settings[a.id] || {}) } })) });
+});
+
+app.post('/api/addons/:id', auth, async (req, res) => {
+  const addon = ADDONS.find(a => a.id === req.params.id);
+  if (!addon) return res.status(404).json({ error: 'No such add-on' });
+  const body = req.body || {};
+  const s = {
+    enabled: !!body.enabled,
+    avatar: body.avatar !== false,
+    name: body.name !== false,
+    presence: body.presence !== false,
+  };
+  const addons = { ...getAddonSettings(req.user), [addon.id]: s };
+  const { error } = await supabase.from('users').update({ addons }).eq('name', req.user.name);
+  if (error) return res.status(500).json({ error: 'Could not save add-on settings' });
+  res.json({ ok: true, settings: s });
+});
+
+// FunWorx reads the authenticated user's shared Funtopia identity.
+// Only returns what the user enabled in the FunWorx add-on settings.
+app.get('/api/addons/funworx/me', auth, async (req, res) => {
+  const u = req.user;
+  const s = getAddonSettings(u).funworx || {};
+  if (!s.enabled) return res.status(403).json({ error: 'FunWorx add-on is not enabled' });
+  const out = {};
+  if (s.name !== false) out.name = u.name;
+  if (s.avatar !== false) out.avatar = u.avatar || null;
+  if (s.presence !== false) {
+    const st = await statusOf(u.name);
+    out.online = !!st.online;
+    if (st.gameId) { out.gameId = st.gameId; out.gameName = st.gameName || ''; }
+  }
+  res.json(out);
 });
 
 app.post('/api/buy/:item', auth, async (req, res) => {
