@@ -432,11 +432,16 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .hw-hero-text h1 { margin: 0 0 6px; color: #ffb74d; }
 .hw-thumb { aspect-ratio: 1; display: grid; place-items: center; font-size: 64px; background: radial-gradient(circle at 50% 35%, #3a2456, #170b28); border-radius: 8px; }
 
-/* ---------- in-game inventory hotbar + kill feed ---------- */
-.inv-bar { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 6; }
-.inv-item { width: 44px; height: 44px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(0,0,0,.55); font-size: 24px; cursor: pointer; display: grid; place-items: center; transition: transform .1s; }
-.inv-item:hover { transform: scale(1.12); }
-.inv-item.active { border-color: #ffd400; box-shadow: 0 0 10px #ffd40088; }
+/* ---------- in-game gear toolbar (Roblox-style) + kill feed ---------- */
+.inv-bar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 6; background: rgba(10,10,14,.55); border: 1px solid rgba(255,255,255,.12); padding: 8px 10px; border-radius: 14px; backdrop-filter: blur(4px); align-items: stretch; }
+.inv-item { position: relative; width: 68px; min-height: 64px; border-radius: 10px; border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px 5px; transition: transform .1s, border-color .1s; font-family: inherit; }
+.inv-item:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.5); }
+.inv-item.active { border-color: #ffd400; box-shadow: 0 0 12px #ffd40088; background: rgba(255,212,0,.12); }
+.inv-key { position: absolute; top: 2px; left: 6px; font-size: 10px; opacity: .55; }
+.inv-emoji { font-size: 26px; line-height: 1; }
+.inv-name { font-size: 10px; opacity: .9; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-empty { color: rgba(255,255,255,.65); font-size: 12px; padding: 8px 10px; }
+.inv-empty a { color: #ffd400; }
 .kill-feed { position: absolute; left: 12px; top: 76px; display: flex; flex-direction: column; gap: 4px; z-index: 6; pointer-events: none; }
 .kill-item { background: rgba(0,0,0,.6); border-left: 3px solid #e53935; color: #fff; font-size: 13px; padding: 5px 10px; border-radius: 6px; animation: kfin .25s ease-out; }
 @keyframes kfin { from { transform: translateX(-12px); opacity: 0; } }
