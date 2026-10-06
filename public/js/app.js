@@ -174,7 +174,6 @@ function shell(active, content) {
   <main class="content">${content}</main>`;
 }
 function mount(active, html, after) {
-  document.body.classList.toggle('looney', looneyThemeActive());
   document.body.classList.toggle('halloween', halloweenActive());
   app.className = ''; app.innerHTML = shell(active, html);
   const userBtn = app.querySelector('.tb-user');
@@ -295,9 +294,7 @@ async function homePage() {
   const recent = me.recent.map(id => byId[id]).filter(Boolean);
   const favs = me.favorites.map(id => byId[id]).filter(Boolean);
   const friends = fr.friends.sort((a, b) => (b.online - a.online) || (!!b.gameId - !!a.gameId));
-  mount('home', `
-    ${looneyActive() ? `<a class="looney-banner" href="#/looney">🥕 <b>Looney Tunes Event is live!</b> Earn 20 Looney Coins for Bugs Bunny, Daffy Duck & an exclusive badge &rsaquo;</a>` : ''}
-    ${halloweenActive() ? `<a class="halloween-banner" href="#/halloween">🎃 <b>Halloween is here!</b> Spooky games, costumes & double daily FunTix &rsaquo;</a>` : ''}
+  mount('home', `    ${halloweenActive() ? `<a class="halloween-banner" href="#/halloween">🎃 <b>Halloween is here!</b> Spooky games, costumes & double daily FunTix &rsaquo;</a>` : ''}
     <div class="home-head">${avatarImgTag(me.avatar, "headshot", "home-avatar")}<h1>Hello, ${esc(me.name)}!</h1></div>
     <section><div class="sec-h"><h2>Friends (${friends.length})</h2><a href="#/friends">See All &rsaquo;</a></div>
       <div class="friends-row">${friends.length ? friends.map(userTile).join('') : `<a class="add-friends" href="#/friends"><span>+</span>Add Friends</a>`}</div></section>
@@ -356,7 +353,7 @@ async function playPage(id) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=1d8bc4af');
+  const { Game } = await import('./game.js?v=ba05ce9f');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -501,14 +498,7 @@ async function dmPage(name) {
   });
   refreshNotif();
 }
-const LOONEY_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
-const LOONEY_THEME_DATES = { starts: Date.parse('2026-10-05T00:00:00Z'), ends: Date.parse('2026-10-27T00:00:00Z') };
-const HALLOWEEN_DATES = { starts: Date.parse('2026-10-24T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
-// Voxel character art for the Looney Tunes event page (same box data as the in-game characters).
-// Each box: [dx,dy,dz,w,h,d,color]
-const LOONEY_CHAR_ART = {"bugs":[[0,2,0,3,4,2,"#9e9e9e"],[0,5.2,0,2.8,2.8,2.6,"#9e9e9e"],[0,4.9,1.4,1.6,1,0.5,"#ffffff"],[-0.35,4.3,1.45,0.5,0.7,0.3,"#ffffff"],[0.35,4.3,1.45,0.5,0.7,0.3,"#ffffff"],[-0.7,8,0,0.9,3.2,0.7,"#9e9e9e"],[0.7,8,0,0.9,3.2,0.7,"#9e9e9e"],[-0.7,8,0.28,0.45,2.2,0.25,"#f8bbd0"],[0.7,8,0.28,0.45,2.2,0.25,"#f8bbd0"],[-0.7,5.7,1.32,0.55,0.7,0.2,"#212121"],[0.7,5.7,1.32,0.55,0.7,0.2,"#212121"],[0,2.2,-1.35,1.3,1.3,0.8,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,2,"#9e9e9e"],[0.9,0.4,0.3,1.1,0.8,2,"#9e9e9e"],[-1.75,2.5,0,0.8,2.4,0.8,"#9e9e9e"],[1.75,2.5,0,0.8,2.4,0.8,"#9e9e9e"]],"daffy":[[0,2,0,3,4,2.2,"#212121"],[0,3.9,0,3.2,0.7,2.4,"#ffffff"],[0,5.3,0,2.6,2.6,2.4,"#212121"],[0,5.0,1.5,1.7,0.9,1.0,"#ff9800"],[-0.65,5.9,1.15,0.6,0.8,0.25,"#ffffff"],[0.65,5.9,1.15,0.6,0.8,0.25,"#ffffff"],[-0.65,5.9,1.28,0.25,0.35,0.1,"#212121"],[0.65,5.9,1.28,0.25,0.35,0.1,"#212121"],[0,7.1,0,1.2,1.0,1.2,"#212121"],[-0.9,0.35,0.4,1.2,0.7,2.2,"#ff9800"],[0.9,0.35,0.4,1.2,0.7,2.2,"#ff9800"],[-1.7,2.6,0,0.7,2.2,2.6,"#212121"],[1.7,2.6,0,0.7,2.2,2.6,"#212121"]],"tweety":[[0,1.8,0,2.6,3.2,2.2,"#ffeb3b"],[0,4.6,0,3.4,3.2,3.0,"#ffeb3b"],[-0.8,5.2,1.5,0.9,1.1,0.25,"#ffffff"],[0.8,5.2,1.5,0.9,1.1,0.25,"#ffffff"],[-0.8,5.2,1.62,0.4,0.5,0.1,"#1565c0"],[0.8,5.2,1.62,0.4,0.5,0.1,"#1565c0"],[0,4.3,1.6,1.0,0.7,0.7,"#ff9800"],[0,6.6,0,1.6,0.9,1.6,"#ffeb3b"],[-0.7,0.3,0.3,1.0,0.6,1.8,"#ff9800"],[0.7,0.3,0.3,1.0,0.6,1.8,"#ff9800"],[-1.5,2.2,0,0.6,1.8,1.2,"#ffeb3b"],[1.5,2.2,0,0.6,1.8,1.2,"#ffeb3b"]],"sylvester":[[0,2,0,3,4,2.2,"#212121"],[0,2,1.15,1.8,2.6,0.4,"#ffffff"],[0,5.3,0,2.8,2.8,2.6,"#212121"],[0,4.8,1.35,1.7,1.2,0.5,"#ffffff"],[0,5.15,1.6,0.5,0.4,0.3,"#e53935"],[-1.1,7,0,0.9,1.4,0.8,"#212121"],[1.1,7,0,0.9,1.4,0.8,"#212121"],[-0.7,5.8,1.32,0.55,0.7,0.2,"#ffffff"],[0.7,5.8,1.32,0.55,0.7,0.2,"#ffffff"],[0,2.2,-1.4,1.0,1.0,1.6,"#212121"],[-0.9,0.4,0.3,1.1,0.8,2,"#212121"],[0.9,0.4,0.3,1.1,0.8,2,"#212121"]],"porky":[[0,2,0,3.2,4,2.4,"#f48fb1"],[0,5.2,0,2.8,2.6,2.6,"#f48fb1"],[0,4.9,1.4,1.4,1.1,0.7,"#f06292"],[-0.35,4.9,1.78,0.25,0.25,0.15,"#4e342e"],[0.35,4.9,1.78,0.25,0.25,0.15,"#4e342e"],[-1,6.9,0,0.8,1.2,0.6,"#f48fb1"],[1,6.9,0,0.8,1.2,0.6,"#f48fb1"],[-0.75,5.7,1.32,0.55,0.7,0.2,"#ffffff"],[0.75,5.7,1.32,0.55,0.7,0.2,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,1.8,"#f48fb1"],[0.9,0.4,0.3,1.1,0.8,1.8,"#f48fb1"],[0,2.2,-1.5,0.4,0.4,1.2,"#f06292"]],"elmer":[[0,2,0,3,4,2,"#6d4c41"],[0,5.2,0,2.6,2.6,2.4,"#ffcc99"],[-0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0,4.7,1.25,1.2,0.35,0.25,"#8d6e63"],[0,6.9,0,3.4,0.7,3.2,"#4e342e"],[0,7.9,0,2.0,1.6,2.0,"#4e342e"],[-0.9,0.4,0.2,1.1,0.8,1.8,"#3e2723"],[0.9,0.4,0.2,1.1,0.8,1.8,"#3e2723"],[2.2,3.2,0.6,0.7,3.4,0.7,"#5d4037"]],"marvin":[[0,2,0,3,3.6,2,"#2e7d32"],[0,4.9,0,2.6,2.6,2.4,"#212121"],[-0.6,5.3,1.22,0.7,0.9,0.2,"#ffffff"],[0.6,5.3,1.22,0.7,0.9,0.2,"#ffffff"],[0,6.6,0,3.0,1.2,2.8,"#9e9e9e"],[0,7.6,0,1.8,1.2,1.8,"#9e9e9e"],[0,8.5,-0.2,0.7,0.9,2.2,"#e53935"],[-0.9,0.35,0.2,1.0,0.7,1.6,"#212121"],[0.9,0.35,0.2,1.0,0.7,1.6,"#212121"],[-1.7,2.4,0,0.7,1.8,0.7,"#2e7d32"],[1.7,2.4,0,0.7,1.8,0.7,"#2e7d32"]],"foghorn":[[0,2.2,0,3.4,4.4,2.6,"#ffffff"],[0,5.6,0,2.6,2.6,2.4,"#ffffff"],[0,6.3,1.3,1.2,0.9,0.9,"#ff9800"],[-0.65,6.1,1.22,0.55,0.7,0.2,"#212121"],[0.65,6.1,1.22,0.55,0.7,0.2,"#212121"],[0,7.3,0,1.8,1.0,0.6,"#e53935"],[0,4.9,1.35,0.8,1.2,0.4,"#e53935"],[-1.9,2.8,0,0.8,2.6,1.4,"#ffffff"],[1.9,2.8,0,0.8,2.6,1.4,"#ffffff"],[0,2.6,-1.8,1.6,2.4,1.0,"#2e7d32"],[-0.8,0.35,0.3,1.0,0.7,2.0,"#ff9800"],[0.8,0.35,0.3,1.0,0.7,2.0,"#ff9800"]],"pepe":[[0,2,0,3,4,2.2,"#212121"],[0,2,1.2,1.4,3.4,0.35,"#ffffff"],[0,5.2,0,2.6,2.6,2.4,"#212121"],[0,6.2,0.6,1.2,1.6,1.4,"#ffffff"],[0,4.9,1.3,0.9,0.7,0.6,"#212121"],[-0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0.65,5.7,1.22,0.5,0.6,0.2,"#ffffff"],[0,3,-2.2,2.4,3.4,1.6,"#212121"],[0,3,-2.2,1.2,2.6,1.7,"#ffffff"],[-0.9,0.4,0.3,1.1,0.8,1.8,"#212121"],[0.9,0.4,0.3,1.1,0.8,1.8,"#212121"]],"speedy":[[0,1.2,0,1.8,2.2,1.4,"#8d6e63"],[0,2.9,0,1.6,1.6,1.4,"#8d6e63"],[0,2.7,0.75,0.7,0.5,0.4,"#d7ccc8"],[-0.4,3.2,0.72,0.3,0.35,0.15,"#212121"],[0.4,3.2,0.72,0.3,0.35,0.15,"#212121"],[-0.9,3.6,0,0.5,0.7,0.3,"#8d6e63"],[0.9,3.6,0,0.5,0.7,0.3,"#8d6e63"],[0,4.1,0,5.5,0.5,5.5,"#ffca3a"],[0,5.0,0,2.2,1.8,2.2,"#ffb300"],[-0.5,0.25,0.2,0.6,0.5,1.2,"#8d6e63"],[0.5,0.25,0.2,0.6,0.5,1.2,"#8d6e63"],[0,1.2,-1.0,0.3,0.3,1.4,"#d7ccc8"]],"granny":[[0,1.8,0,3.2,3.6,2.4,"#5c6bc0"],[0,4.6,0,2.4,2.4,2.2,"#ffcc99"],[0,6.0,-0.3,1.4,1.2,1.4,"#9e9e9e"],[-0.6,5.0,1.12,0.45,0.55,0.2,"#212121"],[0.6,5.0,1.12,0.45,0.55,0.2,"#212121"],[-0.9,5.9,0.6,1.2,0.5,0.5,"#eeeeee"],[0.9,5.9,0.6,1.2,0.5,0.5,"#eeeeee"],[0,4.3,1.15,0.9,0.3,0.2,"#8d6e63"],[-1.8,2.6,0,0.7,2.0,0.7,"#5c6bc0"],[1.8,2.6,0,0.7,2.0,0.7,"#5c6bc0"]],"wile":[[0,2.2,0,2.8,4.4,2.0,"#8d6e63"],[0,5.4,0.2,2.4,2.4,2.2,"#8d6e63"],[0,5.0,1.6,1.2,1.0,1.2,"#a1887f"],[0,5.0,2.25,0.4,0.3,0.2,"#212121"],[-1.0,7.0,0,0.8,1.6,0.7,"#8d6e63"],[1.0,7.0,0,0.8,1.6,0.7,"#8d6e63"],[-0.6,5.9,1.15,0.5,0.65,0.2,"#ffffff"],[0.6,5.9,1.15,0.5,0.65,0.2,"#ffffff"],[0,2.4,-1.6,1.0,1.0,1.8,"#8d6e63"],[-0.8,0.4,0.3,1.0,0.8,1.8,"#8d6e63"],[0.8,0.4,0.3,1.0,0.8,1.8,"#8d6e63"]],"roadrunner":[[0,2.4,0,2.2,3.6,1.8,"#1976d2"],[0,5.0,0.2,2.0,2.0,1.8,"#1976d2"],[0,4.8,1.3,0.9,0.6,0.9,"#ff9800"],[-0.5,5.4,0.95,0.4,0.5,0.2,"#ffffff"],[0.5,5.4,0.95,0.4,0.5,0.2,"#ffffff"],[0,6.3,-0.2,0.5,1.2,1.8,"#0d47a1"],[-0.7,1.0,0,0.5,2.0,0.5,"#ff9800"],[0.7,1.0,0,0.5,2.0,0.5,"#ff9800"],[-0.7,0.2,0.3,0.7,0.4,1.4,"#ff9800"],[0.7,0.2,0.3,0.7,0.4,1.4,"#ff9800"],[0,2.8,-1.4,1.2,1.6,1.2,"#0d47a1"],[-1.3,3.0,0,0.5,1.6,1.0,"#1976d2"],[1.3,3.0,0,0.5,1.6,1.0,"#1976d2"]],"taz":[[0,3,0,6,6,5,"#6d4c41"],[0,7.2,0,4.6,3.2,4.2,"#6d4c41"],[0,6.6,2.15,3.0,1.6,0.5,"#3e2723"],[0,2.6,2.55,3.4,3.4,0.4,"#d7ccc8"],[-1.6,9.2,0,0.9,1.2,0.9,"#6d4c41"],[1.6,9.2,0,0.9,1.2,0.9,"#6d4c41"],[-3.4,3.4,0,1.0,2.6,1.0,"#6d4c41"],[3.4,3.4,0,1.0,2.6,1.0,"#6d4c41"]],"sam":[[0,3,0,5,6,4,"#b71c1c"],[0,7.4,0,3,3,2.8,"#ffcc99"],[0,9.1,0,5.6,0.8,5.2,"#4e342e"],[0,10.3,0,3,2.4,3,"#4e342e"],[-0.8,6.9,1.5,1.2,0.5,0.3,"#ffffff"],[0.8,6.9,1.5,1.2,0.5,0.3,"#ffffff"],[0,7.4,1.55,0.6,0.7,0.5,"#e53935"],[-3,4,0,0.9,2.6,0.9,"#b71c1c"],[3,4,0,0.9,2.6,0.9,"#b71c1c"]]};
-const LOONEY_GAME_CHAR = {"1":"bugs","2":"daffy","3":"porky","4":"tweety","5":"sylvester","6":"roadrunner","7":"wile","8":"taz","9":"elmer","10":"marvin","11":"foghorn","12":"pepe","13":"speedy","14":"sam","15":"granny","16":"wile","17":"bugs","18":"bugs","19":"daffy","20":"bugs"};
-const looneyCharFor = id => { const m = /(\d+)$/.exec(String(id || '')); return LOONEY_GAME_CHAR[m ? +m[1] : 0] || 'bugs'; };
+const HALLOWEEN_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
 function shadeHex(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
   const cl = v => Math.max(0, Math.min(255, v));
@@ -550,46 +540,7 @@ function drawVoxel(canvas, boxes) {
     poly([P2(x0, y1, z0), P2(x1, y1, z0), P2(x1, y1, z1), P2(x0, y1, z1)]);
   }
 }
-function paintLooneyChars(root) {
-  (root || document).querySelectorAll('canvas.looney-char').forEach(cv => {
-    const art = LOONEY_CHAR_ART[cv.dataset.char];
-    if (art) drawVoxel(cv, art);
-  });
-}
-
-const looneyActive = () => { const n = Date.now(); return n >= LOONEY_DATES.starts && n <= LOONEY_DATES.ends; };
-const looneyThemeActive = () => { const n = Date.now(); return n >= LOONEY_THEME_DATES.starts && n <= LOONEY_THEME_DATES.ends; };
 const halloweenActive = () => { const n = Date.now(); return n >= HALLOWEEN_DATES.starts && n <= HALLOWEEN_DATES.ends; };
-async function looneyPage() {
-  const ev = await api('GET', '/api/event/looney');
-  const pct = Math.min(100, Math.round(ev.coins / ev.need * 100));
-  const daysLeft = Math.max(0, Math.ceil((ev.ends - Date.now()) / 86400000));
-  mount('looney', `
-    <div class="looney-hero" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
-      <canvas class="looney-char looney-hero-char" width="300" height="300" data-char="bugs" style="width:150px;height:150px;flex:none"></canvas>
-      <div class="looney-hero-text">
-      <h1>🥕 Looney Tunes Event</h1>
-      <p>Beat event games to earn <b>Looney Coins</b> \u2014 one per game. Collect all <b>20</b> for limited rewards!</p>
-      <div class="looney-progress"><div class="looney-bar" style="width:${pct}%"></div><span>${ev.coins} / ${ev.need} Looney Coins</span></div>
-      <p class="muted">${ev.active ? `Ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} \u2014 don't miss out!` : (Date.now() < ev.starts ? 'Starts October 6 \u2014 get ready!' : 'This event has ended.')}</p>
-      ${ev.claimed ? '<p class="looney-claimed">\U0001F389 You earned it all! Check your avatar editor and badges.</p>' : ''}
-      </div>
-    </div>
-    <section><div class="sec-h"><h2>Limited Rewards</h2></div>
-      <div class="looney-rewards">
-        <div class="looney-reward"><canvas class="looney-char lr-char" width="180" height="180" data-char="bugs" style="width:84px;height:84px"></canvas><b>Bugs Bunny</b><span class="muted small">Ears + buck teeth set</span></div>
-        <div class="looney-reward"><canvas class="looney-char lr-char" width="180" height="180" data-char="daffy" style="width:84px;height:84px"></canvas><b>Daffy Duck</b><span class="muted small">Feather tuft + bill set</span></div>
-        <div class="looney-reward"><div class="lr-emoji">🪙</div><b>Looney Tunes Badge</b><span class="muted small">Exclusive event badge</span></div>
-      </div></section>
-    <section><div class="sec-h"><h2>Event Games (${ev.games.length})</h2></div>
-      <div class="game-row">${ev.games.map(g => `
-        <a class="game-card" href="#/play/${g.id}">
-          <div class="gc-thumb looney-thumb" style="background:radial-gradient(circle at 50% 35%,#fff8e1,#ffe0b2);border-radius:8px;overflow:hidden"><canvas class="looney-char" width="240" height="240" data-char="${looneyCharFor(g.id)}" style="width:100%;height:auto;display:block"></canvas></div>
-          <b>${esc(g.name)}</b><span class="muted small">${fmt(g.visits)} plays</span>
-          ${ev.wins.includes(g.id) ? '<span class="looney-check" title="Looney Coin earned!">🪙</span>' : ''}
-        </a>`).join('') || '<p class="muted">Games are being prepared\u2026</p>'}</div></section>`);
-  paintLooneyChars();
-}
 const HALLOWEEN_EMOJI = { g_halloween01: '👻', g_halloween02: '🎃', g_halloween03: '🧙', g_halloween04: '💀', g_halloween05: '🦇' };
 async function halloweenPage() {
   let ev = null;
@@ -873,7 +824,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=1d8bc4af');
+      const { Game: GameClass } = await import('./game.js?v=ba05ce9f');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1143,7 +1094,6 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
-      case 'looney': return await looneyPage();
       case 'halloween': return await halloweenPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
       case 'groups': return await groupsPage();
