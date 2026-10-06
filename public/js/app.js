@@ -107,6 +107,7 @@ const icons = {
   trophy: '<svg viewBox="0 0 24 24"><path d="M6 3h12v2h3v3a5 5 0 0 1-4.6 5A6 6 0 0 1 13 16.9V19h4v2H7v-2h4v-2.1A6 6 0 0 1 7.6 13 5 5 0 0 1 3 8V5h3zM5 7v1a3 3 0 0 0 1.3 2.5C6.1 9.7 6 8.9 6 8V7zm13 0v1c0 .9-.1 1.7-.3 2.5A3 3 0 0 0 19 8V7z"/></svg>',
   thumb: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M2 10h4v11H2zM8 21V10l5-8c1.5 0 2.5 1 2.2 2.6L14.5 9H21c1 0 2 1 1.7 2.2l-2 8.3c-.2.9-1 1.5-2 1.5z"/></svg>',
   people: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM0 20c0-4 3.5-7 8-7s8 3 8 7zm17 0c0-2-.7-4-2-5.3 4.5-.8 9 1 9 5.3z"/></svg>',
+  puzzle: '<svg viewBox="0 0 24 24"><path d="M10 2h4v3a2 2 0 1 0 3 0h3v4h-3a2 2 0 1 0 0 3v3h-4v-3a2 2 0 1 0-3 0H7v-4h3a2 2 0 1 0 0-3z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
 };
 
 const ADMIN = '<span class="admin-badge">ADMIN</span>';
@@ -166,7 +167,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -1063,6 +1064,39 @@ function funtixPage() {
     </div>`);
 }
 
+async function addonsPage() {
+  const { addons } = await api('GET', '/api/addons');
+  mount('addons', `<h1>Add-ons</h1><p class="muted">Connect Funtopia to other apps. You control exactly what each add-on can see.</p>
+    <div class="addon-list">${addons.map(a => `
+      <div class="addon-card" data-addon="${esc(a.id)}">
+        <div class="addon-head">
+          <div><h2>${esc(a.name)}</h2><p class="muted">${esc(a.description)}</p></div>
+          <label class="switch"><input type="checkbox" class="addon-enabled" ${a.settings.enabled ? 'checked' : ''}><span></span></label>
+        </div>
+        <div class="addon-perms ${a.settings.enabled ? '' : 'disabled'}">
+          ${a.permissions.map(p => `
+            <label class="addon-perm"><input type="checkbox" data-perm="${esc(p.id)}" ${a.settings[p.id] !== false ? 'checked' : ''} ${a.settings.enabled ? '' : 'disabled'}>
+              <div><strong>${esc(p.label)}</strong><div class="muted small">${esc(p.description)}</div></div>
+            </label>`).join('')}
+        </div>
+      </div>`).join('') || '<p class="muted">No add-ons available yet.</p>'}
+    </div>`, () => {
+      document.querySelectorAll('.addon-card').forEach(card => {
+        const id = card.dataset.addon;
+        const enabledEl = card.querySelector('.addon-enabled');
+        const save = async () => {
+          const settings = { enabled: enabledEl.checked };
+          card.querySelectorAll('[data-perm]').forEach(cb => { settings[cb.dataset.perm] = cb.checked; });
+          const r = await api('POST', '/api/addons/' + encodeURIComponent(id), settings);
+          if (r.ok) { toast(esc(id) + (settings.enabled ? ' enabled' : ' disabled')); addonsPage(); }
+          else toast('Could not save');
+        };
+        enabledEl.addEventListener('change', save);
+        card.querySelectorAll('[data-perm]').forEach(cb => cb.addEventListener('change', save));
+      });
+    });
+}
+
 // ---------- router ----------
 let routing = 0;
 async function route() {
@@ -1093,6 +1127,7 @@ async function route() {
       case 'club': return clubPage();
       case 'admin': return await adminPage();
       case 'funtix': case 'funbux': return funtixPage();
+      case 'addons': return await addonsPage();
       default: return await homePage();
     }
   } catch (e) {
