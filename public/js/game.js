@@ -139,7 +139,12 @@ export class Game {
   }
   toolbarGears() {
     const gears = this.ownedGears().map(g => ({ id: g.id, name: g.name, emoji: g.emoji || '📦', temp: false }));
-    if (this.o.shooter && !gears.some(g => g.id === 'gear_blaster'))
+    for (const id of (this.o.gameGears || [])) {
+      const it = ITEM[id];
+      if (it && it.type === 'gear' && !gears.some(x => x.id === id))
+        gears.push({ id, name: it.name, emoji: it.emoji || '📦', temp: true });
+    }
+    if (this.o.shooter && !gears.some(x => x.id === 'gear_blaster'))
       gears.unshift({ id: 'gear_blaster', name: 'Arena Blaster', emoji: '🔫', temp: true });
     return gears;
   }
