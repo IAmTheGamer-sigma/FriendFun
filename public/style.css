@@ -433,7 +433,7 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .hw-thumb { aspect-ratio: 1; display: grid; place-items: center; font-size: 64px; background: radial-gradient(circle at 50% 35%, #3a2456, #170b28); border-radius: 8px; }
 
 /* ---------- in-game gear toolbar (Roblox-style) + kill feed ---------- */
-.inv-bar { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 6; background: rgba(10,10,14,.55); border: 1px solid rgba(255,255,255,.12); padding: 8px 10px; border-radius: 14px; backdrop-filter: blur(4px); align-items: stretch; }
+.inv-bar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 6; background: rgba(10,10,14,.55); border: 1px solid rgba(255,255,255,.12); padding: 8px 10px; border-radius: 14px; backdrop-filter: blur(4px); align-items: stretch; }
 .inv-item { position: relative; width: 68px; min-height: 64px; border-radius: 10px; border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px 5px; transition: transform .1s, border-color .1s; font-family: inherit; }
 .inv-item:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.5); }
 .inv-item.active { border-color: #ffd400; box-shadow: 0 0 12px #ffd40088; background: rgba(255,212,0,.12); }
