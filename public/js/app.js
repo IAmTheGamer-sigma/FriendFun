@@ -65,7 +65,7 @@ function buildCharacter(avatar) {
   return _avatar3d.buildCharacter(avatar);
 }
 import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=a85c7a51';
-import { templates } from './worlds.js?v=NEW_SHA';
+import { templates } from './worlds.js?v=542bb3d8';
 import { startSpooky, stopSpooky } from './sound.js?v=89850e26';
 
 const app = document.getElementById('app');
