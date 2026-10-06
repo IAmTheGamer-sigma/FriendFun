@@ -144,6 +144,7 @@ export const templates = { baseplate, obby, hangout, tower, coinRush, shooterAre
 
 export function shooterArena() {
   const w = startWorld('#ff9e57');
+  w.shooter = true;
   w.parts.push(part([0, -0.5, 0], [70, 1, 70], '#8d8d94', { name: 'ArenaFloor' }));
   const wh = 8;
   w.parts.push(part([0, wh / 2, -35], [70, wh, 2], '#5c5c66', { name: 'WallN' }));
