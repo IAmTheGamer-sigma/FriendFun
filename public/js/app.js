@@ -65,7 +65,7 @@ function buildCharacter(avatar) {
   return _avatar3d.buildCharacter(avatar);
 }
 import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=4721cc9b';
-import { templates } from './worlds.js';
+import { templates } from './worlds.js?v=63010f18';
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
