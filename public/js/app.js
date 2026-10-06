@@ -365,7 +365,8 @@ async function playPage(id) {
 
 // ---------- avatar editor ----------
 const SKIN = ['#f5cd30', '#ffcc99', '#e8b98a', '#c68e5b', '#8d5524', '#5c3a1e', '#ffffff', '#a3a2a5', '#1b2a35', '#0d69ac', '#6e99ca', '#2f8cff', '#a4bd47', '#4b974b', '#287f47', '#c4281c', '#ff66cc', '#8a4bd8', '#da8541', '#ffd400', '#000000', '#7c5c46'];
-function avatarPage(tab = 'body') {
+async function avatarPage(tab = 'body') {
+  try { await ensureAvatar3d(); } catch {}
   const av = structuredClone(me.avatar); av.head ??= 'head_classic';
   let part = 'all';
   mount('avatar', `
