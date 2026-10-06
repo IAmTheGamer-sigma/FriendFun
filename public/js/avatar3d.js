@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES } from './catalog.js';
+import { ITEM, BADGES, PET_MODELS } from './catalog.js';
 import { renderToDataURL } from './three-util.js';
 
 const faceCache = {}, shirtCache = {};
@@ -211,6 +211,20 @@ export function buildCharacter(avatar) {
     lleg = limb(-0.5, 2, C.lleg); rleg = limb(0.5, 2, C.rleg);
   }
   root.userData.limbs = { larm, rarm, lleg, rleg, head: headPivot, torso };
+  const petSpec = PET_MODELS[avatar.pet];
+  if (petSpec) {
+    const pet = new THREE.Group();
+    for (const b of petSpec.boxes) {
+      const m = box(b[3], b[4], b[5], b[6]);
+      m.position.set(b[0], b[1], b[2]);
+      if (b[7]) m.rotation.z = b[7];
+      pet.add(m);
+    }
+    pet.position.set(1.9, 0, 0.6);
+    pet.rotation.y = -0.4;
+    root.add(pet);
+    root.userData.pet = pet;
+  }
   return root;
 }
 
