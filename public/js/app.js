@@ -1160,4 +1160,64 @@ setInterval(async () => {
 }, 20000);
 refreshNotif();
 
+// ---------- IKNOW GLITCH MODE ----------
+if (location.pathname.startsWith('/iknow')) {
+  const gs = document.createElement('style');
+  gs.textContent = `
+  @keyframes gshake { 0%{transform:translate(0)} 20%{transform:translate(-4px,3px) skewX(2deg)} 40%{transform:translate(5px,-2px)} 60%{transform:translate(-3px,-4px) skewX(-3deg)} 80%{transform:translate(4px,2px)} 100%{transform:translate(0)} }
+  @keyframes grgb { 0%,100%{text-shadow:2px 0 #f0f,-2px 0 #0ff} 25%{text-shadow:-3px 0 #f0f,3px 0 #0ff} 50%{text-shadow:1px 2px #f0f,-1px -2px #0ff} 75%{text-shadow:-2px -1px #f0f,2px 1px #0ff} }
+  @keyframes ghue { 0%,100%{filter:hue-rotate(0)} 50%{filter:hue-rotate(180deg)} }
+  @keyframes gflick { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.3} 94%{opacity:1} 97%{opacity:.6} 98%{opacity:1} }
+  @keyframes gslice { 0%,100%{clip-path:inset(0 0 0 0)} 10%{clip-path:inset(20% 0 60% 0)} 20%{clip-path:inset(0 0 0 0)} 35%{clip-path:inset(60% 0 10% 0)} 50%{clip-path:inset(0 0 0 0)} 70%{clip-path:inset(10% 0 70% 0)} 85%{clip-path:inset(0 0 0 0)} }
+  body.glitching #app { animation: gshake .25s infinite, gflick 3s infinite; }
+  body.glitching h1, body.glitching h2, body.glitching h3, body.glitching p, body.glitching a, body.glitching button, body.glitching span { animation: grgb .4s infinite !important; }
+  body.glitching img, body.glitching canvas { animation: ghue 2s infinite, gslice 1.5s infinite !important; }
+  body.glitching::after { content:''; position:fixed; inset:0; pointer-events:none; z-index:99999;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.15) 0 1px, transparent 1px 3px); mix-blend-mode:overlay; }
+  body.glitching::before { content:'I KNOW'; position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) rotate(-8deg);
+    font-size:15vw; font-weight:900; color:#f0f; z-index:100000; pointer-events:none; opacity:.12;
+    text-shadow:4px 0 #0ff, -4px 0 #ff0; animation:gflick .8s infinite; }`;
+  document.head.appendChild(gs);
+  document.body.classList.add('glitching');
+  // Flashing TV static overlay
+  const sc = document.createElement('canvas');
+  sc.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99998;pointer-events:none;opacity:0;mix-blend-mode:screen';
+  document.body.appendChild(sc);
+  const sctx = sc.getContext('2d');
+  sc.width = 160; sc.height = 90;
+  const sdata = sctx.createImageData(160, 90);
+  function drawStatic() {
+    const d = sdata.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      d[i] = v; d[i+1] = v; d[i+2] = v; d[i+3] = 255;
+    }
+    sctx.putImageData(sdata, 0, 0);
+  }
+  drawStatic();
+  (function staticLoop() {
+    drawStatic();
+    const r = Math.random();
+    sc.style.opacity = r < .12 ? (.5 + Math.random() * .5) : r < .4 ? (Math.random() * .25) : 0;
+    setTimeout(staticLoop, 60 + Math.random() * 120);
+  })();
+  const glyphs = '█▓▒░<>/\\|#@$%&?!01';
+  setInterval(() => {
+    const els = document.querySelectorAll('#app p, #app span, #app a, #app h1, #app h2, #app h3, #app button');
+    for (let i = 0; i < 6 && els.length; i++) {
+      const el = els[Math.floor(Math.random() * els.length)];
+      if (el.children.length || !el.textContent.trim()) continue;
+      const t = el.textContent;
+      const idx = Math.floor(Math.random() * t.length);
+      el.textContent = t.slice(0, idx) + glyphs[Math.floor(Math.random() * glyphs.length)] + t.slice(idx + 1);
+    }
+    if (Math.random() < .3 && els.length) {
+      const el = els[Math.floor(Math.random() * els.length)];
+      el.style.transform = `translate(${(Math.random() - .5) * 30}px, ${(Math.random() - .5) * 30}px)`;
+      setTimeout(() => el.style.transform = '', 180);
+    }
+  }, 400);
+  console.log('%cI KNOW', 'font-size:60px;color:#f0f;text-shadow:3px 0 #0ff');
+}
+
 route(); maybeSpooky();
