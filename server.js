@@ -1029,7 +1029,15 @@ wss.on('connection', (ws) => {
           looneyComplete = true;
         }
       }
-      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges, inventory, looneyWins }).eq('name', player.user.name).select().single();
+      const winUpdate = { funtix: (Number(player.user.funtix) || 0) + ECON.WIN_TIX, champ: true, earnedBadges, inventory, looneyWins };
+      let { data: updated, error } = await supabase.from('users').update(winUpdate).eq('name', player.user.name).select().single();
+      if (error) {
+        // If the looneyWins column is missing (migration not run), still grant the win reward
+        console.log('win update failed, retrying without looneyWins:', error.message);
+        looneyCoin = false; looneyComplete = false;
+        const retry = await supabase.from('users').update({ funtix: winUpdate.funtix, champ: true, earnedBadges, inventory }).eq('name', player.user.name).select().single();
+        updated = retry.data; error = retry.error;
+      }
       if (error || !updated) return send(ws, { t: 'error', error: 'Could not add FunTix' });
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned: ECON.WIN_TIX, ...(looneyCoin ? { looneyCoins: looneyWins.length } : {}) });
