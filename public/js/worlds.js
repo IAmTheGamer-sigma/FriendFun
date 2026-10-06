@@ -140,7 +140,57 @@ export function coinRush() {
   return w;
 }
 
-export const templates = { baseplate, obby, hangout, tower, coinRush };
+export const templates = { baseplate, obby, hangout, tower, coinRush, shooterArena, shooterFort, shooterRooftop };
+
+export function shooterArena() {
+  const w = startWorld('#ff9e57');
+  w.parts.push(part([0, -0.5, 0], [70, 1, 70], '#8d8d94', { name: 'ArenaFloor' }));
+  const wh = 8;
+  w.parts.push(part([0, wh / 2, -35], [70, wh, 2], '#5c5c66', { name: 'WallN' }));
+  w.parts.push(part([0, wh / 2, 35], [70, wh, 2], '#5c5c66', { name: 'WallS' }));
+  w.parts.push(part([-35, wh / 2, 0], [2, wh, 70], '#5c5c66', { name: 'WallW' }));
+  w.parts.push(part([35, wh / 2, 0], [2, wh, 70], '#5c5c66', { name: 'WallE' }));
+  for (const [x, z] of [[-12, -12], [12, -12], [-12, 12], [12, 12], [0, -18], [0, 18], [-18, 0], [18, 0], [-6, 6], [6, -6]])
+    w.parts.push(part([x, 2, z], [4, 4, 4], '#a1887f', { name: 'Crate', m: 'wood' }));
+  w.parts.push(part([0, 1, 0], [10, 2, 10], '#78909c', { name: 'Platform' }));
+  w.parts.push(part([0, 3.5, 0], [4, 1, 4], '#ffd400', { name: 'TopPad', m: 'neon' }));
+  for (const [x, z] of [[-28, -28], [28, -28], [-28, 28], [28, 28]])
+    w.parts.push(part([x, 0.25, z], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  return w;
+}
+
+export function shooterFort() {
+  const w = startWorld('#87ceeb');
+  w.parts.push(part([0, -0.5, 0], [90, 1, 90], '#7da87b', { name: 'Field' }));
+  for (const s of [-1, 1]) {
+    const z = s * 30;
+    w.parts.push(part([0, 3, z], [24, 6, 2], '#8d6e63', { name: 'FortWall', m: 'brick' }));
+    w.parts.push(part([-12, 3, z - s * 6], [2, 6, 14], '#8d6e63', { name: 'FortSide', m: 'brick' }));
+    w.parts.push(part([12, 3, z - s * 6], [2, 6, 14], '#8d6e63', { name: 'FortSide', m: 'brick' }));
+    w.parts.push(part([0, 5, z + s * 4], [6, 10, 6], '#6d4c41', { name: 'Tower', m: 'wood' }));
+    w.parts.push(part([0, 10.5, z + s * 4], [8, 1, 8], '#5d4037', { name: 'TowerTop', m: 'wood' }));
+    w.parts.push(part([-8, 0.25, z + s * 8], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+    w.parts.push(part([8, 0.25, z + s * 8], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  }
+  for (const [x, z] of [[-10, 0], [10, 0], [0, -8], [0, 8]])
+    w.parts.push(part([x, 1.5, z], [6, 3, 2], '#a1887f', { name: 'Barrier', m: 'wood' }));
+  return w;
+}
+
+export function shooterRooftop() {
+  const w = startWorld('#1a1a2e');
+  const roofs = [[0, 0, 0, 26], [-22, 2, -14, 18], [22, 2, 14, 18], [-20, 4, 16, 14], [20, 4, -16, 14], [0, 6, -28, 12]];
+  for (const [x, y, z, s] of roofs) {
+    w.parts.push(part([x, y - 0.5, z], [s, 1, s], '#4a4a5a', { name: 'Roof' }));
+    w.parts.push(part([x, y + 0.25, z], [4, 0.5, 4], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+    w.parts.push(part([x + s / 4, y + 1, z - s / 4], [3, 2, 3], '#5c5c66', { name: 'ACUnit' }));
+  }
+  w.parts.push(part([-11, 2.2, -7], [16, 0.6, 3], '#6a6a7a', { name: 'Bridge' }));
+  w.parts.push(part([11, 2.2, 7], [16, 0.6, 3], '#6a6a7a', { name: 'Bridge' }));
+  w.parts.push(part([0, 6.2, -14], [4, 0.6, 16], '#6a6a7a', { name: 'Bridge' }));
+  w.parts.push(part([0, -30, 0], [300, 1, 300], '#ff3b1f', { name: 'Void', k: 'kill', m: 'neon' }));
+  return w;
+}
 
 // ============ ORIGINAL HALLOWEEN WORLDS (hand-designed, Oct 2026) ============
 // Helper: floating candy coin
