@@ -355,9 +355,9 @@ async function playPage(id) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=f328ea52');
+  const { Game } = await import('./game.js?v=78e88485');
   const game = new Game(app.querySelector('.play-container'), {
-    world: g.world, gameId: g.id, gameName: g.name, shooter: g.event === 'shooter' || g.world?.shooter === true, me, token, funtix: me.funtix,
+    world: g.world, gameId: g.id, gameName: g.name, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
   });
   cleanup = () => game.destroy();
@@ -834,13 +834,13 @@ async function studioPage(id, tpl) {
   else { g = await api('GET', '/api/games/' + id); if (g.creator.toLowerCase() !== me.name.toLowerCase()) { toast('You can only edit your own games', true); location.hash = '#/games/' + id; return; } }
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
-  const { Studio } = await import('./studio.js?v=e0ab633');
+  const { Studio } = await import('./studio.js?v=a7a88890');
   const studio = new Studio(app.querySelector('.studio-container'), {
     gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=f328ea52');
+      const { Game: GameClass } = await import('./game.js?v=78e88485');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
