@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase } from './public/js/worlds.js';
+import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase, shooterArena, shooterFort, shooterRooftop } from './public/js/worlds.js';
 import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1521,10 +1521,34 @@ app.get('/api/event/halloween', auth, async (req, res) => {
   res.json({ id: e.id, name: e.name, starts: e.starts, ends: e.ends, active: halloweenActive(), games: games || [] });
 });
 
+// PvP shooter arenas (seeded once, never deleted)
+const SHOOTER_GAMES = [
+  { id: 'g_arena1', name: 'Block Arena', desc: 'Close-quarters shooter arena. Grab a gear and fight! 🔫', build: shooterArena },
+  { id: 'g_arena2', name: 'Fort Battle', desc: 'Storm the enemy fort in this team-style shooter battleground! 🏰', build: shooterFort },
+  { id: 'g_arena3', name: 'Rooftop Rumble', desc: 'Night-city rooftop shootout. Watch your step! 🌃', build: shooterRooftop },
+];
+async function seedShooterGames() {
+  try {
+    const { data: ex } = await supabase.from('games').select('id').in('id', SHOOTER_GAMES.map(g => g.id));
+    const have = new Set((ex || []).map(g => g.id));
+    let created = 0;
+    for (const cfg of SHOOTER_GAMES) {
+      if (have.has(cfg.id)) continue;
+      const world = cfg.build();
+      const { error } = await supabase.from('games').insert({ id: cfg.id, name: cfg.name, creator: 'Funtopia',
+        description: cfg.desc, world: sanitizeWorld(world), event: 'shooter',
+        visits: 0, likes: 0, dislikes: 0, max_players: 24, created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false });
+      if (error) console.warn('shooter fail', cfg.id, error.message); else created++;
+    }
+    return { created };
+  } catch (e) { console.warn('shooter err', e.message); return { created: 0 }; }
+}
+
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
 // Looney event deleted Oct 6, 2026: remove its games from the DB (prize kept via LOONEY_PRIZE grant)
 supabase.from('games').delete().eq('event', 'looney').then(() => console.log('looney games removed'));
 seedHalloweenGames().then(r => console.log('hw:', r.created));
+seedShooterGames().then(r => console.log('shooter:', r.created));
 server.listen(PORT, () => console.log(`Funtopia running on http://localhost:${PORT}`));
 
 export default app;
