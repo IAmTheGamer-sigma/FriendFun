@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=2f4a2dca';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=ecbc1237';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=1c94fecc';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=a85c7a51';
 
@@ -253,7 +253,7 @@ export class Game {
       if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) addBox(this.triggers);
     }
     this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
-    this.char = buildCharacter(this.me.avatar);
+    this.char = buildCharacter(this.me.avatar, { pet: false, gear: false });
     this.scene.add(this.char);
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.setPet(); this.setGear();
@@ -582,7 +582,7 @@ export class Game {
     this.jumpBuf = 0; this.coyote = 0; this.jumping = false;
     if (this.debris) { for (const d of this.debris) this.scene.remove(d.m); this.debris = null; }
     this.scene.remove(this.char);
-    this.char = buildCharacter(this.me.avatar); this.scene.add(this.char);
+    this.char = buildCharacter(this.me.avatar, { pet: false, gear: false }); this.scene.add(this.char);
     this.char.position.copy(this.pos);
     if (this.pet) { this.pet.position.copy(this.pos); this.pet.visible = true; }
     if (first) this.camYaw = Math.PI;
@@ -709,7 +709,7 @@ export class Game {
   hideLoading() { const l = this.c.querySelector('.loading'); if (l) { l.classList.add('fade'); setTimeout(() => l.remove(), 500); } }
   addPlayer(p) {
     if (this.players.has(p.id)) return;
-    const char = buildCharacter(p.avatar); char.add(makeNameTag(p.name, p.badge));
+    const char = buildCharacter(p.avatar, { pet: false, gear: false }); char.add(makeNameTag(p.name, p.badge));
     this.scene.add(char);
     const pet = buildPet(p.avatar?.pet);
     if (pet) { pet.position.copy(char.position); this.scene.add(pet); }
