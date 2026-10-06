@@ -157,7 +157,7 @@ const HEADS = {
 
 // Returns a THREE.Group; feet at y=0, facing +z. userData.limbs = { larm, rarm, lleg, rleg, head, torso }
 const BODY_SUITS = { head_bugs: '#9e9e9e', head_daffy: '#212121' };
-export function buildCharacter(avatar) {
+export function buildCharacter(avatar, opts = {}) {
   const C = { ...avatar.colors };
   const suitColor = BODY_SUITS[avatar.head];
   if (suitColor) for (const k of Object.keys(C)) C[k] = suitColor;
@@ -211,7 +211,7 @@ export function buildCharacter(avatar) {
     lleg = limb(-0.5, 2, C.lleg); rleg = limb(0.5, 2, C.rleg);
   }
   root.userData.limbs = { larm, rarm, lleg, rleg, head: headPivot, torso };
-  const petSpec = PET_MODELS[avatar.pet];
+  const petSpec = opts.pet === false ? null : PET_MODELS[avatar.pet];
   if (petSpec) {
     const pet = new THREE.Group();
     for (const b of petSpec.boxes) {
@@ -225,7 +225,7 @@ export function buildCharacter(avatar) {
     root.add(pet);
     root.userData.pet = pet;
   }
-  const gearSpec = GEAR_MODELS[avatar.gear];
+  const gearSpec = opts.gear === false ? null : GEAR_MODELS[avatar.gear];
   if (gearSpec) {
     const gear = new THREE.Group();
     for (const b of gearSpec.boxes) {
