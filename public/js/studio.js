@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { setupLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js';
+import { CATALOG } from './catalog.js?v=a85c7a51';
 
+const GEARS = CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const PRESETS = {
   part: { name: 'Part', s: [4, 1, 2], c: '#a3a2a5', k: 'part', m: 'plastic' },
@@ -631,11 +633,16 @@ export class Studio {
     d.innerHTML = `<div class="modal"><h2>Publish to Funtopia</h2>
       <label>Name<input class="pd-name" maxlength="50" value="${esc(this.name)}"></label>
       <label>Description<textarea class="pd-desc" maxlength="1000" rows="4">${esc(this.description)}</textarea></label>
+      <div class="pd-tools"><b>Game Tools</b><span class="muted small">Everyone who plays gets these in their toolbar.</span>
+        <div class="pd-gears">${GEARS.map(gr => `<label class="pd-gear"><input type="checkbox" data-gear="${gr.id}" ${(this.world.gears || []).includes(gr.id) ? 'checked' : ''}>${gr.emoji || '📦'} ${esc(gr.name)}</label>`).join('')}</div></div>
       <div class="modal-actions"><button class="btn-secondary pd-cancel">Cancel</button><button class="btn-primary pd-ok">Publish</button></div></div>`;
     document.body.appendChild(d);
     d.querySelector('.pd-cancel').onclick = () => d.remove();
     d.querySelector('.pd-ok').onclick = async () => {
       this.name = d.querySelector('.pd-name').value.trim() || 'Untitled Game'; this.description = d.querySelector('.pd-desc').value;
+      const gg = [...d.querySelectorAll('[data-gear]:checked')].map(c => c.dataset.gear);
+      if (gg.length) this.world.gears = gg; else delete this.world.gears;
+      this.markDirty();
       this.c.querySelector('.st-gname').textContent = this.name;
       const thumb = worldThumbnail(this.world);
       if (await this.save({ publish: true, thumbnail: thumb })) d.remove();
