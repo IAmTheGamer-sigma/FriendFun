@@ -98,6 +98,7 @@ export class Game {
         <div class="fp-players"></div>
         <h4>Self</h4>
         <div class="fp-row"><button class="btn-secondary fp-fly">✈️ Fly: OFF</button><button class="btn-secondary fp-spawn">TP to Spawn</button></div>
+        <div class="fp-row"><button class="btn-secondary fp-noclip">🚫 Noclip: OFF</button><button class="btn-secondary fp-speed">⚡ Speed: OFF</button></div>
         ${['owner', 'admin'].includes(this.me.role) ? `<h4>Server</h4>
         <div class="fp-row"><input class="fp-announce" placeholder="Announce to server..." maxlength="200"><button class="btn-primary fp-announce-send">Send</button></div>
         ${this.me.role === 'owner' ? '<div class="fp-row"><button class="btn-danger fp-kickall">Kick everyone</button></div>' : ''}` : ''}
@@ -131,6 +132,10 @@ export class Game {
     if (fpc) fpc.onclick = () => this.toggleFunPanel(false);
     const flyB = q('.fp-fly');
     if (flyB) flyB.onclick = () => { this.fly = !this.fly; flyB.textContent = `✈️ Fly: ${this.fly ? 'ON' : 'OFF'}`; this.sys(`Fly ${this.fly ? 'enabled (Space up / C down)' : 'disabled'}`); };
+    const ncB = q('.fp-noclip');
+    if (ncB) ncB.onclick = () => { this.noclip = !this.noclip; ncB.textContent = `🚫 Noclip: ${this.noclip ? 'ON' : 'OFF'}`; this.sys(`Noclip ${this.noclip ? 'enabled (Space up / C down)' : 'disabled'}`); };
+    const sp2B = q('.fp-speed');
+    if (sp2B) sp2B.onclick = () => { this.speedBoost = !this.speedBoost; sp2B.textContent = `⚡ Speed: ${this.speedBoost ? 'ON' : 'OFF'}`; this.sys(`Speed boost ${this.speedBoost ? 'enabled' : 'disabled'}`); };
     const spB = q('.fp-spawn');
     if (spB) spB.onclick = () => this.spawn();
     const annS = q('.fp-announce-send');
@@ -309,7 +314,10 @@ export class Game {
     const list = [...this.players.values()];
     box.innerHTML = list.length ? list.map(p => `<div class="fp-player"><img src="${avatarImage(p.avatar)}"><span class="fp-name">${esc(p.name)}</span>
       <button class="btn-secondary" data-fp="tp" data-id="${p.id}" title="Teleport to them">TP</button>
+      <button class="btn-secondary" data-fp="bring" data-id="${p.id}" title="Teleport them to you">Bring</button>
+      <button class="btn-secondary" data-fp="freeze" data-id="${p.id}" title="Freeze/unfreeze them">${this.frozenIds?.has(p.id) ? 'Unfreeze' : 'Freeze'}</button>
       <button class="btn-secondary" data-fp="mute" data-id="${p.id}" title="Mute 10 min">Mute</button>
+      ${['owner', 'admin'].includes(this.me.role) ? `<button class="btn-secondary" data-fp="gift" data-id="${p.id}" title="Give FunTix">🎁</button>` : ''}
       <button class="btn-secondary" data-fp="kick" data-id="${p.id}" title="Kick from server">Kick</button>
       <button class="btn-danger" data-fp="ban" data-id="${p.id}" title="Start a ban (needs a second staff to confirm)">Ban</button>
     </div>`).join('') : '<p class="muted small">No other players here.</p>';
@@ -320,6 +328,22 @@ export class Game {
     if (!p) return;
     try {
       if (a === 'tp') { this.pos.copy(p.char.position); this.pos.y += 4; this.vel.set(0, 0, 0); this.sys(`Teleported to ${p.name}`); }
+      else if (a === 'bring') {
+        await this.fpApi('POST', '/api/mod/send', { kind: 'bring', name: p.name, x: +this.pos.x.toFixed(2), y: +this.pos.y.toFixed(2), z: +this.pos.z.toFixed(2) });
+        this.sys(`Brought ${p.name} to you`);
+      }
+      else if (a === 'freeze') {
+        const on = !this.frozenIds?.has(p.id);
+        await this.fpApi('POST', '/api/mod/send', { kind: 'freeze', name: p.name, on });
+        (this.frozenIds ||= new Set())[on ? 'add' : 'delete'](p.id);
+        this.sys(`${on ? 'Froze' : 'Unfroze'} ${p.name}`); this.renderFunPanel();
+      }
+      else if (a === 'gift') {
+        const amt = prompt(`Give how many FunTix to ${p.name}? (1-10000)`, '100');
+        if (amt == null) return;
+        const r = await this.fpApi('POST', '/api/admin/funtix', { name: p.name, amount: +amt });
+        this.sys(`Gave ${p.name} ${amt} FunTix 🎉`);
+      }
       else if (a === 'mute') { await this.fpApi('POST', '/api/mod/mute', { name: p.name, minutes: 10, reason: 'Muted in-game via FunPanel' }); this.sys(`Muted ${p.name} for 10 min`); }
       else if (a === 'kick') { if (!confirm(`Kick ${p.name} from the server?`)) return; await this.fpApi('POST', '/api/mod/kick', { name: p.name, reason: 'Kicked in-game via FunPanel' }); this.sys(`Kicked ${p.name}`); }
       else if (a === 'ban') {
@@ -846,6 +870,12 @@ export class Game {
       else if (m.t === 'money') { this.setMoney(m); if (m.reason === 'play') this.sys(`+${m.amount} FunTix for playing!`); if (m.looneyCoins != null) { this.showBig(`🪙 Looney Coin earned! (${m.looneyCoins}/20)`, 3500); sfx.win(); } }
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
       else if (m.t === 'gearHit') { if (!this.dead) this.die(); }
+      else if (m.t === 'tp') { this.pos.set(m.x, m.y, m.z); this.vel.set(0, 0, 0); this.sys('Teleported by a moderator'); }
+      else if (m.t === 'freeze') {
+        this.frozen = !!m.on;
+        if (this.frozen && this.vehicleId) this.exitVehicle();
+        this.sys(this.frozen ? '❄️ You were frozen by a moderator' : 'You were unfrozen');
+      }
       else if (m.t === 'sys') this.sys(m.text);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
@@ -881,6 +911,7 @@ export class Game {
   blockedAt(x, y, z) { for (const b of this.solids) if (this.overlaps(b, x, y, z)) return true; return false; }
   moveAxis(ax, d, hw = HW) {
     const P = this.pos; P.setComponent(ax, P.getComponent(ax) + d);
+    if (this.noclip) return;
     for (const b of this.solids) {
       if (!this.overlaps(b, P.x, P.y, P.z, hw)) continue;
       if (ax === 1) {
@@ -894,6 +925,7 @@ export class Game {
     }
   }
   physics(dt) {
+    if (this.frozen) { this.vel.set(0, 0, 0); this.carSpeed = 0; this.anim = 'idle'; return; }
     if (this.vehicleId && !this.dead) { this.drivePhysics(dt); return; }
     const k = this.keys;
     const f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0) - this.joy.y;
@@ -903,12 +935,15 @@ export class Game {
     const right = new THREE.Vector3(Math.cos(this.camYaw), 0, -Math.sin(this.camYaw));
     const move = fwd.multiplyScalar(f).add(right.multiplyScalar(s));
     if (move.lengthSq() > 1) move.normalize();
-    const speed = this.speedTimer > 0 ? WALK * 2 : WALK;
+    const speed = (this.speedTimer > 0 ? WALK * 2 : WALK) * (this.speedBoost ? 2.5 : 1);
     this.vel.x = move.x * speed; this.vel.z = move.z * speed;
     if (this.onGround) { this.coyote = 0.12; this.jumping = false; }
     else this.coyote = Math.max(0, (this.coyote || 0) - dt);
     this.jumpBuf = Math.max(0, (this.jumpBuf || 0) - dt);
     if (this.fly && this.isStaff()) {
+      this.vel.y = (this.keys.Space ? 34 : 0) - (this.keys.KeyC ? 34 : 0);
+      this.onGround = false; this.jumping = false;
+    } else if (this.noclip) {
       this.vel.y = (this.keys.Space ? 34 : 0) - (this.keys.KeyC ? 34 : 0);
       this.onGround = false; this.jumping = false;
     } else {
