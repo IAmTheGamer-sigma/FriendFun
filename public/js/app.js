@@ -110,6 +110,7 @@ const icons = {
   people: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM0 20c0-4 3.5-7 8-7s8 3 8 7zm17 0c0-2-.7-4-2-5.3 4.5-.8 9 1 9 5.3z"/></svg>',
   puzzle: '<svg viewBox="0 0 24 24"><path d="M10 2h4v3a2 2 0 1 0 3 0h3v4h-3a2 2 0 1 0 0 3v3h-4v-3a2 2 0 1 0-3 0H7v-4h3a2 2 0 1 0 0-3z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   chat: '<svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1z"/></svg>',
+  news: '<svg viewBox="0 0 24 24"><path d="M4 4h13v12H6l-2 2zm15 1h3v13l-3-2M7 8h8M7 11h8M7 14h5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
 };
 
 const ADMIN = '<span class="admin-badge">ADMIN</span>';
@@ -144,6 +145,44 @@ function userTile(u) {
 }
 
 // ---------- layout ----------
+const UPDATES = [
+  { id: 'u5', date: 'Oct 6, 2026', title: 'Shooter games & gear hotbar', items: [
+    'Three new PvP shooter arenas: Block Arena, Fort Battle, Rooftop Rumble — shoot other players!',
+    'Roblox-style gear hotbar in every game (click or press 1-9)',
+    'Free Arena Blaster for everyone in shooter games — no gear needed',
+    'Your equipped gear now stays on after you respawn',
+    'New Shooter Arena template in Create — build your own battleground',
+  ]},
+  { id: 'u4', date: 'Oct 6, 2026', title: 'Marketplace mega-drop', items: [
+    '200+ new items: hats, faces, shirts and heads — all render in 3D',
+    '15 pets including the three-headed Hydra, now with full 3D models',
+    '12 new gears: blasters, swords, hammers, cannons and more',
+  ]},
+  { id: 'u3', date: 'Oct 6, 2026', title: 'Gears are here', items: [
+    'Classic gears (sword, slingshot, grapple, rocket) in the Marketplace',
+    'Equip a gear on your avatar and use it in any game with left-click',
+  ]},
+  { id: 'u2', date: 'Oct 6, 2026', title: 'Halloween in Funtopia', items: [
+    'Halloween event runs Oct 6 - Nov 2: spooky site theme + double daily FunTix',
+    'Five original spooky games: haunted mansion escape, pumpkin patch hunt, witch tower climb, ghost town, spooky baseplate',
+    'Halloween costumes, pets and creepy menu music',
+  ]},
+  { id: 'u1', date: 'Oct 5, 2026', title: 'Pets arrive', items: [
+    'Pets follow you in games and appear on your avatar',
+    'Pet tab in the Avatar Editor and Marketplace',
+  ]},
+];
+function hasNewUpdates() { try { return localStorage.getItem('updatesSeen') !== UPDATES[0].id; } catch { return true; } }
+function markUpdatesSeen() { try { localStorage.setItem('updatesSeen', UPDATES[0].id); } catch {} }
+function updatesPage() {
+  markUpdatesSeen();
+  mount('updates', `<h1>Updates</h1><p class="muted">What's new in Funtopia.</p>
+    <div class="update-log">${UPDATES.map(u => `
+      <section class="update"><div class="update-date">${esc(u.date)}</div>
+        <h2>${esc(u.title)}</h2>
+        <ul>${u.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
+      </section>`).join('')}</div>`);
+}
 function shell(active, content) {
   return `
   <header class="topbar">
@@ -169,7 +208,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -1131,6 +1170,7 @@ async function route() {
       case 'groups': return await groupsPage();
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
+      case 'updates': return updatesPage();
       case 'studio': return await studioPage(seg[1], seg[2]);
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
