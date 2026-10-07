@@ -730,7 +730,7 @@ app.get('/api/games/:id', auth, async (req, res) => {
   const { data: g, error: gErr } = await supabase.from('games').select('*').eq('id', req.params.id).single();
   if (gErr || !g) return res.status(404).json({ error: 'Game not found' });
   const vote = g.votes?.[key(req.user.name)] || 0;
-  res.json({ ...gameSummary(g), description: g.description, max_players: g.max_players || 30, created: g.created, world: g.world, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favorite_count || 0 });
+  res.json({ ...gameSummary(g), description: g.description, max_players: g.max_players || 30, created: g.created, world: g.world, event: g.event || null, unpublished: !!g.unpublished, vote, favorited: (req.user.favorites || []).includes(g.id), favorites: g.favorite_count || 0 });
 });
 
 app.post('/api/games', auth, async (req, res) => {
