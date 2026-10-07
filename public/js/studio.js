@@ -129,10 +129,13 @@ export class Studio {
     q('.rb-color').oninput = e => { if (this.sel) { this.pushUndo(); this.sel.c = e.target.value; this.refresh(this.sel); } };
     q('.rb-mat').onchange = e => { if (this.sel) { this.pushUndo(); this.sel.m = e.target.value; this.refresh(this.sel); } };
     q('.rb-snap').onchange = e => { this.snap = e.target.checked; this.applySnap(); };
-    q('.rb-sky').oninput = e => { this.world.sky = e.target.value; this.applyLight(); this.markDirty(); };
+    q('.rb-sky').oninput = e => { this.world.sky = e.target.value; const si = this.props.querySelector('[data-lf="sky"]'); if (si) si.value = toHex(e.target.value); this.applyLight(); this.markDirty(); };
     const lightUpd = () => {
       this.world.light = { tod: +q('.rb-tod').value, ambient: +q('.rb-amb').value, fog: +q('.rb-fog').value };
       q('.rb-tod-v').textContent = q('.rb-tod').value + 'h';
+      const syncProp = (f, v) => { const inp = this.props.querySelector(`[data-lf="${f}"]`); if (inp) inp.value = v; };
+      syncProp('tod', q('.rb-tod').value); syncProp('ambient', q('.rb-amb').value); syncProp('fog', q('.rb-fog').value);
+      const tv = this.props.querySelector('[data-lf-v="tod"]'); if (tv) tv.textContent = q('.rb-tod').value + 'h';
       this.applyLight(); this.markDirty();
     };
     q('.rb-tod').oninput = lightUpd; q('.rb-amb').oninput = lightUpd; q('.rb-fog').oninput = lightUpd;
