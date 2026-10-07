@@ -1090,7 +1090,7 @@ async function moderationPage() {
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=3692e53d');
+  const m = await import('./admin.js?v=ae4329b8');
   return m.adminPage(adminDeps, q);
 }
 
