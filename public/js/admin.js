@@ -90,6 +90,7 @@ export async function adminPage(D, q = '', gq = '') {
         ${me.owner ? `<div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
           <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Take FunTix">Take FunTix</button></span>
           <button class="btn-secondary mod-toggle" data-name="${esc(u.name)}" data-on="${u.role === 'moderator' ? '0' : '1'}" title="Toggle moderator">${u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}</button>
+          ${u.funpanel ? `<button class="btn-secondary funpanel-toggle" data-name="${esc(u.name)}" data-on="0" title="Take back their FunPanel">Revoke FunPanel</button>` : (u.admin || u.owner || u.role === 'moderator' ? '' : `<button class="btn-primary funpanel-toggle" data-name="${esc(u.name)}" data-on="1" title="Give them the in-game FunPanel">🎁 Gift FunPanel</button>`)}
           <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove item">Remove Item</button></span>
           <button class="btn-secondary inv-view" data-name="${esc(u.name)}" title="See everything they own">View Items</button>
           <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle Club">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
@@ -225,6 +226,11 @@ export async function adminPage(D, q = '', gq = '') {
     app.querySelectorAll('.mod-toggle').forEach(b => b.onclick = () => {
       const on = b.dataset.on === '1';
       cmd(b.dataset.name, on ? 'grant_moderator' : 'revoke_moderator', {});
+    });
+    app.querySelectorAll('.funpanel-toggle').forEach(b => b.onclick = () => {
+      const on = b.dataset.on === '1';
+      if (!on && !confirm(`Revoke FunPanel from ${b.dataset.name}?`)) return;
+      cmd(b.dataset.name, on ? 'grant_funpanel' : 'revoke_funpanel', {});
     });
     ownerCmd('.item-grant', 'grant_item', b => {
       const inp = app.querySelector(`.item-id[data-name="${CSS.escape(b.dataset.name)}"]`);
