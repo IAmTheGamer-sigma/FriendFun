@@ -921,6 +921,16 @@ app.post('/api/dm/:name', auth, async (req, res) => {
   res.json(data);
 });
 
+app.delete('/api/dm/:id', auth, async (req, res) => {
+  const me = req.user.name;
+  const { data: m } = await supabase.from('dms').select('*').eq('id', req.params.id).maybeSingle();
+  if (!m) return res.status(404).json({ error: 'Message not found' });
+  if (m.sender !== me && !req.user.admin) return res.status(403).json({ error: 'Not your message' });
+  const { error } = await supabase.from('dms').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: 'Could not delete' });
+  res.json({ ok: true });
+});
+
 app.get('/api/notifications', auth, async (req, res) => {
   const me = req.user.name;
   const { data } = await supabase.from('notifications').select('*').eq('username', me).order('created', { ascending: false }).limit(30);
