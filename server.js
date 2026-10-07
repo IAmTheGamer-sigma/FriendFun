@@ -42,6 +42,8 @@ const hash = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const key = n => n.toLowerCase();
 const money = u => ({ funtix: Number(u.funtix) || 0 });
 const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
+// Owner-granted moderators (used when the users.moderator column is missing).
+const extraMods = new Set();
 
 // ---------- add-ons ----------
 const ADDONS = [
@@ -193,6 +195,7 @@ app.post('/api/login', async (req, res) => {
     const msg = u.banReason ? `Banned: ${u.banReason}` : 'Your account is banned';
     return res.status(403).json({ error: msg });
   }
+  if (maintenance && !isOwner(u)) return res.status(403).json({ error: 'Funtopia is in maintenance mode right now. Try again soon!' });
 
   const tok = crypto.randomBytes(24).toString('hex');
   await supabase.from('sessions').insert({ token: tok, username: u.name });
@@ -504,6 +507,80 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     if (isOwner(user)) return res.status(400).json({ error: 'Cannot revoke an owner' });
     updates = { admin: false };
     message = `Revoked admin from ${user.name}`;
+  } else if (command === 'take_tix') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const amount = Math.max(1, Math.min(100000, Math.floor(Number(req.body?.amount) || 100)));
+    updates = { funtix: Math.max(0, (Number(user.funtix) || 0) - amount) };
+    message = `Took ${amount} FunTix from ${user.name}`;
+  } else if (command === 'grant_moderator') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    await setModerator(user.name, true);
+    updates = {}; message = `Made ${user.name} a moderator`;
+  } else if (command === 'revoke_moderator') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    if (isOwner(user)) return res.status(400).json({ error: 'Cannot demote an owner' });
+    await setModerator(user.name, false);
+    updates = {}; message = `Removed moderator from ${user.name}`;
+  } else if (command === 'grant_item') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const itemId = String(req.body?.item || '').trim();
+    if (!CATALOG.some(i => i.id === itemId)) return res.status(400).json({ error: 'Unknown item id' });
+    updates = { inventory: [...new Set([...(user.inventory || []), itemId])] };
+    message = `Gave ${itemId} to ${user.name}`;
+  } else if (command === 'revoke_item') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const itemId = String(req.body?.item || '').trim();
+    updates = { inventory: (user.inventory || []).filter(id => id !== itemId) };
+    message = `Removed ${itemId} from ${user.name}`;
+  } else if (command === 'give_club') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    updates = { clubForever: true };
+    message = `Gave FriendClub to ${user.name}`;
+  } else if (command === 'revoke_club') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    updates = { clubForever: false, clubUntil: 0 };
+    message = `Revoked FriendClub from ${user.name}`;
+  } else if (command === 'reset_password') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const temp = 'fun' + Math.random().toString(36).slice(2, 8);
+    const salt = crypto.randomBytes(8).toString('hex');
+    updates = { salt, pw: hash(temp, salt) };
+    message = `${user.name}'s temporary password: ${temp}`;
+  } else if (command === 'rename') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const newName = key(String(req.body?.newName || '').trim());
+    if (!/^[a-z0-9_]{3,16}$/.test(newName)) return res.status(400).json({ error: 'Name must be 3-16 chars: a-z, 0-9, _' });
+    const { data: taken } = await supabase.from('users').select('name').eq('name', newName).maybeSingle();
+    if (taken) return res.status(400).json({ error: 'That name is taken' });
+    updates = { name: newName };
+    message = `Renamed ${user.name} to ${newName}`;
+  } else if (command === 'reset_avatar') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    updates = { avatar: structuredClone(DEFAULT_AVATAR) };
+    message = `Reset ${user.name}'s avatar`;
+  } else if (command === 'unmute') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    mutes.delete(key(user.name));
+    try { await supabase.from('users').update({ mutedUntil: null, muteReason: null }).eq('name', user.name); } catch {}
+    updates = {}; message = `Unmuted ${user.name}`;
+  } else if (command === 'system_dm') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    const text = String(req.body?.text || '').slice(0, 500);
+    if (!text) return res.status(400).json({ error: 'Empty message' });
+    await supabase.from('dms').insert({ sender: 'Funtopia', recipient: user.name, text: '📢 ' + text, created: Date.now() });
+    updates = {}; message = `Sent system DM to ${user.name}`;
+  } else if (command === 'wipe_games') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    await supabase.from('games').delete().eq('creator', key(user.name));
+    updates = {}; message = `Deleted all games by ${user.name}`;
+  } else if (command === 'clear_friends') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    updates = { friends: [], requests: [] };
+    message = `Cleared ${user.name}'s friends and requests`;
+  } else if (command === 'clear_badges') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    updates = { earnedBadges: [], badge: 'none' };
+    message = `Cleared ${user.name}'s badges`;
   } else {
     return res.status(400).json({ error: 'Unknown admin command' });
   }
@@ -513,11 +590,65 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever, aiAccess: isAdmin(updated) || !!updated.aiAccess, banned: isBanned, banReason: updated.banReason || '', bannedUntil: updated.bannedUntil || 0, admin: isAdmin(updated) } });
 });
 
+// View a player's inventory (owner only).
+app.get('/api/admin/users/:name/inventory', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+  const { data: u } = await supabase.from('users').select('name, inventory').eq('name', key(req.params.name)).maybeSingle();
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  res.json({ name: u.name, items: (u.inventory || []).map(id => { const it = CATALOG.find(i => i.id === id); return { id, name: it ? it.name : id }; }) });
+});
+
+// ---------- Owner site controls ----------
+let siteAnnounce = null, maintenance = false;
+app.post('/api/admin/site/command', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+  const command = String(req.body?.command || '');
+  if (command === 'announce') {
+    const text = String(req.body?.text || '').slice(0, 200);
+    if (!text) return res.status(400).json({ error: 'Empty announcement' });
+    siteAnnounce = { text, t: Date.now(), by: req.user.name };
+    return res.json({ ok: true, message: 'Announcement broadcast site-wide' });
+  } else if (command === 'clear_announce') {
+    siteAnnounce = null;
+    return res.json({ ok: true, message: 'Announcement cleared' });
+  } else if (command === 'maintenance') {
+    maintenance = !!req.body?.on;
+    return res.json({ ok: true, message: maintenance ? 'Maintenance mode ON — only owners can log in' : 'Maintenance mode OFF' });
+  } else if (command === 'kick_all') {
+    let n = 0;
+    for (const [, room] of rooms) for (const [, p] of room.players) { try { send(p.ws, { t: 'kicked', reason: 'Server restart by staff' }); p.ws.close(); } catch {} n++; }
+    rooms.clear();
+    return res.json({ ok: true, message: `Kicked ${n} players from all games` });
+  } else if (command === 'funtix_rain') {
+    const amount = Math.max(1, Math.min(1000, Math.floor(Number(req.body?.amount) || 50)));
+    const names = new Set();
+    for (const [, room] of rooms) for (const [, p] of room.players) names.add(key(p.name));
+    for (const n of names) {
+      try {
+        const { data: u } = await supabase.from('users').select('funtix').eq('name', n).maybeSingle();
+        if (u) await supabase.from('users').update({ funtix: (Number(u.funtix) || 0) + amount }).eq('name', n);
+      } catch {}
+    }
+    for (const [, room] of rooms) broadcast(room, { t: 'sys', text: `🌧️ FunTix rain! +${amount} FunTix for everyone online!` });
+    return res.json({ ok: true, message: `Rained ${amount} FunTix on ${names.size} online players` });
+  }
+  return res.status(400).json({ error: 'Unknown site command' });
+});
+app.get('/api/site', (req, res) => res.json({ announce: siteAnnounce, maintenance }));
+
 // ---------- Moderation ----------
 // Named moderator group (seeded by Zayd). Moderators can mute, kick and review
 // flagged content. Bans always need two separate confirmations from two people.
 const MODERATORS = ['bro', 'fun', 'nsc9510alt', 'nsc9510ft'];
-function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || MODERATORS.includes(String(u.name || '').toLowerCase())); }
+async function setModerator(name, on) {
+  const k = key(name);
+  try {
+    const { error } = await supabase.from('users').update({ moderator: !!on }).eq('name', k);
+    if (error) throw error;
+    extraMods.delete(k);
+  } catch { on ? extraMods.add(k) : extraMods.delete(k); }
+}
+function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || MODERATORS.includes(String(u.name || '').toLowerCase()) || extraMods.has(String(u.name || '').toLowerCase())); }
 const modOnly = (req, res, next) => isMod(req.user) ? next() : res.status(403).json({ error: 'Moderators only' });
 const modLog = [];
 function logMod(by, action, target, reason) { modLog.unshift({ t: Date.now(), by, action, target, reason: String(reason || '').slice(0, 200) }); if (modLog.length > 200) modLog.length = 200; }
@@ -670,6 +801,15 @@ app.post('/api/mod/kick', auth, modOnly, async (req, res) => {
   logMod(req.user.name, 'kick', target.name, reason);
   notify(target.name, 'mod', `You were kicked from your game session: ${reason}`, '#/moderation');
   res.json({ ok: true, sessions: n });
+});
+
+// Announce a message to every live game server (moderators and up).
+app.post('/api/mod/announce', auth, modOnly, async (req, res) => {
+  const text = String(req.body?.text || '').slice(0, 200);
+  if (!text) return res.status(400).json({ error: 'Empty announcement' });
+  for (const room of rooms.values()) broadcast(room, { t: 'sys', text: '📢 ' + text });
+  logMod(req.user.name, 'announce', '-', text);
+  res.json({ ok: true });
 });
 
 app.post('/api/mod/ban/initiate', auth, modOnly, async (req, res) => {
