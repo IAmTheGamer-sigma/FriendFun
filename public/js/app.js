@@ -219,7 +219,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -1016,7 +1016,7 @@ async function moderationPage() {
     ${isMod ? `
     <section><div class="sec-h"><h2>Review Queue (${queue.length})</h2></div>
       ${queue.map(r => `<div class="mod-report">${badge(r.label)}
-        <div class="mod-report-body"><b>${esc(r.type)}: ${esc(r.target)}</b><div>${esc(r.reason)}</div>
+        <div class="mod-report-body"><b>${esc(r.type)}: ${r.type === 'user' ? `<a href="#/users/${encodeURIComponent(r.target)}">${esc(r.target)}</a>` : esc(r.target)}</b><div>${esc(r.reason)}</div>
         ${r.details ? `<div class="muted small">${esc(r.details)}</div>` : ''}
         <div class="muted small">Reported by ${esc(r.by)} · ${new Date(r.t).toLocaleString()}${r.flags.length ? ' · ' + r.flags.map(esc).join(', ') : ''}</div></div>
         <div class="mod-report-actions">
