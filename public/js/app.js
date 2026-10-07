@@ -238,10 +238,27 @@ async function refreshPartyBar() {
     app.querySelector('.topbar')?.after(bar);
   } catch {}
 }
+let siteStateCache = null, siteStateAt = 0;
+async function refreshSiteBanner() {
+  try {
+    if (!siteStateCache || Date.now() - siteStateAt > 60000) {
+      siteStateCache = await api('GET', '/api/site');
+      siteStateAt = Date.now();
+    }
+    document.querySelector('.site-banner')?.remove();
+    if (siteStateCache?.announce) {
+      const bar = document.createElement('div');
+      bar.className = 'site-banner';
+      bar.innerHTML = `📢 <b>Funtopia:</b> ${esc(siteStateCache.announce.text)}`;
+      app.querySelector('.topbar')?.after(bar);
+    }
+  } catch {}
+}
 function mount(active, html, after) {
   document.body.classList.toggle('halloween', halloweenActive());
   app.className = ''; app.innerHTML = shell(active, html);
   refreshPartyBar();
+  refreshSiteBanner();
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
   if (userBtn && menu) {
@@ -445,7 +462,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=c37c8d63');
+  const { Game } = await import('./game.js?v=b1c8225d');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -945,7 +962,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=c37c8d63');
+      const { Game: GameClass } = await import('./game.js?v=b1c8225d');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1089,6 +1106,15 @@ async function adminPage(q = '') {
         <button class="btn-danger btn-small badge-delete" data-id="${esc(b.id)}" title="Delete badge">×</button></span>`).join('') || '<span class="muted small">No custom badges yet</span>'}
       </div>
     </section>
+    ${me.owner ? `<section class="admin-section owner-tools"><h3>👑 Owner Tools <span class="muted small">site-wide</span></h3>
+      <div class="owner-grid">
+        <span class="admin-inline"><input class="announce-text" placeholder="Broadcast announcement..." maxlength="200" style="min-width:220px"><button class="btn-primary announce-send">📢 Broadcast</button><button class="btn-secondary announce-clear">Clear</button></span>
+        <span class="admin-inline"><button class="btn-secondary maint-toggle">🔧 Maintenance: OFF</button></span>
+        <span class="admin-inline"><button class="btn-danger kick-all">Kick all players</button></span>
+        <span class="admin-inline"><input type="number" class="rain-amt" value="50" min="1" max="1000" title="FunTix per online player"><button class="btn-primary funtix-rain">🌧️ FunTix Rain</button></span>
+      </div>
+      <div class="site-state muted small"></div>
+    </section>` : ''}
     <div class="lbp">${users.map(u => `
       <div class="lbp-row admin-row-wrap">
         ${avatarImgTag(u.avatar)}<a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
@@ -1127,6 +1153,21 @@ async function adminPage(q = '') {
               : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
           </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
         </div>
+        ${me.owner ? `<div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
+          <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Remove FunTix">Take FunTix</button></span>
+          <button class="btn-secondary mod-toggle" data-name="${esc(u.name)}" data-on="${u.role === 'moderator' ? '0' : '1'}" title="Toggle moderator">${u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}</button>
+          <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give a marketplace item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove a marketplace item">Remove Item</button></span>
+          <button class="btn-secondary inv-view" data-name="${esc(u.name)}" title="See everything they own">View Items</button>
+          <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle permanent FriendClub">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
+          <button class="btn-secondary pw-reset" data-name="${esc(u.name)}" title="Set a temporary password">Reset Password</button>
+          <button class="btn-secondary rename-btn" data-name="${esc(u.name)}" title="Change their username">Rename</button>
+          <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar to default">Reset Avatar</button>
+          <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Lift their mute">Unmute</button>
+          <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="DM them as Funtopia">System DM</button>
+          <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete all games they made">Wipe Games</button>
+          <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Remove all friends">Clear Friends</button>
+          <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Remove all badges">Clear Badges</button>
+        </div>` : ''}
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
     const cmd = async (name, command, extra = {}) => {
@@ -1222,6 +1263,94 @@ async function adminPage(q = '') {
       if (!confirm(`Remove admin from ${b.dataset.name}?`)) return;
       cmd(b.dataset.name, 'revoke_admin', {});
     });
+    // ---- Owner-only per-user controls ----
+    const ownerCmd = (sel, command, extraFn, confirmMsg) => app.querySelectorAll(sel).forEach(b => b.onclick = () => {
+      if (confirmMsg && !confirm(typeof confirmMsg === 'function' ? confirmMsg(b) : confirmMsg)) return;
+      const extra = extraFn ? extraFn(b) : {};
+      if (extra === null) return;
+      cmd(b.dataset.name, command, extra);
+    });
+    ownerCmd('.tix-take', 'take_tix', b => {
+      const inp = app.querySelector(`.tix-take-amt[data-name="${CSS.escape(b.dataset.name)}"]`);
+      return { amount: Math.max(1, Math.floor(Number(inp?.value) || 100)) };
+    });
+    app.querySelectorAll('.mod-toggle').forEach(b => b.onclick = () => {
+      const on = b.dataset.on === '1';
+      cmd(b.dataset.name, on ? 'grant_moderator' : 'revoke_moderator', {});
+    });
+    ownerCmd('.item-grant', 'grant_item', b => {
+      const inp = app.querySelector(`.item-id[data-name="${CSS.escape(b.dataset.name)}"]`);
+      const item = (inp?.value || '').trim();
+      if (!item) { toast('Enter an item id', true); return null; }
+      return { item };
+    });
+    ownerCmd('.item-revoke', 'revoke_item', b => {
+      const inp = app.querySelector(`.item-id[data-name="${CSS.escape(b.dataset.name)}"]`);
+      const item = (inp?.value || '').trim();
+      if (!item) { toast('Enter an item id', true); return null; }
+      return { item };
+    });
+    app.querySelectorAll('.inv-view').forEach(b => b.onclick = async () => {
+      try {
+        const r = await api('GET', '/api/admin/users/' + encodeURIComponent(b.dataset.name) + '/inventory');
+        toast(`${r.name} owns ${r.items.length} items`, false);
+        alert(`${r.name}'s inventory (${r.items.length}):\n` + (r.items.map(i => `• ${i.name} (${i.id})`).join('\n') || 'Empty'));
+      } catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('.club2-toggle').forEach(b => b.onclick = () => cmd(b.dataset.name, b.dataset.on === '1' ? 'give_club' : 'revoke_club', {}));
+    app.querySelectorAll('.pw-reset').forEach(b => b.onclick = async () => {
+      if (!confirm(`Reset ${b.dataset.name}'s password?`)) return;
+      try { const r = await api('POST', '/api/admin/users/' + encodeURIComponent(b.dataset.name) + '/command', { command: 'reset_password' }); alert(r.message); } catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('.rename-btn').forEach(b => b.onclick = () => {
+      const v = prompt(`Rename ${b.dataset.name} to:`, b.dataset.name);
+      if (v && v.trim()) cmd(b.dataset.name, 'rename', { newName: v.trim() });
+    });
+    ownerCmd('.avatar-reset', 'reset_avatar', null, b => `Reset ${b.dataset.name}'s avatar to default?`);
+    ownerCmd('.unmute-btn', 'unmute', null);
+    app.querySelectorAll('.sysdm-btn').forEach(b => b.onclick = () => {
+      const v = prompt(`System DM to ${b.dataset.name}:`);
+      if (v && v.trim()) cmd(b.dataset.name, 'system_dm', { text: v.trim() });
+    });
+    ownerCmd('.wipe-games', 'wipe_games', null, b => `DELETE ALL games by ${b.dataset.name}? This cannot be undone.`);
+    ownerCmd('.clear-friends', 'clear_friends', null, b => `Clear all friends of ${b.dataset.name}?`);
+    ownerCmd('.clear-badges', 'clear_badges', null, b => `Clear all badges of ${b.dataset.name}?`);
+    // ---- Owner site-wide tools ----
+    const siteCmd = async (command, extra = {}) => {
+      try { const r = await api('POST', '/api/admin/site/command', { command, ...extra }); toast(r.message || 'Done'); refreshSiteState(); }
+      catch (e) { toast(e.message, true); }
+    };
+    const refreshSiteState = async () => {
+      const el = app.querySelector('.site-state'); if (!el) return;
+      try {
+        const s = await api('GET', '/api/site');
+        el.textContent = `Announcement: ${s.announce ? `"${s.announce.text}" (by ${s.announce.by})` : 'none'} · Maintenance: ${s.maintenance ? 'ON' : 'OFF'}`;
+        const mt = app.querySelector('.maint-toggle'); if (mt) mt.textContent = `🔧 Maintenance: ${s.maintenance ? 'ON' : 'OFF'}`;
+      } catch {}
+    };
+    refreshSiteState();
+    const announceBtn = app.querySelector('.announce-send');
+    if (announceBtn) announceBtn.onclick = () => {
+      const v = app.querySelector('.announce-text')?.value.trim();
+      if (!v) { toast('Type an announcement first', true); return; }
+      siteCmd('announce', { text: v });
+    };
+    const announceClear = app.querySelector('.announce-clear');
+    if (announceClear) announceClear.onclick = () => siteCmd('clear_announce');
+    const maintBtn = app.querySelector('.maint-toggle');
+    if (maintBtn) maintBtn.onclick = async () => {
+      try {
+        const s = await api('GET', '/api/site');
+        if (s.maintenance || confirm('Turn ON maintenance mode? Only owners will be able to log in.')) siteCmd('maintenance', { on: !s.maintenance });
+      } catch (e) { toast(e.message, true); }
+    };
+    const kickAll = app.querySelector('.kick-all');
+    if (kickAll) kickAll.onclick = () => { if (confirm('Kick EVERYONE out of all games right now?')) siteCmd('kick_all'); };
+    const rainBtn = app.querySelector('.funtix-rain');
+    if (rainBtn) rainBtn.onclick = () => {
+      const amount = Math.max(1, Math.min(1000, Math.floor(Number(app.querySelector('.rain-amt')?.value) || 50)));
+      siteCmd('funtix_rain', { amount });
+    };
   });
 }
 
