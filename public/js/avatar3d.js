@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=a85c7a51';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=31ccb953';
 import { renderToDataURL } from './three-util.js?v=2f4a2dca';
 
 const faceCache = {}, shirtCache = {};
@@ -134,7 +134,7 @@ function buildHat(id) {
   const C = it.color || '#aaaaaa', W = '#ffffff', D = '#212121';
   switch (st) {
     case 'cap': add(new THREE.SphereGeometry(0.68, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), C, 0, 0.05); add(new THREE.BoxGeometry(1.1, 0.08, 0.6), C, 0, 0.05, 0.75); break;
-    case 'tophat': add(new THREE.CylinderGeometry(0.95, 0.95, 0.08, 24), C); add(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 24), C, 0, 0.55); add(new THREE.CylinderGeometry(0.56, 0.56, 0.18, 24), '#b71c1c', 0, 0.15); break;
+    case 'tophat': add(new THREE.CylinderGeometry(0.95, 0.95, 0.08, 24), C); add(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 24), C, 0, 0.55); add(new THREE.CylinderGeometry(0.56, 0.56, 0.18, 24), it.band || '#b71c1c', 0, 0.15); break;
     case 'crown': add(new THREE.CylinderGeometry(0.62, 0.62, 0.35, 24, 1, true), C, 0, 0.15); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; add(new THREE.ConeGeometry(0.13, 0.35, 8), C, Math.cos(a) * 0.6, 0.48, Math.sin(a) * 0.6); } add(new THREE.SphereGeometry(0.1), '#e53935', 0, 0.15, 0.63); break;
     case 'horns': { const l = add(new THREE.ConeGeometry(0.14, 0.6, 12), C, -0.38, 0.22); l.rotation.z = 0.4; const r = add(new THREE.ConeGeometry(0.14, 0.6, 12), C, 0.38, 0.22); r.rotation.z = -0.4; break; }
     case 'halo': { const h = add(new THREE.TorusGeometry(0.5, 0.07, 8, 32), C, 0, 0.55); h.rotation.x = Math.PI / 2; h.material.emissive = new THREE.Color('#fff176'); break; }
