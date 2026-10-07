@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=76feaaaa';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=360165c8';
 import { sfx } from './sound.js?v=89850e26';
-import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=93b57b2c';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=80abb485';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
+const VEHICLES = ['vehicle_car', 'vehicle_truck']; // net code = index + 1
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
 
 // ---------- Halloween in-game decor (Oct 24 - Nov 2) ----------
@@ -87,7 +88,7 @@ export class Game {
         <div class="health"><div class="health-fill"></div></div>
       </div>
       <div class="touch-ui"><div class="joy-zone"><div class="joy"><div class="joy-knob"></div></div></div><button class="jump-btn" aria-label="Jump"><svg viewBox="0 0 24 24" width="42" height="42"><path fill="currentColor" d="M12 4l8 9h-5v7H9v-7H4z"/></svg></button></div>
-      <div class="hud-bottom"><div class="funbux-hud" title="FunTix">${tix} <span class="tx-count">${this.o.funtix ?? ''}</span></div>${this.o.test ? '<button class="stop-btn">Stop</button>' : ''}</div>
+      <div class="hud-bottom"><div class="funbux-hud" title="FunTix">${tix} <span class="tx-count">${this.o.funtix ?? ''}</span></div>${this.o.test ? '<button class="stop-btn">Stop</button>' : ''}<button class="veh-btn" title="Drive vehicle (V)">🚗</button></div>
       <div class="inv-bar" title="Your gear inventory (click or press 1-9)"></div>
       <div class="kill-feed"></div>
       <div class="big-msg"></div>
@@ -145,6 +146,7 @@ export class Game {
       try { await this.fpApi('POST', '/api/admin/site/command', { command: 'kick_all' }); } catch (e) { this.sys('Kick failed: ' + e.message); }
     };
     if (q('.stop-btn')) q('.stop-btn').onclick = () => this.exit();
+    if (q('.veh-btn')) q('.veh-btn').onclick = () => this.toggleVehicle();
     this.escMenu.onclick = (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'reset') { this.toggleMenu(false); this.die(); }
@@ -192,6 +194,62 @@ export class Game {
   equipGearByIndex(i) {
     const g = this.toolbarGears()[i];
     if (g) this.equipGear(g.id, g.temp);
+  }
+  // ---------- vehicles ----------
+  ownedVehicle() {
+    const inv = this.me?.inventory || [];
+    return VEHICLES.find(id => inv.includes(id)) || null;
+  }
+  toggleVehicle() {
+    if (this.dead || this.o.test) return;
+    if (this.vehicleId) this.exitVehicle();
+    else {
+      const id = this.ownedVehicle();
+      if (!id) { this.sys('You need a vehicle! Buy one in the Marketplace 🚗'); return; }
+      this.enterVehicle(id);
+    }
+  }
+  enterVehicle(id) {
+    this.vehicleId = id; this.carSpeed = 0;
+    this.vehicleMesh = buildVehicle(id);
+    this.avatarKids = this.char.children.slice();
+    this.avatarKids.forEach(c => c.visible = false);
+    this.char.add(this.vehicleMesh);
+    this.sys(`Driving ${ITEM[id]?.name || 'vehicle'}! E or V to exit.`);
+    sfx.click?.();
+  }
+  exitVehicle() {
+    if (this.vehicleMesh) { this.char.remove(this.vehicleMesh); this.vehicleMesh = null; }
+    if (this.avatarKids) { this.avatarKids.forEach(c => c.visible = true); this.avatarKids = null; }
+    this.vehicleId = null; this.carSpeed = 0;
+  }
+  drivePhysics(dt) {
+    const k = this.keys;
+    const spec = ITEM[this.vehicleId] || {};
+    const maxSpeed = spec.speed || 32, turnRate = spec.turn || 2.4;
+    const throttle = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0) - this.joy.y;
+    const steer = (k.KeyA || k.ArrowLeft ? 1 : 0) - (k.KeyD || k.ArrowRight ? 1 : 0) + this.joy.x;
+    const braking = k.Space ? 1 : 0;
+    const target = braking ? 0 : throttle * maxSpeed;
+    const accel = braking ? 90 : 40;
+    const d = target - this.carSpeed;
+    this.carSpeed += Math.sign(d) * Math.min(Math.abs(d), accel * dt);
+    const dir = Math.sign(this.carSpeed) || (throttle >= 0 ? 1 : -1);
+    if (Math.abs(this.carSpeed) > 0.5) this.facing -= steer * turnRate * dt * dir;
+    const mx = Math.sin(this.facing) * this.carSpeed, mz = Math.cos(this.facing) * this.carSpeed;
+    this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
+    this.wasGround = this.onGround; this.onGround = false; this.ground = null;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(mx), Math.abs(this.vel.y), Math.abs(mz)) * dt / 0.4));
+    const sdt = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      this.moveAxis(0, mx * sdt, 2.2); this.moveAxis(2, mz * sdt, 2.2);
+      this.moveAxis(1, this.vel.y * sdt);
+    }
+    if (this.onGround) { this.coyote = 0.12; this.jumping = false; }
+    if (this.vehicleMesh) for (const w of this.vehicleMesh.userData.wheels || []) w.rotation.x += this.carSpeed * dt * 0.8;
+    this.anim = 'idle';
+    if (this.pos.y < -300) this.die();
+    this.triggersCheck();
   }
   async equipGear(id, temp = false) {
     const it = ITEM[id];
@@ -677,6 +735,7 @@ export class Game {
 
   die() {
     if (this.dead) return;
+    if (this.vehicleId) this.exitVehicle();
     this.dead = true; this.health = 0; sfx.oof();
     for (const fn of (this._scriptState?.deathFns || [])) { try { fn(); } catch (e) { console.warn('onDeath error:', e); } }
     this.debris = breakApart(this.scene, this.char, this.vel);
@@ -699,6 +758,8 @@ export class Game {
       }
       if (down && e.key === 'Shift' && !e.repeat) this.toggleShiftLock();
       if (down && !e.repeat && e.code === 'F4' && this.isStaff()) { e.preventDefault(); this.toggleFunPanel(); return; }
+      if (down && !e.repeat && e.code === 'KeyV') { this.toggleVehicle(); return; }
+      if (down && !e.repeat && e.code === 'KeyE' && this.vehicleId) { this.exitVehicle(); return; }
       if (down && !e.repeat && /^Digit[1-9]$/.test(e.code)) { this.equipGearByIndex(+e.code.slice(5) - 1); return; }
       this.keys[e.code] = down;
       if (e.code === 'Space') {
@@ -798,7 +859,7 @@ export class Game {
   hideLoading() { const l = this.c.querySelector('.loading'); if (l) { l.classList.add('fade'); setTimeout(() => l.remove(), 500); } }
   addPlayer(p) {
     if (this.players.has(p.id)) return;
-    const char = buildCharacter(p.avatar, { pet: false, gear: false }); char.add(makeNameTag(p.name, p.badge));
+    const char = buildCharacter(p.avatar, { pet: false, gear: false }); const tag = makeNameTag(p.name, p.badge); tag.userData.isTag = true; char.add(tag);
     this.scene.add(char);
     const pet = buildPet(p.avatar?.pet);
     if (pet) { pet.position.copy(char.position); this.scene.add(pet); }
@@ -814,25 +875,26 @@ export class Game {
     if (this.jumping && this.vel.y > 20) this.vel.y = 20;
     this.jumping = false;
   }
-  overlaps(b, x, y, z) {
-    return x + HW > b.min[0] && x - HW < b.max[0] && y + H > b.min[1] && y < b.max[1] && z + HW > b.min[2] && z - HW < b.max[2];
+  overlaps(b, x, y, z, hw = HW) {
+    return x + hw > b.min[0] && x - hw < b.max[0] && y + H > b.min[1] && y < b.max[1] && z + hw > b.min[2] && z - hw < b.max[2];
   }
   blockedAt(x, y, z) { for (const b of this.solids) if (this.overlaps(b, x, y, z)) return true; return false; }
-  moveAxis(ax, d) {
+  moveAxis(ax, d, hw = HW) {
     const P = this.pos; P.setComponent(ax, P.getComponent(ax) + d);
     for (const b of this.solids) {
-      if (!this.overlaps(b, P.x, P.y, P.z)) continue;
+      if (!this.overlaps(b, P.x, P.y, P.z, hw)) continue;
       if (ax === 1) {
         if (d <= 0) { P.y = b.max[1]; if (this.vel.y < 0) this.vel.y = 0; this.onGround = true; this.ground = b; }
         else { P.y = b.min[1] - H; if (this.vel.y > 0) this.vel.y = 0; }
       } else {
         const step = b.max[1] - P.y;
         if (step > 0 && step <= 1.3 && this.wasGround && !this.blockedAt(P.x, b.max[1] + 0.01, P.z)) { P.y = b.max[1] + 0.01; continue; }
-        if (d > 0) P.setComponent(ax, b.min[ax] - HW - 0.001); else P.setComponent(ax, b.max[ax] + HW + 0.001);
+        if (d > 0) P.setComponent(ax, b.min[ax] - hw - 0.001); else P.setComponent(ax, b.max[ax] + hw + 0.001);
       }
     }
   }
   physics(dt) {
+    if (this.vehicleId && !this.dead) { this.drivePhysics(dt); return; }
     const k = this.keys;
     const f = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0) - this.joy.y;
     const s = (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0) + this.joy.x;
@@ -937,6 +999,18 @@ export class Game {
       if (ch.position.distanceTo(tgt) > 30) ch.position.copy(tgt); else ch.position.lerp(tgt, k);
       let dy = s[4] - ch.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); ch.rotation.y += dy * k;
       let anim = ANIMS[s[5]] || 'idle';
+      const vcode = s[6] | 0;
+      if (vcode !== (p.vcode | 0)) {
+        p.vcode = vcode;
+        if (p.carMesh) { ch.remove(p.carMesh); p.carMesh = null; }
+        if (p.bodyKids) { p.bodyKids.forEach(c => c.visible = true); p.bodyKids = null; }
+        if (vcode > 0 && VEHICLES[vcode - 1]) {
+          p.bodyKids = ch.children.filter(c => !c.userData.isTag);
+          p.bodyKids.forEach(c => c.visible = false);
+          p.carMesh = buildVehicle(VEHICLES[vcode - 1]);
+          ch.add(p.carMesh);
+        }
+      }
       if (anim === 'idle' && p.emote) anim = p.emote; else if (anim !== 'idle') p.emote = null;
       ch.visible = anim !== 'dead';
       if (p.pet) { p.pet.visible = ch.visible; if (ch.visible) this.updatePet(p.pet, ch.position, ch.rotation.y, dt); }
@@ -997,7 +1071,7 @@ export class Game {
     for (const m of this.meshes.values()) if (m.userData.spin) m.rotation.y += dt * 2.5;
     // network
     this.netT = (this.netT || 0) + dt;
-    if (this.netT > 0.066) { this.netT = 0; this.send({ t: 's', s: [+this.pos.x.toFixed(2), +this.pos.y.toFixed(2), +this.pos.z.toFixed(2), +this.char.rotation.y.toFixed(3), this.dead ? 6 : ANIMS.indexOf(this.anim)] }); }
+    if (this.netT > 0.066) { this.netT = 0; this.send({ t: 's', s: [+this.pos.x.toFixed(2), +this.pos.y.toFixed(2), +this.pos.z.toFixed(2), +this.char.rotation.y.toFixed(3), this.dead ? 6 : ANIMS.indexOf(this.anim), this.vehicleId ? VEHICLES.indexOf(this.vehicleId) + 1 : 0] }); }
     this.updateCamera(dt);
     this.healthFill.style.width = this.health + '%';
     this.renderer.render(this.scene, this.camera);
