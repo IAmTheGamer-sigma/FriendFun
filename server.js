@@ -121,7 +121,7 @@ async function publicUser(u) {
   const badge = u.badge === 'none' ? null : (badges.includes(u.badge) ? u.badge : badges[0] || null);
 
   return {
-    name: u.name, club: isClub(u), admin: isAdmin(u), badges, badge,
+    name: u.name, club: isClub(u), admin: isAdmin(u), moderator: isMod(u), badges, badge,
     avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length,
     ...(await statusOf(u.name))
   };
@@ -237,6 +237,16 @@ app.get('/api/me', auth, async (req, res) => {
   if (!list(u, 'earnedBadges').includes('looney')) {
     const badges = [...list(u, 'earnedBadges'), 'looney'];
     await supabase.from('users').update({ earnedBadges: badges }).eq('name', u.name);
+  }
+  // Named moderators: persist the flag when the column exists (ignored otherwise)
+  if (MODERATORS.includes(u.name.toLowerCase()) && !u.moderator) {
+    const { error } = await supabase.from('users').update({ moderator: true }).eq('name', u.name);
+    if (!error) u.moderator = true;
+  }
+  // Slime Skin gift for @gimkid
+  if (u.name.toLowerCase() === 'gimkid' && !u.inventory.includes('head_slimebody')) {
+    u.inventory = [...u.inventory, 'head_slimebody'];
+    await supabase.from('users').update({ inventory: u.inventory }).eq('name', u.name);
   }
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
 });
@@ -475,13 +485,7 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     updates = { aiAccess: false };
     message = `Revoked AI coder access from ${user.name}`;
   } else if (command === 'ban') {
-    if (isAdmin(user)) return res.status(400).json({ error: 'Cannot ban an admin' });
-    const reason = String(req.body?.reason || '').slice(0, 200);
-    const days = Math.max(0, Math.min(365, Math.floor(Number(req.body?.days) || 0)));
-    updates = { banned: true, banReason: reason, bannedUntil: days > 0 ? Date.now() + days * 864e5 : 0 };
-    message = `Banned ${user.name}${days ? ` for ${days} days` : ' permanently'}${reason ? `: ${reason}` : ''}`;
-    // Kill their sessions
-    await supabase.from('sessions').delete().eq('username', user.name);
+    return res.status(400).json({ error: 'Bans now need two confirmations: use POST /api/mod/ban/initiate, then /api/mod/ban/confirm with a different staff member.' });
   } else if (command === 'unban') {
     updates = { banned: false, banReason: '', bannedUntil: 0 };
     message = `Unbanned ${user.name}`;
@@ -502,6 +506,176 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   if (error) return res.status(500).json({ error: error.message });
   const isBanned = !!updated.banned && (!updated.bannedUntil || updated.bannedUntil > Date.now());
   res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever, aiAccess: isAdmin(updated) || !!updated.aiAccess, banned: isBanned, banReason: updated.banReason || '', bannedUntil: updated.bannedUntil || 0, admin: isAdmin(updated) } });
+});
+
+// ---------- Moderation ----------
+// Named moderator group (seeded by Zayd). Moderators can mute, kick and review
+// flagged content. Bans always need two separate confirmations from two people.
+const MODERATORS = ['bro', 'fun', 'nsc9510alt', 'nsc9510ft'];
+function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || MODERATORS.includes(String(u.name || '').toLowerCase())); }
+const modOnly = (req, res, next) => isMod(req.user) ? next() : res.status(403).json({ error: 'Moderators only' });
+const modLog = [];
+function logMod(by, action, target, reason) { modLog.unshift({ t: Date.now(), by, action, target, reason: String(reason || '').slice(0, 200) }); if (modLog.length > 200) modLog.length = 200; }
+
+// Mutes: persisted to users.mutedUntil/muteReason when those columns exist,
+// otherwise kept in memory.
+const mutes = new Map();
+async function muteUser(name, minutes, reason, by) {
+  const mins = Math.max(1, Math.min(1440, Math.floor(minutes) || 30));
+  const until = Date.now() + mins * 60000;
+  const { error } = await supabase.from('users').update({ mutedUntil: until, muteReason: reason }).eq('name', name);
+  if (error) mutes.set(name.toLowerCase(), { until, reason }); else mutes.delete(name.toLowerCase());
+  logMod(by, 'mute', name, `${reason} (${mins}m)`);
+  return until;
+}
+function muteState(u) {
+  const mem = mutes.get(String(u.name || '').toLowerCase());
+  const memUntil = mem && mem.until > Date.now() ? mem.until : 0;
+  const dbUntil = Number(u.mutedUntil) || 0;
+  const until = Math.max(dbUntil, memUntil);
+  if (until <= Date.now()) return null;
+  return { until, reason: dbUntil >= memUntil ? (u.muteReason || '') : (mem?.reason || '') };
+}
+
+// Flagged-content reports + automated first-pass triage.
+// The triage labels every report (clear / review / urgent) so humans know what
+// to look at first. It never mutes, kicks or bans anyone on its own.
+let reports = [], nextRid = 1;
+function triage(text) {
+  const t = String(text || '').toLowerCase();
+  const flags = [];
+  if (/\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/.test(t) || /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(t)) flags.push('personal-info');
+  if (['kill you', 'kys', 'murder', 'rape', 'bomb', 'shoot you', 'stab you', 'hurt you'].some(w => t.includes(w))) flags.push('threat');
+  if (BAD.some(w => new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(t))) flags.push('profanity');
+  if (t.includes('discord.gg') || /https?:\/\//.test(t)) flags.push('link');
+  if (/(.)\1{5,}/.test(t)) flags.push('spam');
+  const label = (flags.includes('threat') || flags.includes('personal-info')) ? 'urgent' : flags.length ? 'review' : 'clear';
+  return { label, flags };
+}
+
+// Bans need two separate confirmations from two different staff members.
+// Step 1 issues a short-lived token; step 2 (by someone else) executes.
+const banTokens = new Map();
+function beginBan(by, targetName, reason, days) {
+  const token = crypto.randomBytes(16).toString('hex');
+  banTokens.set(token, { name: targetName, reason, days, by, expires: Date.now() + 10 * 60000 });
+  return token;
+}
+function takeBan(token, confirmer) {
+  const b = banTokens.get(token);
+  if (!b) return { error: 'Confirmation expired or invalid. Start the ban again.' };
+  banTokens.delete(token);
+  if (b.expires < Date.now()) return { error: 'Confirmation expired. Start the ban again.' };
+  if (String(b.by).toLowerCase() === String(confirmer).toLowerCase()) return { error: 'A different moderator or admin must give the second confirmation.' };
+  return { ban: b };
+}
+async function executeBan(name, reason, days, by) {
+  const { error } = await supabase.from('users').update({ banned: true, banReason: reason, bannedUntil: days > 0 ? Date.now() + days * 864e5 : 0 }).eq('name', name);
+  if (error) throw new Error(error.message);
+  await supabase.from('sessions').delete().eq('username', name);
+  logMod(by, 'ban', name, `${reason}${days ? ` (${days}d)` : ' (permanent)'}`);
+}
+
+async function modTarget(name) {
+  const { data } = await supabase.from('users').select('*').eq('name', key(String(name || ''))).maybeSingle();
+  return data || null;
+}
+const staffGuard = target => isMod(target) ? 'You cannot take moderation action against staff.' : null;
+
+app.get('/api/moderators', async (req, res) => {
+  const set = new Set(MODERATORS);
+  try { const { data } = await supabase.from('users').select('name').eq('moderator', true); for (const u of data || []) set.add(String(u.name).toLowerCase()); } catch {}
+  res.json([...set].map(name => ({ name })));
+});
+
+app.post('/api/report', auth, async (req, res) => {
+  const type = ['user', 'game', 'message'].includes(req.body?.type) ? req.body.type : 'user';
+  const target = String(req.body?.target || '').slice(0, 60).trim();
+  const reason = String(req.body?.reason || '').slice(0, 120).trim();
+  const details = String(req.body?.details || '').slice(0, 500).trim();
+  if (!target || !reason) return res.status(400).json({ error: 'Target and reason are required' });
+  const { label, flags } = triage(`${target} ${reason} ${details}`);
+  const r = { id: nextRid++, t: Date.now(), by: req.user.name, type, target, reason, details, label, flags, status: 'open' };
+  reports.unshift(r); if (reports.length > 500) reports.length = 500;
+  res.json({ ok: true, id: r.id, label, message: label === 'urgent' ? 'Report received and escalated for urgent review.' : 'Report received. Moderators will review it.' });
+});
+
+app.get('/api/mod/queue', auth, modOnly, (req, res) => {
+  const open = reports.filter(r => r.status === 'open');
+  open.sort((a, b) => (a.label === 'urgent' ? 0 : 1) - (b.label === 'urgent' ? 0 : 1) || b.t - a.t);
+  res.json(open);
+});
+
+app.post('/api/mod/reports/:id', auth, modOnly, (req, res) => {
+  const r = reports.find(x => x.id === Number(req.params.id));
+  if (!r) return res.status(404).json({ error: 'Report not found' });
+  if (!['dismiss', 'resolve'].includes(req.body?.action)) return res.status(400).json({ error: 'Unknown action' });
+  r.status = req.body.action === 'dismiss' ? 'dismissed' : 'resolved';
+  r.reviewedBy = req.user.name; r.reviewedAt = Date.now();
+  logMod(req.user.name, 'report-' + r.status, r.target, r.reason);
+  res.json({ ok: true });
+});
+
+app.get('/api/mod/log', auth, modOnly, (req, res) => res.json(modLog.slice(0, 100)));
+
+app.get('/api/mod/ban/pending', auth, modOnly, (req, res) => {
+  res.json([...banTokens.entries()].map(([token, b]) => ({ token, name: b.name, reason: b.reason, days: b.days, by: b.by, expires: b.expires })));
+});
+
+app.post('/api/mod/mute', auth, modOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const g = staffGuard(target); if (g) return res.status(400).json({ error: g });
+  const minutes = Math.max(1, Math.min(1440, Math.floor(Number(req.body?.minutes) || 30)));
+  const reason = String(req.body?.reason || '').slice(0, 200) || 'Muted by a moderator';
+  const until = await muteUser(target.name, minutes, reason, req.user.name);
+  notify(target.name, 'mod', `You were muted for ${minutes} minutes: ${reason}`, '#/moderation');
+  res.json({ ok: true, until });
+});
+
+app.post('/api/mod/unmute', auth, modOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  mutes.delete(target.name.toLowerCase());
+  try { await supabase.from('users').update({ mutedUntil: 0, muteReason: '' }).eq('name', target.name); } catch {}
+  logMod(req.user.name, 'unmute', target.name, '');
+  res.json({ ok: true });
+});
+
+app.post('/api/mod/kick', auth, modOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const g = staffGuard(target); if (g) return res.status(400).json({ error: g });
+  const reason = String(req.body?.reason || '').slice(0, 200) || 'Kicked by a moderator';
+  let n = 0;
+  for (const room of rooms.values()) for (const p of [...room.players.values()]) {
+    if (p.name.toLowerCase() === target.name.toLowerCase()) { send(p.ws, { t: 'kicked', reason }); try { p.ws.close(); } catch {} n++; }
+  }
+  logMod(req.user.name, 'kick', target.name, reason);
+  notify(target.name, 'mod', `You were kicked from your game session: ${reason}`, '#/moderation');
+  res.json({ ok: true, sessions: n });
+});
+
+app.post('/api/mod/ban/initiate', auth, modOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const g = staffGuard(target); if (g) return res.status(400).json({ error: g });
+  const reason = String(req.body?.reason || '').slice(0, 200) || 'Banned by a moderator';
+  const days = Math.max(0, Math.min(365, Math.floor(Number(req.body?.days) || 0)));
+  const token = beginBan(req.user.name, target.name, reason, days);
+  res.json({ ok: true, needsConfirm: true, token, summary: `Ban ${target.name}${days ? ` for ${days} days` : ' permanently'}: ${reason}. A different moderator or admin must confirm.` });
+});
+
+app.post('/api/mod/ban/confirm', auth, modOnly, async (req, res) => {
+  const r = takeBan(String(req.body?.token || ''), req.user.name);
+  if (r.error) return res.status(400).json({ error: r.error });
+  const target = await modTarget(r.ban.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const g = staffGuard(target); if (g) return res.status(400).json({ error: g });
+  try { await executeBan(target.name, r.ban.reason, r.ban.days, `${r.ban.by} + ${req.user.name}`); }
+  catch (e) { return res.status(500).json({ error: e.message }); }
+  notify(target.name, 'mod', `Your account was banned: ${r.ban.reason}`, '#/moderation');
+  res.json({ ok: true, message: `Banned ${target.name}` });
 });
 
 function groupView(group, username) {
@@ -915,6 +1089,7 @@ app.get('/api/dm/:name', auth, async (req, res) => {
 
 app.post('/api/dm/:name', auth, async (req, res) => {
   const me = req.user.name;
+  if (muteState(req.user)) return res.status(403).json({ error: 'You are muted and cannot send messages right now.' });
   const text = String(req.body?.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: 'Empty message' });
   const { data: u } = await supabase.from('users').select('name').eq('name', key(req.params.name)).maybeSingle();
@@ -1074,6 +1249,8 @@ wss.on('connection', (ws) => {
     if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
           }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
+      const mi = muteState(player.user);
+      if (mi) return send(ws, { t: 'error', error: `You are muted${mi.reason ? ': ' + mi.reason : ''}` });
       const text = filter(m.text.trim());
       broadcast(room, { t: 'chat', id: player.id, name: player.name, text, club: isClub(player.user), badge: badgeOf(player.user) });
     }
