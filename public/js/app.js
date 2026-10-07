@@ -15,7 +15,7 @@ const badgeIcon2 = (id, size = 18) => {
   if (b.custom || b.icon) return `<span style="font-size:${size}px" title="${esc(b.name)}">${b.icon || '🏅'}</span>`;
   return badgeIcon(id, size);
 };
-import { worldThumbnail } from './three-util.js';
+import { worldThumbnail } from './three-util.js?v=ac3e6f2b';
 import * as THREE from 'three';
 // avatar3d.js (with THREE) loads lazily after login - not needed for login page
 let _avatar3d = null;
