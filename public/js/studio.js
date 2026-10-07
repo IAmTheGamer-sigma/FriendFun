@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { setupLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js';
+import { setupLighting, applyLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js?v=6bc4de5a';
 import { CATALOG } from './catalog.js?v=a85c7a51';
 
 const GEARS = CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none');
@@ -95,8 +95,13 @@ export class Studio {
         </div><div class="rb-label">Edit</div></div>
         <div class="rb-group"><div class="rb-row">
           <button class="rb-btn play" data-a="play" title="Play test (F5)"><span class="rb-ico">&#x25B6;</span>Play</button>
-          <label class="rb-btn" title="Sky color"><input type="color" class="rb-sky" value="${toHex(this.world.sky || '#8fc8ff')}">Sky</label>
         </div><div class="rb-label">Test</div></div>
+        <div class="rb-group"><div class="rb-row rb-light">
+          <label class="rb-btn" title="Sky color"><input type="color" class="rb-sky" value="${toHex(this.world.sky || '#8fc8ff')}">Sky</label>
+          <label class="rb-slider" title="Time of day">🕐<input type="range" class="rb-tod" min="0" max="24" step="0.5" value="${this.world.light?.tod ?? 12}"><b class="rb-tod-v">${this.world.light?.tod ?? 12}h</b></label>
+          <label class="rb-slider" title="Brightness">🔆<input type="range" class="rb-amb" min="0" max="2" step="0.1" value="${this.world.light?.ambient ?? 1}"></label>
+          <label class="rb-slider" title="Fog">🌫️<input type="range" class="rb-fog" min="0" max="1" step="0.05" value="${this.world.light?.fog ?? 0.35}"></label>
+        </div><div class="rb-label">Lighting</div></div>
       </div>
       <div class="st-main">
         <div class="st-view"><canvas class="st-canvas"></canvas><div class="st-hint">Right-drag to look &middot; WASD/QE to fly &middot; Wheel to zoom &middot; F to focus &middot; Click to select</div></div>
@@ -124,7 +129,13 @@ export class Studio {
     q('.rb-color').oninput = e => { if (this.sel) { this.pushUndo(); this.sel.c = e.target.value; this.refresh(this.sel); } };
     q('.rb-mat').onchange = e => { if (this.sel) { this.pushUndo(); this.sel.m = e.target.value; this.refresh(this.sel); } };
     q('.rb-snap').onchange = e => { this.snap = e.target.checked; this.applySnap(); };
-    q('.rb-sky').oninput = e => { this.world.sky = e.target.value; this.scene.background.set(e.target.value); this.scene.fog.color.set(e.target.value); this.markDirty(); };
+    q('.rb-sky').oninput = e => { this.world.sky = e.target.value; this.applyLight(); this.markDirty(); };
+    const lightUpd = () => {
+      this.world.light = { tod: +q('.rb-tod').value, ambient: +q('.rb-amb').value, fog: +q('.rb-fog').value };
+      q('.rb-tod-v').textContent = q('.rb-tod').value + 'h';
+      this.applyLight(); this.markDirty();
+    };
+    q('.rb-tod').oninput = lightUpd; q('.rb-amb').oninput = lightUpd; q('.rb-fog').oninput = lightUpd;
     const aiBtn = q('.ai-gen');
     if (aiBtn) aiBtn.onclick = async () => {
       const promptEl = q('.ai-prompt');
@@ -232,11 +243,17 @@ export class Studio {
     this.markDirty(); this.renderProps(); this.renderExplorerItem(p);
   }
   markDirty() { this.dirty = true; this.c.querySelector('.st-dirty').textContent = ' *'; }
+  applyLight() { const L = this.scene.userData.lighting; if (L) applyLighting(this.scene, L.sun, L.hemi, this.world.sky || '#8fc8ff', this.world.light); }
   newId() { let i = this.world.parts.length + 1; const ids = new Set(this.world.parts.map(p => p.id)); while (ids.has('p' + i)) i++; return 'p' + i; }
 
   // ---------- selection ----------
+  selectService(name) {
+    this.sel = null; this.selSvc = name; this.tc.detach(); this.selBox.visible = false;
+    this.explorer.querySelectorAll('.ex-item').forEach(e => e.classList.toggle('sel', e.dataset.service === name));
+    this.renderProps();
+  }
   select(p) {
-    this.sel = p || null;
+    this.sel = p || null; this.selSvc = null;
     if (p && this.tool !== 'select') this.tc.attach(this.meshes.get(p.id)); else this.tc.detach();
     this.selBox.visible = !!p;
     if (p) { this.c.querySelector('.rb-color').value = toHex(p.c); this.c.querySelector('.rb-mat').value = p.m; }
@@ -294,7 +311,8 @@ export class Studio {
         <button class="ex-tbtn" data-act="new-folder" title="New Folder">📁+</button>
         <button class="ex-tbtn" data-act="new-script" title="New Script">📝+</button>
       </div>
-      <div class="ex-root">&#x25B8; Workspace</div>` + renderFolder('', 0);
+      <div class="ex-root">&#x25B8; Workspace</div>
+      <div class="ex-item ex-service" data-service="lighting"><span class="ex-sico">&#x2600;&#xFE0F;</span>Lighting</div>` + renderFolder('', 0);
 
     this.explorer.onclick = e => {
       const actBtn = e.target.closest('.ex-act, .ex-tbtn');
@@ -307,6 +325,8 @@ export class Studio {
       }
       const scriptEl = e.target.closest('.ex-script');
       if (scriptEl && !e.target.closest('.ex-actions')) { this.openScriptEditor(scriptEl.dataset.sid); return; }
+      const svcEl = e.target.closest('.ex-service');
+      if (svcEl) { this.selectService(svcEl.dataset.service); return; }
       const it = e.target.closest('.ex-item');
       if (it) this.select(this.world.parts.find(p => p.id === it.dataset.id));
     };
@@ -459,7 +479,32 @@ export class Studio {
     };
   }
   renderExplorerItem(p) { const el = this.explorer.querySelector(`[data-id="${p.id}"]`); if (el) el.innerHTML = `<i class="sw" style="background:${p.c}"></i>${esc(p.name)}`; }
+  renderLightProps() {
+    const L = this.world.light || {};
+    const tod = L.tod ?? 12, amb = L.ambient ?? 1, fog = L.fog ?? 0.35;
+    this.props.innerHTML = `
+      <div class="pr-sec">Lighting</div>
+      <div class="pr-row"><span>Sky Color</span><input type="color" data-lf="sky" value="${toHex(this.world.sky || '#8fc8ff')}"></div>
+      <div class="pr-row"><span>Time Of Day</span><div class="pr-v3"><input type="range" data-lf="tod" min="0" max="24" step="0.5" value="${tod}" style="flex:1"><b data-lf-v="tod">${tod}h</b></div></div>
+      <div class="pr-row"><span>Brightness</span><input type="range" data-lf="ambient" min="0" max="2" step="0.1" value="${amb}"></div>
+      <div class="pr-row"><span>Fog</span><input type="range" data-lf="fog" min="0" max="1" step="0.05" value="${fog}"></div>`;
+    this.props.querySelectorAll('[data-lf]').forEach(inp => inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+      const f = inp.dataset.lf;
+      if (f === 'sky') { this.world.sky = inp.value; this.c.querySelector('.rb-sky').value = inp.value; }
+      else {
+        if (!this.world.light) this.world.light = {};
+        this.world.light[f] = +inp.value;
+        const q = s => this.c.querySelector(s);
+        if (f === 'tod') { q('.rb-tod').value = inp.value; q('.rb-tod-v').textContent = inp.value + 'h'; }
+        if (f === 'ambient') q('.rb-amb').value = inp.value;
+        if (f === 'fog') q('.rb-fog').value = inp.value;
+      }
+      const v = this.props.querySelector('[data-lf-v="tod"]'); if (v && f === 'tod') v.textContent = inp.value + 'h';
+      this.applyLight(); this.markDirty();
+    }));
+  }
   renderProps() {
+    if (this.selSvc === 'lighting') { this.renderLightProps(); return; }
     const p = this.sel;
     if (!p) { this.props.innerHTML = '<div class="st-empty">Select a part to see its properties</div>'; return; }
     const v3 = (k, label) => `<div class="pr-row"><span>${label}</span><div class="pr-v3">${[0, 1, 2].map(i => `<input type="number" step="0.5" data-v3="${k}" data-i="${i}" value="${+p[k][i].toFixed(2)}">`).join('')}</div></div>`;
