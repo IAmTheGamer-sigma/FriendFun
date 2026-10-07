@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=31ccb953';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=93b57b2c';
 import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
 
 const faceCache = {}, shirtCache = {};
@@ -236,6 +236,29 @@ function buildDaffyHead(g) {
   const ring = add(new THREE.TorusGeometry(0.55, 0.1, 10, 24), '#ffffff', 0, 0.02);
   ring.rotation.x = Math.PI / 2;
 }
+function buildSlimeHead(g) {
+  const green = '#66bb6a', dark = '#43a047';
+  const M = (c, r = 0.22) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+  const add = (geo, color, x = 0, y = 0, z = 0, rough) => { const m = new THREE.Mesh(geo, M(color, rough)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  const blob = add(new THREE.SphereGeometry(0.66, 24, 18), green, 0, 0.6); blob.scale.set(1.06, 0.92, 1);
+  // gooey drips on top
+  add(new THREE.SphereGeometry(0.17, 12, 10), green, -0.32, 1.14);
+  add(new THREE.SphereGeometry(0.13, 12, 10), green, 0.02, 1.24);
+  add(new THREE.SphereGeometry(0.15, 12, 10), green, 0.34, 1.12);
+  // drip sliding down the side
+  const drip = add(new THREE.SphereGeometry(0.1, 10, 8), green, 0.64, 0.42, 0.12); drip.scale.set(0.8, 1.7, 0.8);
+  // big cute eyes
+  for (const sx of [-1, 1]) {
+    add(new THREE.SphereGeometry(0.17, 14, 12), '#ffffff', sx * 0.25, 0.76, 0.5, 0.4);
+    add(new THREE.SphereGeometry(0.075, 10, 8), '#212121', sx * 0.25, 0.76, 0.64, 0.4);
+  }
+  // smile
+  const smile = add(new THREE.TorusGeometry(0.15, 0.032, 8, 16, Math.PI), dark, 0, 0.5, 0.56, 0.5);
+  smile.rotation.z = Math.PI;
+  // glossy highlight
+  const hi = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.45 }));
+  hi.position.set(-0.32, 0.92, 0.5); hi.scale.set(1, 1.5, 0.5); g.add(hi);
+}
 function buildPumpkinHead(g) {
   const M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
   const add = (geo, color, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, M(color)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
@@ -261,6 +284,7 @@ function buildGhostHead(g) {
 const HEADS = {
   head_bugs: { h: 1.3, custom: buildBugsHead },
   head_daffy: { h: 1.3, custom: buildDaffyHead },
+  head_slimebody: { h: 1.35, custom: buildSlimeHead },
   head_pumpkin: { h: 1.45, custom: buildPumpkinHead },
   head_ghost: { h: 1.6, custom: buildGhostHead },
   head_classic: { h: 1.2, fz: 0.63, fw: 1, geo: () => new THREE.CylinderGeometry(0.62, 0.62, 1.2, 24) },
@@ -296,7 +320,7 @@ const HEADS = {
 };
 
 // Returns a THREE.Group; feet at y=0, facing +z. userData.limbs = { larm, rarm, lleg, rleg, head, torso }
-const BODY_SUITS = { head_bugs: '#9e9e9e', head_daffy: '#212121' };
+const BODY_SUITS = { head_bugs: '#9e9e9e', head_daffy: '#212121', head_slimebody: '#66bb6a' };
 export function buildCharacter(avatar, opts = {}) {
   const C = { ...avatar.colors };
   const suitColor = BODY_SUITS[avatar.head];
