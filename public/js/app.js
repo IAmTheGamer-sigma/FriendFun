@@ -146,6 +146,11 @@ function userTile(u) {
 
 // ---------- layout ----------
 const UPDATES = [
+  { id: 'u7', date: 'Oct 7, 2026', title: 'Admin levels', items: [
+    'Staff now has three levels: Owner, Admin, and Moderator',
+    'Owners can grant and remove admins; admins keep full panel powers otherwise',
+    'Everyone\'s level shows as a tag in the Admin panel',
+  ]},
   { id: 'u6', date: 'Oct 7, 2026', title: 'Moderator team is live', items: [
     'Funtopia has its first moderators: @bro, @fun, @nsc9510alt and @nsc9510ft',
     'New Moderation page: report players from their profile, moderators get a review queue',
@@ -960,6 +965,8 @@ async function leaderboardPage() {
 }
 // ---------- Moderation ----------
 const MOD_POLICY = `
+<h3>Admin levels</h3>
+<p><b>Owner</b> — full control, including granting and removing admins. <b>Admin</b> — everything except managing other admins. <b>Moderator</b> — mute, kick, review the report queue, and start bans (which still need a second person to confirm). No level can take action against someone at the same level or higher.</p>
 <h3>What moderators do</h3>
 <p>Review content players report, mute disruptive players (up to 24 hours), remove players from game sessions, and escalate serious cases. Moderators never get extra FunTix, items, or admin powers — just safety tools.</p>
 <h3>Automated first pass</h3>
@@ -1004,8 +1011,8 @@ async function moderationPage() {
   const reload = () => moderationPage();
   mount('moderation', `<h1>🛡️ Moderation</h1>
     <section><div class="sec-h"><h2>Policy</h2></div><div class="mod-policy">${MOD_POLICY}</div></section>
-    <section><div class="sec-h"><h2>Moderators (${mods.length})</h2></div>
-      <div class="friends-row">${mods.map(m => `<a class="user-tile" href="#/users/${encodeURIComponent(m.name)}"><div class="ut-name">🛡️ ${esc(m.name)}</div><div class="ut-game">Moderator</div></a>`).join('')}</div></section>
+    <section><div class="sec-h"><h2>Staff (${mods.length})</h2></div>
+      <div class="friends-row">${mods.map(m => `<a class="user-tile" href="#/users/${encodeURIComponent(m.name)}"><div class="ut-name">🛡️ ${esc(m.name)}</div><div class="ut-game">${esc((m.role || 'moderator').toUpperCase())}</div></a>`).join('')}</div></section>
     ${isMod ? `
     <section><div class="sec-h"><h2>Review Queue (${queue.length})</h2></div>
       ${queue.map(r => `<div class="mod-report">${badge(r.label)}
@@ -1085,6 +1092,7 @@ async function adminPage(q = '') {
     <div class="lbp">${users.map(u => `
       <div class="lbp-row admin-row-wrap">
         ${avatarImgTag(u.avatar)}<a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
+        <span class="role-tag role-${u.role || 'player'}">${esc((u.role || 'player').toUpperCase())}</span>
         <span class="admin-status">${status(u)} &middot; ${tix} ${(u.funtix ?? 0).toLocaleString()}</span>
         <div class="admin-controls">
           ${u.admin ? '' : u.club
@@ -1113,7 +1121,7 @@ async function adminPage(q = '') {
               ? `<button class="btn-primary ban-revoke" data-name="${esc(u.name)}" title="Unban this user">Unban</button><span class="banned-tag" title="${esc(u.banReason || 'Banned')}">🚫 BANNED${u.bannedUntil ? ' until ' + new Date(u.bannedUntil).toLocaleDateString() : ''}</span>`
               : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
           </span>
-          ${['fun','bro'].includes(me.name.toLowerCase()) ? `<span class="admin-inline">
+          ${me.owner ? `<span class="admin-inline">
             ${u.envAdmin ? '<span class="muted small">Env Admin</span>' : u.admin
               ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
               : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
