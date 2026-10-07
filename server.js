@@ -1502,7 +1502,7 @@ wss.on('connection', (ws) => {
       return;
     }
     if (!player) return;
-    if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 6).map(Number); touch(player.name, player.gameId);
+    if (m.t === 's' && Array.isArray(m.s)) { player.s = m.s.slice(0, 7).map(Number); touch(player.name, player.gameId);
           }
     else if (m.t === 'chat' && typeof m.text === 'string' && m.text.trim()) {
       const mi = muteState(player.user);
