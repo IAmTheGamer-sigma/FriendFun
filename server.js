@@ -915,6 +915,45 @@ app.post('/api/mod/announce', auth, modOnly, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Send a whitelisted realtime message to a player's live sessions (bring/freeze).
+app.post('/api/mod/send', auth, modOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const g = staffGuard(target); if (g) return res.status(400).json({ error: g });
+  const kind = req.body?.kind;
+  let msg = null;
+  if (kind === 'bring') {
+    const x = +req.body.x, y = +req.body.y, z = +req.body.z;
+    if (![x, y, z].every(Number.isFinite)) return res.status(400).json({ error: 'Bad coordinates' });
+    msg = { t: 'tp', x, y: y + 3, z };
+  } else if (kind === 'freeze') {
+    msg = { t: 'freeze', on: !!req.body.on };
+  }
+  if (!msg) return res.status(400).json({ error: 'Unknown message kind' });
+  let n = 0;
+  for (const room of rooms.values()) for (const p of room.players.values()) {
+    if (p.name.toLowerCase() === target.name.toLowerCase()) { send(p.ws, msg); n++; }
+  }
+  logMod(req.user.name, kind, target.name, n + ' session(s)');
+  res.json({ ok: true, sessions: n });
+});
+
+// Grant FunTix to a user (admins and up).
+app.post('/api/admin/funtix', auth, adminOnly, async (req, res) => {
+  const target = await modTarget(req.body?.name);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const amount = Math.floor(+req.body?.amount);
+  if (!Number.isFinite(amount) || amount < 1 || amount > 10000) return res.status(400).json({ error: 'Amount must be 1-10000' });
+  const { data, error } = await supabase.from('users').update({ funtix: (target.funtix || 0) + amount }).eq('name', target.name).select('funtix').single();
+  if (error) return res.status(500).json({ error: 'DB error' });
+  logMod(req.user.name, 'grant_tix', target.name, '+' + amount);
+  notify(target.name, 'funtix', `${req.user.name} gave you ${amount} FunTix! 🎉`, '#/');
+  for (const room of rooms.values()) for (const p of room.players.values()) {
+    if (p.name.toLowerCase() === target.name.toLowerCase()) send(p.ws, { t: 'money', funtix: data.funtix });
+  }
+  res.json({ ok: true, funtix: data.funtix });
+});
+
 app.post('/api/mod/ban/initiate', auth, modOnly, async (req, res) => {
   const target = await modTarget(req.body?.name);
   if (!target) return res.status(404).json({ error: 'User not found' });
