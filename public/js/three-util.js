@@ -87,7 +87,8 @@ export function applyLighting(scene, sun, hemi, sky, light = {}) {
   const base = new THREE.Color(sky);
   const night = new THREE.Color('#0b0e24');
   const mixed = night.clone().lerp(base, 0.12 + 0.88 * day);
-  scene.background.copy(mixed);
+  if (!scene.background) scene.background = new THREE.Color(mixed);
+  else scene.background.copy(mixed);
   const near = 400 - fogAmt * 340, far = 1200 - fogAmt * 950;
   if (!scene.fog) scene.fog = new THREE.Fog(mixed, near, far);
   else { scene.fog.color.copy(mixed); scene.fog.near = near; scene.fog.far = far; }
