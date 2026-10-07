@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { setupLighting, applyLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js?v=6bc4de5a';
+import { setupLighting, applyLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js?v=ac3e6f2b';
 import { CATALOG } from './catalog.js?v=a85c7a51';
 
 const GEARS = CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none');
