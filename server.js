@@ -944,6 +944,58 @@ app.post('/api/games/:id/private', auth, async (req, res) => {
   res.json({ code });
 });
 
+function getPartyOf(name) { const id = userParty.get(name); return id ? parties.get(id) : null; }
+function leaveParty(name) {
+  const pid = userParty.get(name); if (!pid) return;
+  const p = parties.get(pid); userParty.delete(name);
+  if (!p) return;
+  p.members = p.members.filter(m => m !== name);
+  if (!p.members.length) { parties.delete(pid); return; }
+  if (p.leader === name) p.leader = p.members[0];
+}
+app.get('/api/party', auth, (req, res) => {
+  const p = getPartyOf(req.user.name);
+  res.json(p ? { id: [...parties.entries()].find(([, v]) => v === p)[0], leader: p.leader, members: p.members } : null);
+});
+app.post('/api/party', auth, (req, res) => {
+  leaveParty(req.user.name);
+  const id = crypto.randomUUID().slice(0, 8);
+  parties.set(id, { leader: req.user.name, members: [req.user.name] });
+  userParty.set(req.user.name, id);
+  res.json({ id });
+});
+app.post('/api/party/:id/invite', auth, async (req, res) => {
+  const p = parties.get(req.params.id);
+  if (!p || p.leader !== req.user.name) return res.status(403).json({ error: 'Not your party' });
+  const target = String(req.body?.user || '').trim();
+  const { data: u } = await supabase.from('users').select('name').eq('name', key(target)).maybeSingle();
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  if (p.members.includes(u.name)) return res.status(400).json({ error: 'Already in party' });
+  notify(u.name, 'party', `${req.user.name} invited you to their party!`, `#/party/join/${req.params.id}`);
+  res.json({ ok: true });
+});
+app.post('/api/party/join/:id', auth, (req, res) => {
+  const p = parties.get(req.params.id);
+  if (!p) return res.status(404).json({ error: 'Party not found' });
+  if (p.members.length >= 10) return res.status(400).json({ error: 'Party is full' });
+  leaveParty(req.user.name);
+  p.members.push(req.user.name); userParty.set(req.user.name, req.params.id);
+  res.json({ ok: true });
+});
+app.post('/api/party/leave', auth, (req, res) => { leaveParty(req.user.name); res.json({ ok: true }); });
+app.post('/api/party/play', auth, async (req, res) => {
+  const p = getPartyOf(req.user.name);
+  if (!p || p.leader !== req.user.name) return res.status(403).json({ error: 'Only the party leader can start a game' });
+  const { data: g } = await supabase.from('games').select('id').eq('id', req.body?.gameId).maybeSingle();
+  if (!g) return res.status(404).json({ error: 'Game not found' });
+  const ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code; do { code = Array.from({ length: 6 }, () => ABC[Math.floor(Math.random() * ABC.length)]).join(''); } while (privateServers.has(code));
+  privateServers.set(code, { gameId: g.id, owner: req.user.name, created: Date.now() });
+  const link = `#/play/${g.id}?server=${code}`;
+  for (const m of p.members) if (m !== req.user.name) notify(m, 'party', `${req.user.name} started a party game — join now!`, link);
+  res.json({ code });
+});
+
 app.get('/api/notifications', auth, async (req, res) => {
   const me = req.user.name;
   const { data } = await supabase.from('notifications').select('*').eq('username', me).order('created', { ascending: false }).limit(30);
@@ -963,6 +1015,8 @@ app.post('/api/notifications/read', auth, async (req, res) => {
 // realtime
 const rooms = new Map();
 const privateServers = new Map(); // CODE -> { gameId, owner, created }
+const parties = new Map(); // id -> { leader, members: [] }
+const userParty = new Map(); // username -> partyId
 let nextPid = 1;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
