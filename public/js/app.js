@@ -376,6 +376,8 @@ async function gamePage(id) {
           </div>
         </div>
       </div>
+      <div class="gp-private"><h3>Private Servers</h3><p class="muted small">Create your own server — only people with the link can join.</p>
+        <button class="btn-secondary ps-create">Create Private Server</button><div class="ps-result"></div></div>
       <div class="gp-tabs"><b>About</b></div>
       <h3>Description</h3><p class="gp-desc">${esc(g.description || 'No description.').replace(/\n/g, '<br>')}</p>
       <div class="gp-stats">
@@ -387,16 +389,28 @@ async function gamePage(id) {
     const vote = async v => { const r = await api('POST', `/api/games/${g.id}/vote`, { vote: v }); g.vote = r.vote; route(); };
     app.querySelector('.vote-up').onclick = () => vote(1); app.querySelector('.vote-down').onclick = () => vote(-1);
     app.querySelector('.gp-fav').onclick = async () => { const r = await api('POST', `/api/games/${g.id}/favorite`); me.favorites = r.favorited ? [...me.favorites, g.id] : me.favorites.filter(x => x !== g.id); route(); };
+    app.querySelector('.ps-create').onclick = async e => {
+      e.target.disabled = true;
+      try {
+        const r = await api('POST', `/api/games/${g.id}/private`);
+        const link = location.origin + '/#/play/' + g.id + '?server=' + r.code;
+        app.querySelector('.ps-result').innerHTML = `<div class="ps-code">Code: <b>${r.code}</b></div>
+          <div class="ps-link"><input readonly value="${esc(link)}"><button class="btn-secondary ps-copy">Copy</button>
+          <a class="btn-primary" href="#/play/${g.id}?server=${r.code}">Join</a></div>`;
+        const inp = app.querySelector('.ps-link input');
+        app.querySelector('.ps-copy').onclick = () => { inp.select(); document.execCommand('copy'); navigator.clipboard?.writeText(link); toast('Link copied!'); };
+      } catch (err) { toast(err.message, true); e.target.disabled = false; }
+    };
   });
 }
 
-async function playPage(id) {
+async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
   const { Game } = await import('./game.js?v=11026493');
   const game = new Game(app.querySelector('.play-container'), {
-    world: g.world, gameId: g.id, gameName: g.name, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
+    world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
   });
   cleanup = () => game.destroy();
@@ -1167,7 +1181,7 @@ async function route() {
       case 'login': location.hash = '#/home'; return;
       case 'discover': return await discoverPage(qp.get('q'));
       case 'games': return await gamePage(seg[1]);
-      case 'play': return await playPage(seg[1]);
+      case 'play': return await playPage(seg[1], qp.get('server'));
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'friends': return await friendsPage();
