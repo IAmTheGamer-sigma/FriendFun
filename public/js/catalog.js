@@ -71,6 +71,7 @@ export const CATALOG = [
   { id: 'hat_tophat_purple', type: 'hat', name: 'Purple Top Hat', price: 200, color: '#7b1fa2' },
   { id: 'hat_tophat_white', type: 'hat', name: 'White Top Hat', price: 200, color: '#f5f5f5' },
   { id: 'hat_tophat_rainbow', type: 'hat', name: 'Rainbow Top Hat', price: 400, color: '#ff6f00' },
+  { id: 'hat_tophat_blue', type: 'hat', name: 'Blue Top Hat', price: 200, color: '#1565c0', band: '#ffd400' },
   { id: 'hat_crown_silver', type: 'hat', name: 'Silver Crown', price: 500, color: '#b0bec5' },
   { id: 'hat_crown_ruby', type: 'hat', name: 'Ruby Crown', price: 900, color: '#d81b60' },
   { id: 'hat_crown_ice', type: 'hat', name: 'Ice Crown', price: 800, color: '#80deea' },
