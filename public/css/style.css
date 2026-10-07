@@ -486,3 +486,11 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .rb-slider { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
 .rb-slider input[type=range] { width: 90px; accent-color: #ffd400; }
 .rb-tod-v { min-width: 34px; font-size: 12px; }
+
+/* ---------- private servers ---------- */
+.gp-private { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 18px 0; }
+.gp-private h3 { margin: 0 0 4px; }
+.ps-result { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.ps-code { font-size: 18px; }
+.ps-link { display: flex; gap: 8px; }
+.ps-link input { flex: 1; background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 8px 10px; font-size: 13px; }
