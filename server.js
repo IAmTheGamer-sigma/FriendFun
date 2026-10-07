@@ -99,7 +99,7 @@ function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin;
 // Staff tiers: owner (env admins) > admin (DB flag) > moderator (named group) > player.
 // Owners can do everything including granting/revoking admin. Admins get the full
 // admin panel except managing other admins. Moderators get mute/kick/review only.
-function isOwner(u) { return !!u && ADMINS.includes(String(u.name || '').toLowerCase()); }
+function isOwner(u) { const n = String(u?.name || '').toLowerCase(); return n === 'fun' || ADMINS.includes(n); }
 function roleOf(u) { if (isOwner(u)) return 'owner'; if (u && u.admin) return 'admin'; if (isMod(u)) return 'moderator'; return 'player'; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
@@ -399,7 +399,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0, admin: isAdmin(u), envAdmin: ADMINS.includes(u.name.toLowerCase()) }))));
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0, admin: isAdmin(u), owner: isOwner(u), envAdmin: ADMINS.includes(u.name.toLowerCase()) }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -501,7 +501,7 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     message = `Granted full admin to ${user.name}`;
   } else if (command === 'revoke_admin') {
     if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can revoke admin' });
-    if (ADMINS.includes(user.name.toLowerCase())) return res.status(400).json({ error: 'Cannot revoke env-based admin' });
+    if (isOwner(user)) return res.status(400).json({ error: 'Cannot revoke an owner' });
     updates = { admin: false };
     message = `Revoked admin from ${user.name}`;
   } else {
@@ -599,6 +599,8 @@ app.get('/api/moderators', async (req, res) => {
     } catch {}
     out.push({ name, role });
   }
+  const rank = r => ({ owner: 0, admin: 1, moderator: 2 }[r] ?? 3);
+  out.sort((a, b) => rank(a.role) - rank(b.role) || a.name.localeCompare(b.name));
   res.json(out);
 });
 
