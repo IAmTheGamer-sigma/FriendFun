@@ -499,3 +499,18 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .party-bar { display: flex; align-items: center; gap: 10px; background: linear-gradient(90deg, #6a1b9a, #4a148c); color: #fff; padding: 8px 16px; font-size: 14px; }
 .party-members { opacity: .9; }
 .party-bar .link { color: #ffd400; margin-left: auto; background: none; border: none; cursor: pointer; font-size: 13px; }
+
+/* ---------- moderation ---------- */
+.mod-policy h3 { margin: 14px 0 4px; font-size: 15px; }
+.mod-policy p { margin: 4px 0 10px; color: #cfd2d6; font-size: 14px; }
+.mod-report { display: flex; gap: 12px; align-items: flex-start; background: rgba(255,255,255,.04); border: 1px solid #3a3a3a; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.mod-report-body { flex: 1; min-width: 0; }
+.mod-report-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.mod-urgent, .mod-review, .mod-clear { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.mod-urgent { background: #ff2020; color: #fff; }
+.mod-review { background: #ff9800; color: #000; }
+.mod-clear { background: #2ec4ff; color: #000; }
+.mod-log-row { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid #2c2c2c; font-size: 13px; flex-wrap: wrap; align-items: center; }
+.mod-act { background: #444; border-radius: 6px; padding: 1px 8px; font-size: 12px; }
+.modal label { display: block; margin: 10px 0; font-size: 14px; }
+.modal select, .modal textarea { width: 100%; margin-top: 4px; box-sizing: border-box; }
