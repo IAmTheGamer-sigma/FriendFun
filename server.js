@@ -856,9 +856,12 @@ function sanitizeWorld(w) {
     code: String(s.code || '').slice(0, 20000),
   })) : [];
   const gears = Array.isArray(w?.gears) ? [...new Set(w.gears.filter(id => typeof id === 'string' && /^gear_[a-z0-9_]+$/.test(id)))].slice(0, 10) : [];
+  const lw = w?.light || {};
+  const light = { tod: Math.max(0, Math.min(24, +lw.tod || 0)), ambient: Math.max(0, Math.min(2, lw.ambient ?? 1)), fog: Math.max(0, Math.min(1, lw.fog ?? 0.35)) };
   return { sky: /^#[0-9a-fA-F]{6}$/.test(w?.sky) ? w.sky : '#8fc8ff', parts,
     ...(w?.shooter === true ? { shooter: true } : {}),
     ...(gears.length ? { gears } : {}),
+    ...(((light.tod !== 12 || light.ambient !== 1 || light.fog !== 0.35)) ? { light } : {}),
     ...(htmlScripts.length ? { htmlScripts } : {}),
     ...(folders.length ? { folders } : {}),
     ...(scripts.length ? { scripts } : {}) };
