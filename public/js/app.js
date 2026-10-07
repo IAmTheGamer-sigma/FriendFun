@@ -1,6 +1,6 @@
 import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
 
-// ---- Badge definitions (built-in + admin-created custom) ----
+// Badge definitions
 let BADGE_DEFS = {};
 async function loadBadgeDefs() {
   try {
@@ -17,7 +17,7 @@ const badgeIcon2 = (id, size = 18) => {
 };
 import { worldThumbnail } from './three-util.js?v=ac3e6f2b';
 import * as THREE from 'three';
-// avatar3d.js (with THREE) loads lazily after login - not needed for login page
+// avatar3d loads lazily after login
 let _avatar3d = null;
 let _avatar3dLoading = null;
 async function ensureAvatar3d() {
@@ -43,7 +43,7 @@ function refreshAvatars() {
 }
 function avatarImage(avatar, mode = 'headshot') {
   if (_avatar3d) return _avatar3d.avatarImage(avatar, mode);
-  // Placeholder with data for later swap - kick off background load
+  // Placeholder; real avatar swaps in after load
   ensureAvatar3d().catch(() => {});
   const placeholder = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="35" r="20" fill="#888"/><rect x="25" y="60" width="50" height="35" rx="10" fill="#888"/></svg>');
   // Return placeholder; refreshAvatars will swap it when 3D loads
@@ -146,6 +146,11 @@ function userTile(u) {
 
 // ---------- layout ----------
 const UPDATES = [
+  { id: 'u8', date: 'Oct 7, 2026', title: 'Owner tier + FunPanel', items: [
+    'Owners get 20 extra controls: take FunTix, make mods, grant items, reset passwords, system DMs, broadcasts, maintenance mode, FunTix rain, more',
+    'Admins keep the classic panel; moderators keep the Moderation page',
+    'In-game FunPanel (🛡️ button or F4) for staff: teleport to players, mute, kick, bans, fly mode, server announcements',
+  ]},
   { id: 'u7', date: 'Oct 7, 2026', title: 'Admin levels', items: [
     'Staff now has three levels: Owner, Admin, and Moderator',
     'Owners can grant and remove admins; admins keep full panel powers otherwise',
@@ -1154,19 +1159,19 @@ async function adminPage(q = '') {
           </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
         </div>
         ${me.owner ? `<div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
-          <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Remove FunTix">Take FunTix</button></span>
+          <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Take FunTix">Take FunTix</button></span>
           <button class="btn-secondary mod-toggle" data-name="${esc(u.name)}" data-on="${u.role === 'moderator' ? '0' : '1'}" title="Toggle moderator">${u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}</button>
-          <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give a marketplace item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove a marketplace item">Remove Item</button></span>
+          <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove item">Remove Item</button></span>
           <button class="btn-secondary inv-view" data-name="${esc(u.name)}" title="See everything they own">View Items</button>
-          <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle permanent FriendClub">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
-          <button class="btn-secondary pw-reset" data-name="${esc(u.name)}" title="Set a temporary password">Reset Password</button>
-          <button class="btn-secondary rename-btn" data-name="${esc(u.name)}" title="Change their username">Rename</button>
-          <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar to default">Reset Avatar</button>
-          <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Lift their mute">Unmute</button>
-          <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="DM them as Funtopia">System DM</button>
-          <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete all games they made">Wipe Games</button>
-          <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Remove all friends">Clear Friends</button>
-          <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Remove all badges">Clear Badges</button>
+          <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle Club">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
+          <button class="btn-secondary pw-reset" data-name="${esc(u.name)}" title="Temp password">Reset Password</button>
+          <button class="btn-secondary rename-btn" data-name="${esc(u.name)}" title="Rename user">Rename</button>
+          <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar">Reset Avatar</button>
+          <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Unmute">Unmute</button>
+          <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="System DM">System DM</button>
+          <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete games">Wipe Games</button>
+          <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Clear friends">Clear Friends</button>
+          <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Clear badges">Clear Badges</button>
         </div>` : ''}
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('.admin-search').onsubmit = e => { e.preventDefault(); adminPage(e.target.q.value.trim()); };
@@ -1263,7 +1268,6 @@ async function adminPage(q = '') {
       if (!confirm(`Remove admin from ${b.dataset.name}?`)) return;
       cmd(b.dataset.name, 'revoke_admin', {});
     });
-    // ---- Owner-only per-user controls ----
     const ownerCmd = (sel, command, extraFn, confirmMsg) => app.querySelectorAll(sel).forEach(b => b.onclick = () => {
       if (confirmMsg && !confirm(typeof confirmMsg === 'function' ? confirmMsg(b) : confirmMsg)) return;
       const extra = extraFn ? extraFn(b) : {};
@@ -1315,7 +1319,6 @@ async function adminPage(q = '') {
     ownerCmd('.wipe-games', 'wipe_games', null, b => `DELETE ALL games by ${b.dataset.name}? This cannot be undone.`);
     ownerCmd('.clear-friends', 'clear_friends', null, b => `Clear all friends of ${b.dataset.name}?`);
     ownerCmd('.clear-badges', 'clear_badges', null, b => `Clear all badges of ${b.dataset.name}?`);
-    // ---- Owner site-wide tools ----
     const siteCmd = async (command, extra = {}) => {
       try { const r = await api('POST', '/api/admin/site/command', { command, ...extra }); toast(r.message || 'Done'); refreshSiteState(); }
       catch (e) { toast(e.message, true); }
