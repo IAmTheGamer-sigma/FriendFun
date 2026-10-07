@@ -214,9 +214,23 @@ function shell(active, content) {
   </aside>
   <main class="content">${content}</main>`;
 }
+async function refreshPartyBar() {
+  document.querySelector('.party-bar')?.remove();
+  if (app.className === 'fullscreen') return;
+  try {
+    const p = await api('GET', '/api/party');
+    if (!p || !p.members.length) return;
+    const bar = document.createElement('div');
+    bar.className = 'party-bar';
+    bar.innerHTML = `<b>🎉 Party (${p.members.length})</b><span class="party-members">${p.members.map(m => `${esc(m)}${m === p.leader ? ' 👑' : ''}`).join(', ')}</span><button class="link party-leave">Leave</button>`;
+    bar.querySelector('.party-leave').onclick = async () => { try { await api('POST', '/api/party/leave'); } catch {} refreshPartyBar(); toast('Left the party'); };
+    app.querySelector('.topbar')?.after(bar);
+  } catch {}
+}
 function mount(active, html, after) {
   document.body.classList.toggle('halloween', halloweenActive());
   app.className = ''; app.innerHTML = shell(active, html);
+  refreshPartyBar();
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
   if (userBtn && menu) {
@@ -386,6 +400,18 @@ async function gamePage(id) {
       </div>
     </div>`, () => {
     app.querySelector('.play-btn').onclick = () => (location.hash = '#/play/' + g.id);
+    api('GET', '/api/party').then(p => {
+      if (p && p.leader === me.name) {
+        const b = document.createElement('button');
+        b.className = 'btn-primary'; b.innerHTML = '🎉 Start Party Game';
+        b.onclick = async () => {
+          b.disabled = true;
+          try { const r = await api('POST', '/api/party/play', { gameId: g.id }); location.hash = '#/play/' + g.id + '?server=' + r.code; }
+          catch (err) { toast(err.message, true); b.disabled = false; }
+        };
+        app.querySelector('.gp-actions')?.append(b);
+      }
+    }).catch(() => {});
     const vote = async v => { const r = await api('POST', `/api/games/${g.id}/vote`, { vote: v }); g.vote = r.vote; route(); };
     app.querySelector('.vote-up').onclick = () => vote(1); app.querySelector('.vote-down').onclick = () => vote(-1);
     app.querySelector('.gp-fav').onclick = async () => { const r = await api('POST', `/api/games/${g.id}/favorite`); me.favorites = r.favorited ? [...me.favorites, g.id] : me.favorites.filter(x => x !== g.id); route(); };
@@ -647,9 +673,17 @@ async function friendsPage() {
     ${fr.requests.length ? `<section><div class="sec-h"><h2>Friend Requests (${fr.requests.length})</h2></div><div class="req-list">${fr.requests.map(u => `
       <div class="req">${avatarImgTag(u.avatar)}<a href="#/users/${encodeURIComponent(u.name)}">${esc(u.name)}</a><button class="btn-primary" data-accept="${esc(u.name)}">Accept</button><button class="btn-secondary" data-decline="${esc(u.name)}">Ignore</button></div>`).join('')}</div></section>` : ''}
     <section><div class="sec-h"><h2>My Friends (${fr.friends.length})</h2></div>
-      <div class="friend-grid">${fr.friends.map(u => `<div class="friend-card">${userTile(u)}<div class="friend-card-actions"><a class="btn-secondary btn-small" href="#/messages/${encodeURIComponent(u.name)}">Message</a>${u.gameId ? `<a class="btn-join" href="#/play/${u.gameId}">Join</a>` : `<span class="muted small">${u.online ? 'Online' : 'Offline'}</span>`}</div></div>`).join('') || '<p class="muted">No friends yet. Search for people above!</p>'}</div></section>`, () => {
+      <div class="friend-grid">${fr.friends.map(u => `<div class="friend-card">${userTile(u)}<div class="friend-card-actions"><a class="btn-secondary btn-small" href="#/messages/${encodeURIComponent(u.name)}">Message</a><button class="btn-secondary btn-small" data-party="${esc(u.name)}">🎉</button>${u.gameId ? `<a class="btn-join" href="#/play/${u.gameId}">Join</a>` : `<span class="muted small">${u.online ? 'Online' : 'Offline'}</span>`}</div></div>`).join('') || '<p class="muted">No friends yet. Search for people above!</p>'}</div></section>`, () => {
     app.querySelectorAll('[data-accept]').forEach(b => b.onclick = async () => { await api('POST', '/api/friends/' + encodeURIComponent(b.dataset.accept)); toast('You are now friends with ' + b.dataset.accept); me = await api('GET', '/api/me'); friendsPage(); });
     app.querySelectorAll('[data-decline]').forEach(b => b.onclick = async () => { await api('DELETE', '/api/friends/' + encodeURIComponent(b.dataset.decline)); me = await api('GET', '/api/me'); friendsPage(); });
+    app.querySelectorAll('[data-party]').forEach(b => b.onclick = async () => {
+      try {
+        let p = await api('GET', '/api/party');
+        if (!p) p = await api('POST', '/api/party');
+        await api('POST', `/api/party/${p.id}/invite`, { user: b.dataset.party });
+        toast('Party invite sent to ' + b.dataset.party + '!');
+      } catch (err) { toast(err.message, true); }
+    });
     app.querySelector('.user-search').onsubmit = async e => {
       e.preventDefault();
       const r = await api('GET', '/api/search/users?q=' + encodeURIComponent(e.target.q.value));
@@ -1191,6 +1225,13 @@ async function route() {
       case 'users': return await profilePage(decodeURIComponent(seg[1]));
       case 'create': return await createPage();
       case 'updates': return updatesPage();
+      case 'party':
+        if (seg[1] === 'join' && seg[2]) {
+          try { await api('POST', '/api/party/join/' + seg[2]); toast('Joined the party! 🎉'); }
+          catch (err) { toast(err.message, true); }
+          location.hash = '#/home'; return;
+        }
+        location.hash = '#/home'; return;
       case 'studio': return await studioPage(seg[1], seg[2]);
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
