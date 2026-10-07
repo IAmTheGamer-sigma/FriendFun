@@ -467,3 +467,9 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .dm-msg { position: relative; }
 .dm-del { display: none; position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: none; background: #e53935; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
 .dm-msg.me:hover .dm-del { display: block; }
+
+/* ---------- studio lighting ---------- */
+.rb-light { flex-wrap: wrap; }
+.rb-slider { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
+.rb-slider input[type=range] { width: 90px; accent-color: #ffd400; }
+.rb-tod-v { min-width: 34px; font-size: 12px; }
