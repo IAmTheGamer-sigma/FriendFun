@@ -96,6 +96,11 @@ async function statusOf(name) {
 
 // helpers
 function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin; }
+// Staff tiers: owner (env admins) > admin (DB flag) > moderator (named group) > player.
+// Owners can do everything including granting/revoking admin. Admins get the full
+// admin panel except managing other admins. Moderators get mute/kick/review only.
+function isOwner(u) { return !!u && ADMINS.includes(String(u.name || '').toLowerCase()); }
+function roleOf(u) { if (isOwner(u)) return 'owner'; if (u && u.admin) return 'admin'; if (isMod(u)) return 'moderator'; return 'player'; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
   const has = {
@@ -121,7 +126,7 @@ async function publicUser(u) {
   const badge = u.badge === 'none' ? null : (badges.includes(u.badge) ? u.badge : badges[0] || null);
 
   return {
-    name: u.name, club: isClub(u), admin: isAdmin(u), moderator: isMod(u), badges, badge,
+    name: u.name, club: isClub(u), admin: isAdmin(u), moderator: isMod(u), owner: isOwner(u), role: roleOf(u), badges, badge,
     avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length,
     ...(await statusOf(u.name))
   };
@@ -490,12 +495,12 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     updates = { banned: false, banReason: '', bannedUntil: 0 };
     message = `Unbanned ${user.name}`;
   } else if (command === 'grant_admin') {
-    if (!['fun', 'bro'].includes(req.user.name.toLowerCase())) return res.status(403).json({ error: 'Only @fun and @bro can grant admin' });
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can grant admin' });
     if (isAdmin(user)) return res.status(400).json({ error: 'Already an admin' });
     updates = { admin: true };
     message = `Granted full admin to ${user.name}`;
   } else if (command === 'revoke_admin') {
-    if (!['fun', 'bro'].includes(req.user.name.toLowerCase())) return res.status(403).json({ error: 'Only @fun and @bro can revoke admin' });
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can revoke admin' });
     if (ADMINS.includes(user.name.toLowerCase())) return res.status(400).json({ error: 'Cannot revoke env-based admin' });
     updates = { admin: false };
     message = `Revoked admin from ${user.name}`;
@@ -585,7 +590,16 @@ const staffGuard = target => isMod(target) ? 'You cannot take moderation action 
 app.get('/api/moderators', async (req, res) => {
   const set = new Set(MODERATORS);
   try { const { data } = await supabase.from('users').select('name').eq('moderator', true); for (const u of data || []) set.add(String(u.name).toLowerCase()); } catch {}
-  res.json([...set].map(name => ({ name })));
+  const out = [];
+  for (const name of set) {
+    let role = 'moderator';
+    try {
+      const { data: u } = await supabase.from('users').select('name,admin').eq('name', name).maybeSingle();
+      if (u) role = roleOf(u);
+    } catch {}
+    out.push({ name, role });
+  }
+  res.json(out);
 });
 
 app.post('/api/report', auth, async (req, res) => {
