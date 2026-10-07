@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=02219481').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=76feaaaa').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=31ccb953';
+import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=93b57b2c';
 import { templates } from './worlds.js?v=542bb3d8';
 import { startSpooky, stopSpooky } from './sound.js?v=89850e26';
 
@@ -140,12 +140,18 @@ function gameCard(g) {
 function userTile(u) {
   const st = u.gameId ? 'ingame' : u.online ? 'online' : '';
   return `<a class="user-tile" href="#/users/${encodeURIComponent(u.name)}" title="${u.gameName ? 'Playing ' + esc(u.gameName) : ''}">
-    <div class="ut-img ${st}">${avatarImgTag(u.avatar)}</div><div class="ut-name">${esc(u.name)}</div>
+    <div class="ut-img ${st}">${avatarImgTag(u.avatar)}</div><div class="ut-name">${esc(u.name)}${u.moderator ? ' 🛡️' : ''}</div>
     ${u.gameName ? `<div class="ut-game">${esc(u.gameName)}</div>` : ''}</a>`;
 }
 
 // ---------- layout ----------
 const UPDATES = [
+  { id: 'u6', date: 'Oct 7, 2026', title: 'Moderator team is live', items: [
+    'Funtopia has its first moderators: @bro, @fun, @nsc9510alt and @nsc9510ft',
+    'New Moderation page: report players from their profile, moderators get a review queue',
+    'Every report gets an automated first-pass label (clear / needs review / urgent) — humans make all decisions',
+    'Bans now need two separate confirmations from two different moderators or admins',
+  ]},
   { id: 'u5', date: 'Oct 6, 2026', title: 'Shooter games & gear hotbar', items: [
     'Three new PvP shooter arenas: Block Arena, Fort Battle, Rooftop Rumble — shoot other players!',
     'Roblox-style gear hotbar in every game (click or press 1-9)',
@@ -208,7 +214,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['messages', 'Messages', icons.chat], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['leaderboard', 'Leaderboard', icons.trophy], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
       .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -878,7 +884,7 @@ async function profilePage(name) {
       <div class="ph-info"><h1>${esc(u.name)}${badgeIcon2(u.badge)}</h1><div class="muted">@${esc(u.name)}</div>
         <div class="ph-stats"><div><b>${u.friends}</b> Friends</div><div><b>${u.games.length}</b> Creations</div><div>${u.gameName ? `Playing <a href="#/games/${u.gameId}">${esc(u.gameName)}</a>` : u.online ? 'Online' : 'Offline'}</div></div>
       </div>
-      <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `<a class="btn-secondary" href="#/messages/${encodeURIComponent(u.name)}">Message</a>${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : '<button class="btn-primary add-friend">Add Friend</button>'}</div>
+      <div class="ph-actions">${isMe ? '<a class="btn-secondary" href="#/avatar">Edit Avatar</a>' : u.isFriend ? `<a class="btn-secondary" href="#/messages/${encodeURIComponent(u.name)}">Message</a>${u.gameId ? `<a class="btn-primary" href="#/play/${u.gameId}">Join Game</a>` : ''}<button class="btn-secondary unfriend">Unfriend</button><button class="btn-secondary report-btn">Report</button>` : u.requested ? '<button class="btn-secondary" disabled>Request Sent</button>' : `<button class="btn-primary add-friend">Add Friend</button><button class="btn-secondary report-btn">Report</button>`}</div>
     </div>
     <section><div class="sec-h"><h2>About</h2>${isMe ? '<button class="link edit-bio">Edit</button>' : ''}</div><p class="bio">${esc(u.bio || (isMe ? 'Tell people about yourself!' : 'This user has no bio.'))}</p></section>
     <section><div class="sec-h"><h2>Badges (${u.badges.length})</h2></div>
@@ -892,6 +898,7 @@ async function profilePage(name) {
     </section>
     <section><div class="sec-h"><h2>Creations</h2></div><div class="game-row">${u.games.map(gameCard).join('') || '<p class="muted">No creations yet.</p>'}</div></section>`, () => {
     app.querySelector('.add-friend')?.addEventListener('click', async () => { const r = await api('POST', '/api/friends/' + encodeURIComponent(u.name)); toast(r.status === 'friends' ? 'You are now friends!' : 'Friend request sent'); profilePage(name); });
+    app.querySelector('.report-btn')?.addEventListener('click', () => reportModal(u.name, 'user'));
     app.querySelector('.unfriend')?.addEventListener('click', () => confirmModal('Unfriend', `Unfriend ${esc(u.name)}?`, 'Unfriend', async () => { await api('DELETE', '/api/friends/' + encodeURIComponent(u.name)); profilePage(name); }));
     app.querySelectorAll('button[data-badge]').forEach(b => b.onclick = async () => {
       try { await api('PUT', '/api/me/badge', { badge: b.dataset.badge }); toast('Badge updated'); profilePage(name); }
@@ -927,7 +934,7 @@ async function studioPage(id, tpl) {
   else { g = await api('GET', '/api/games/' + id); if (g.creator.toLowerCase() !== me.name.toLowerCase()) { toast('You can only edit your own games', true); location.hash = '#/games/' + id; return; } }
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
-  const { Studio } = await import('./studio.js?v=e226e987');
+  const { Studio } = await import('./studio.js?v=5bdff803');
   const studio = new Studio(app.querySelector('.studio-container'), {
     gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
@@ -951,6 +958,107 @@ async function leaderboardPage() {
         <span class="lbp-name">${badgeIcon(u.badge)}${esc(u.name)}${u.online ? '<i class="dot" title="Online"></i>' : ''}</span>
         <span class="lbp-tix">${tix}${u.funtix.toLocaleString()}</span></a>`).join('')}</div>`);
 }
+// ---------- Moderation ----------
+const MOD_POLICY = `
+<h3>What moderators do</h3>
+<p>Review content players report, mute disruptive players (up to 24 hours), remove players from game sessions, and escalate serious cases. Moderators never get extra FunTix, items, or admin powers — just safety tools.</p>
+<h3>Automated first pass</h3>
+<p>Every report is scanned automatically and labeled <b>clear</b>, <b>needs review</b>, or <b>urgent</b>. Threats and shared personal info (phone numbers, emails) are always urgent. The automated pass never mutes, kicks, or bans anyone — it only decides what humans look at first.</p>
+<h3>Bans need two people</h3>
+<p>No ban takes effect until two different moderators or admins confirm it separately. One person can never ban alone.</p>
+<h3>What moderators see</h3>
+<p>Only content players reported. Moderators do not get a feed of everyone's activity — no surveillance, just the report queue.</p>
+<h3>Safety basics</h3>
+<p>Never share personal info (phone, email, address, school) in chat, messages, or game names. Threats and targeted harassment are treated as urgent. If someone is bothering you, report them from their profile.</p>`;
+
+function reportModal(target, type = 'user') {
+  const d = document.createElement('div'); d.className = 'modal-bg';
+  d.innerHTML = `<div class="modal"><h2>Report ${esc(target)}</h2>
+    <p class="muted small">Reports go to the moderator review queue. An automated first pass labels it, then a human reviews it.</p>
+    <label>Reason<select class="rp-reason">${['Harassment', 'Spam', 'Cheating', 'Inappropriate content', 'Sharing personal info', 'Threats', 'Other'].map(r => `<option>${r}</option>`).join('')}</select></label>
+    <label>Details<textarea class="rp-details" maxlength="500" rows="3" placeholder="What happened? (optional)"></textarea></label>
+    <div class="modal-actions"><button class="btn-secondary rp-cancel">Cancel</button><button class="btn-primary rp-send">Send Report</button></div></div>`;
+  document.body.appendChild(d);
+  d.querySelector('.rp-cancel').onclick = () => d.remove();
+  d.onclick = e => { if (e.target === d) d.remove(); };
+  d.querySelector('.rp-send').onclick = async () => {
+    const reason = d.querySelector('.rp-reason').value;
+    const details = d.querySelector('.rp-details').value.trim();
+    try {
+      const r = await api('POST', '/api/report', { type, target, reason, details });
+      d.remove(); toast(r.message || 'Report sent');
+    } catch (e) { toast(e.message, true); }
+  };
+}
+
+async function moderationPage() {
+  const mods = await api('GET', '/api/moderators').catch(() => []);
+  const isMod = !!(me?.moderator || me?.admin);
+  let queue = [], pending = [], log = [];
+  if (isMod) {
+    queue = await api('GET', '/api/mod/queue').catch(() => []);
+    pending = await api('GET', '/api/mod/ban/pending').catch(() => []);
+    log = await api('GET', '/api/mod/log').catch(() => []);
+  }
+  const badge = l => l === 'urgent' ? '<span class="mod-urgent">URGENT</span>' : l === 'review' ? '<span class="mod-review">REVIEW</span>' : '<span class="mod-clear">CLEAR</span>';
+  const reload = () => moderationPage();
+  mount('moderation', `<h1>🛡️ Moderation</h1>
+    <section><div class="sec-h"><h2>Policy</h2></div><div class="mod-policy">${MOD_POLICY}</div></section>
+    <section><div class="sec-h"><h2>Moderators (${mods.length})</h2></div>
+      <div class="friends-row">${mods.map(m => `<a class="user-tile" href="#/users/${encodeURIComponent(m.name)}"><div class="ut-name">🛡️ ${esc(m.name)}</div><div class="ut-game">Moderator</div></a>`).join('')}</div></section>
+    ${isMod ? `
+    <section><div class="sec-h"><h2>Review Queue (${queue.length})</h2></div>
+      ${queue.map(r => `<div class="mod-report">${badge(r.label)}
+        <div class="mod-report-body"><b>${esc(r.type)}: ${esc(r.target)}</b><div>${esc(r.reason)}</div>
+        ${r.details ? `<div class="muted small">${esc(r.details)}</div>` : ''}
+        <div class="muted small">Reported by ${esc(r.by)} · ${new Date(r.t).toLocaleString()}${r.flags.length ? ' · ' + r.flags.map(esc).join(', ') : ''}</div></div>
+        <div class="mod-report-actions">
+          <button class="btn-secondary btn-small" data-dismiss="${r.id}">Dismiss</button>
+          ${r.type === 'user' ? `<button class="btn-secondary btn-small" data-mute="${esc(r.target)}">Mute</button>
+          <button class="btn-secondary btn-small" data-kick="${esc(r.target)}">Kick</button>
+          <button class="btn-danger btn-small" data-ban="${esc(r.target)}">Ban…</button>` : ''}
+        </div></div>`).join('') || '<p class="muted">Queue is clear. 🎉</p>'}</section>
+    <section><div class="sec-h"><h2>Bans awaiting second confirmation (${pending.length})</h2></div>
+      ${pending.map(p => `<div class="mod-report"><div class="mod-report-body"><b>${esc(p.name)}</b>
+        <div>${esc(p.reason)}${p.days ? ` (${p.days}d)` : ' (permanent)'}</div>
+        <div class="muted small">Started by ${esc(p.by)} · expires ${new Date(p.expires).toLocaleTimeString()}</div></div>
+        <div class="mod-report-actions">${p.by.toLowerCase() === me.name.toLowerCase()
+          ? '<span class="muted small">Waiting for someone else to confirm</span>'
+          : `<button class="btn-danger btn-small" data-confirm-ban="${p.token}" data-name="${esc(p.name)}">Confirm ban (2/2)</button>`}</div></div>`).join('') || '<p class="muted">None pending.</p>'}</section>
+    <section><div class="sec-h"><h2>Action Log</h2></div>
+      <div>${log.map(e => `<div class="mod-log-row"><span class="muted small">${new Date(e.t).toLocaleString()}</span><b>${esc(e.by)}</b><span class="mod-act">${esc(e.action)}</span><span>${esc(e.target)}</span><span class="muted small">${esc(e.reason || '')}</span></div>`).join('') || '<p class="muted">No actions yet.</p>'}</div></section>` : ''}`,
+  () => {
+    app.querySelectorAll('[data-dismiss]').forEach(b => b.onclick = async () => {
+      try { await api('POST', '/api/mod/reports/' + b.dataset.dismiss, { action: 'dismiss' }); toast('Report dismissed'); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('[data-mute]').forEach(b => b.onclick = async () => {
+      const minutes = parseInt(prompt(`Mute ${b.dataset.mute} for how many minutes? (max 1440)`, '30') || '0', 10);
+      if (!minutes) return;
+      const reason = prompt('Mute reason:', 'Disruptive behavior') || '';
+      if (reason === null) return;
+      try { await api('POST', '/api/mod/mute', { name: b.dataset.mute, minutes, reason }); toast(`Muted ${b.dataset.mute}`); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => confirmModal('Kick player', `Kick ${esc(b.dataset.kick)} from their game session?`, 'Kick', async () => {
+      try { await api('POST', '/api/mod/kick', { name: b.dataset.kick, reason: 'Kicked by a moderator' }); toast('Kicked'); reload(); }
+      catch (e) { toast(e.message, true); }
+    }));
+    app.querySelectorAll('[data-ban]').forEach(b => b.onclick = async () => {
+      const reason = prompt(`Ban ${b.dataset.ban}? Enter reason:`) || '';
+      if (reason === null) return;
+      const days = Math.max(0, parseInt(prompt('Ban duration in days (0 = permanent):', '0') || '0', 10));
+      if (!confirm(`STEP 1 of 2: start a ban of ${b.dataset.ban}${days ? ` for ${days} days` : ' permanently'}? A DIFFERENT moderator or admin must confirm before it takes effect.`)) return;
+      try { await api('POST', '/api/mod/ban/initiate', { name: b.dataset.ban, reason, days }); toast('First confirmation recorded — waiting for a second person.'); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('[data-confirm-ban]').forEach(b => b.onclick = () => confirmModal('Confirm ban (2/2)', `You are the SECOND confirmation. Ban ${esc(b.dataset.name)}? This takes effect immediately.`, 'Ban', async () => {
+      try { const r = await api('POST', '/api/mod/ban/confirm', { token: b.dataset.confirmBan }); toast(r.message || 'Banned'); reload(); }
+      catch (e) { toast(e.message, true); }
+    }));
+  });
+}
+
 async function adminPage(q = '') {
   if (!me.admin) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
@@ -1081,14 +1189,17 @@ async function adminPage(q = '') {
     });
     app.querySelectorAll('.ai-grant').forEach(b => b.onclick = () => cmd(b.dataset.name, 'grant_ai', {}));
     app.querySelectorAll('.ai-revoke').forEach(b => b.onclick = () => cmd(b.dataset.name, 'revoke_ai', {}));
-    app.querySelectorAll('.ban-btn').forEach(b => b.onclick = () => {
-      const reason = prompt(`Ban ${b.dataset.name}? Enter reason (optional):`) || '';
+    app.querySelectorAll('.ban-btn').forEach(b => b.onclick = async () => {
+      const reason = prompt(`Ban ${b.dataset.name}? Enter reason:`) || '';
       if (reason === null) return;
       const daysStr = prompt('Ban duration in days (0 = permanent):', '0');
       if (daysStr === null) return;
       const days = Math.max(0, parseInt(daysStr) || 0);
-      if (!confirm(`Ban ${b.dataset.name}${days ? ` for ${days} days` : ' permanently'}?`)) return;
-      cmd(b.dataset.name, 'ban', { reason, days });
+      if (!confirm(`STEP 1 of 2: start a ban of ${b.dataset.name}${days ? ` for ${days} days` : ' permanently'}? A DIFFERENT moderator or admin must confirm on the Moderation page before it takes effect.`)) return;
+      try {
+        await api('POST', '/api/mod/ban/initiate', { name: b.dataset.name, reason, days });
+        toast('First confirmation recorded. A different moderator or admin must confirm in Moderation.');
+      } catch (e) { toast(e.message, true); }
     });
     app.querySelectorAll('.ban-revoke').forEach(b => b.onclick = () => {
       if (!confirm(`Unban ${b.dataset.name}?`)) return;
@@ -1236,6 +1347,7 @@ async function route() {
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
       case 'admin': return await adminPage();
+      case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
       case 'horror': return horrorPage();
       case 'addons': return await addonsPage();
