@@ -966,7 +966,7 @@ async function leaderboardPage() {
 // ---------- Moderation ----------
 const MOD_POLICY = `
 <h3>Admin levels</h3>
-<p><b>Owner</b> — full control, including granting and removing admins. <b>Admin</b> — everything except managing other admins. <b>Moderator</b> — mute, kick, review the report queue, and start bans (which still need a second person to confirm). No level can take action against someone at the same level or higher.</p>
+<p><b>Owner</b> — full control, including granting and removing admins. <b>Admin</b> — everything except managing other admins. <b>Moderator</b> — mute, kick, review the report queue, and start bans (which still need a second person to confirm). @fun is the site owner — the highest level; no one can outrank or demote the owner. No level can take action against someone at the same level or higher.</p>
 <h3>What moderators do</h3>
 <p>Review content players report, mute disruptive players (up to 24 hours), remove players from game sessions, and escalate serious cases. Moderators never get extra FunTix, items, or admin powers — just safety tools.</p>
 <h3>Automated first pass</h3>
@@ -1122,7 +1122,7 @@ async function adminPage(q = '') {
               : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
           </span>
           ${me.owner ? `<span class="admin-inline">
-            ${u.envAdmin ? '<span class="muted small">Env Admin</span>' : u.admin
+            ${u.owner ? '<span class="muted small">Owner</span>' : u.admin
               ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
               : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
           </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
