@@ -340,6 +340,7 @@ function dailyToast(r) { if (r?.daily) toast(`Daily reward: +${r.daily} FunTix!`
 
 // ---------- pages ----------
 function loginPage() {
+  document.body.classList.toggle('halloween', halloweenActive());
   app.className = 'landing';
   app.innerHTML = `
   <div class="landing-bg"></div>
@@ -1090,7 +1091,7 @@ async function moderationPage() {
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=ae4329b8');
+  const m = await import('./admin.js?v=8b51a0e5');
   return m.adminPage(adminDeps, q);
 }
 
