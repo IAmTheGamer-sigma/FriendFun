@@ -73,17 +73,36 @@ export function makePartMesh(p) {
   return mesh;
 }
 
-export function setupLighting(scene, sky) {
-  scene.background = new THREE.Color(sky);
-  scene.fog = new THREE.Fog(sky, 250, 900);
-  scene.add(new THREE.HemisphereLight('#ffffff', '#776655', 1.1));
+// Roblox-Studio-style lighting: light = { tod: 0-24, ambient: 0-2, fog: 0-1 }
+export function applyLighting(scene, sun, hemi, sky, light = {}) {
+  const tod = Math.max(0, Math.min(24, +light.tod || 0));
+  const ambient = Math.max(0, Math.min(2, light.ambient ?? 1));
+  const fogAmt = Math.max(0, Math.min(1, light.fog ?? 0.35));
+  const ang = (tod - 6) / 12 * Math.PI; // 6h sunrise, 12h noon, 18h sunset
+  const day = Math.max(0, Math.min(1, Math.sin(ang) * 1.4 + 0.12)); // 0 night .. 1 noon
+  sun.position.set(Math.cos(ang) * 140, Math.sin(ang) * 140, 40);
+  sun.intensity = 0.08 + 2.0 * day;
+  sun.color.set(day < 0.45 ? '#ff9a5c' : '#fff6e0');
+  hemi.intensity = ambient * (0.3 + 0.9 * day);
+  const base = new THREE.Color(sky);
+  const night = new THREE.Color('#0b0e24');
+  const mixed = night.clone().lerp(base, 0.12 + 0.88 * day);
+  scene.background.copy(mixed);
+  const near = 400 - fogAmt * 340, far = 1200 - fogAmt * 950;
+  if (!scene.fog) scene.fog = new THREE.Fog(mixed, near, far);
+  else { scene.fog.color.copy(mixed); scene.fog.near = near; scene.fog.far = far; }
+}
+export function setupLighting(scene, sky, light) {
+  const hemi = new THREE.HemisphereLight('#ffffff', '#776655', 1.1);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight('#fff6e0', 2.0);
-  sun.position.set(60, 120, 40);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const c = sun.shadow.camera; c.left = c.bottom = -90; c.right = c.top = 90; c.near = 1; c.far = 400;
   sun.shadow.bias = -0.0005;
   scene.add(sun); scene.add(sun.target);
+  applyLighting(scene, sun, hemi, sky, light);
+  scene.userData.lighting = { sun, hemi };
   return sun;
 }
 
