@@ -44,6 +44,15 @@ const money = u => ({ funtix: Number(u.funtix) || 0 });
 const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
 // Owner-granted moderators (used when the users.moderator column is missing).
 const extraMods = new Set();
+// Featured games (used when the games.featured column is missing).
+const featuredGames = new Set();
+async function setFeatured(id, on) {
+  try {
+    const { error } = await supabase.from('games').update({ featured: !!on }).eq('id', id);
+    if (error) throw error;
+    featuredGames.delete(id);
+  } catch { on ? featuredGames.add(id) : featuredGames.delete(id); }
+}
 
 // ---------- add-ons ----------
 const ADDONS = [
@@ -135,7 +144,7 @@ async function publicUser(u) {
 }
 function gameSummary(g) {
   let playing = 0; for (const [k, r] of rooms) if (k === g.id || k.startsWith(g.id + ':')) playing += r.players.size;
-  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky, maxPlayers: g.max_players || 30 };
+  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky, maxPlayers: g.max_players || 30, featured: !!g.featured || featuredGames.has(g.id) };
 }
 const BAD = ['damn', 'hell', 'stupid', 'idiot', 'dumb', 'crap', 'shut up', 'loser'];
 function filter(text) {
@@ -598,6 +607,46 @@ app.get('/api/admin/users/:name/inventory', auth, async (req, res) => {
   res.json({ name: u.name, items: (u.inventory || []).map(id => { const it = CATALOG.find(i => i.id === id); return { id, name: it ? it.name : id }; }) });
 });
 
+// ---------- Game management (admin panel) ----------
+app.get('/api/admin/games', auth, adminOnly, async (req, res) => {
+  const q = key(String(req.query.q || ''));
+  let query = supabase.from('games').select('id, name, creator, visits, likes, dislikes, unpublished, featured, created').order('visits', { ascending: false }).limit(100);
+  if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json((data || []).map(g => ({ ...g, featured: !!g.featured || featuredGames.has(g.id) })));
+});
+app.post('/api/admin/games/:id/command', auth, adminOnly, async (req, res) => {
+  const { data: g } = await supabase.from('games').select('*').eq('id', req.params.id).maybeSingle();
+  if (!g) return res.status(404).json({ error: 'Game not found' });
+  const command = String(req.body?.command || '');
+  let message;
+  if (command === 'toggle_publish') {
+    const { error } = await supabase.from('games').update({ unpublished: !g.unpublished }).eq('id', g.id);
+    if (error) return res.status(500).json({ error: error.message });
+    message = g.unpublished ? `Published "${g.name}"` : `Unpublished "${g.name}" (hidden from Discover)`;
+  } else if (command === 'feature') {
+    await setFeatured(g.id, true); message = `Featured "${g.name}" on Discover`;
+  } else if (command === 'unfeature') {
+    await setFeatured(g.id, false); message = `Unfeatured "${g.name}"`;
+  } else if (command === 'rename') {
+    const name = String(req.body?.name || '').slice(0, 50).trim() || 'Untitled Game';
+    const { error } = await supabase.from('games').update({ name }).eq('id', g.id);
+    if (error) return res.status(500).json({ error: error.message });
+    message = `Renamed to "${name}"`;
+  } else if (command === 'reset_visits') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    await supabase.from('games').update({ visits: 0 }).eq('id', g.id);
+    message = `Reset visits for "${g.name}"`;
+  } else if (command === 'delete') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    await supabase.from('games').delete().eq('id', g.id);
+    featuredGames.delete(g.id);
+    message = `Deleted "${g.name}"`;
+  } else return res.status(400).json({ error: 'Unknown game command' });
+  res.json({ ok: true, message });
+});
+
 // ---------- Owner site controls ----------
 let siteAnnounce = null, maintenance = false;
 app.post('/api/admin/site/command', auth, async (req, res) => {
@@ -1048,7 +1097,7 @@ app.get('/api/games', auth, async (req, res) => {
   if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
   const { data: games } = await query;
   const list = (games || []).map(gameSummary);
-  list.sort((a, b) => (b.playing - a.playing) || (b.visits - a.visits));
+  list.sort((a, b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || (b.playing - a.playing) || (b.visits - a.visits));
   res.json(list);
 });
 
