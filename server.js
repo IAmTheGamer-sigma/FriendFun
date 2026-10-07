@@ -56,6 +56,40 @@ async function setFeatured(id, on) {
     featuredGames.delete(id);
   } catch { on ? featuredGames.add(id) : featuredGames.delete(id); }
 }
+// games.featured / games.unpublished columns are added by Zayd in Supabase;
+// until then, fall back gracefully so a missing column never breaks a page.
+async function creatorGames(name) {
+  try {
+    const { data, error } = await supabase.from('games').select('id, visits').eq('creator', key(name)).eq('unpublished', false);
+    if (error) throw error;
+    return data || [];
+  } catch {
+    const { data } = await supabase.from('games').select('id, visits').eq('creator', key(name));
+    return data || [];
+  }
+}
+async function adminGamesList(q) {
+  const run = async cols => {
+    let query = supabase.from('games').select(cols).order('visits', { ascending: false }).limit(100);
+    if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
+    return query;
+  };
+  let { data, error } = await run('id, name, creator, visits, likes, dislikes, unpublished, featured, created');
+  if (error) ({ data, error } = await run('id, name, creator, visits, likes, dislikes, created'));
+  if (error) throw error;
+  return (data || []).map(g => ({ ...g, unpublished: !!g.unpublished, featured: !!g.featured || featuredGames.has(g.id) }));
+}
+async function discoverGames(q) {
+  const run = async filtered => {
+    let query = supabase.from('games').select('*');
+    if (filtered) query = query.eq('unpublished', false);
+    if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
+    return query;
+  };
+  let { data, error } = await run(true);
+  if (error) ({ data } = await run(false));
+  return (data || []).filter(g => !g.unpublished).map(gameSummary);
+}
 
 // ---------- add-ons ----------
 const ADDONS = [
@@ -134,7 +168,7 @@ function badgeOf(u) {
   return list.includes(u.badge) ? u.badge : list[0] || null;
 }
 async function publicUser(u) {
-  const { data: publishedGames } = await supabase.from('games').select('id, visits').eq('creator', key(u.name)).eq('unpublished', false);
+  const publishedGames = await creatorGames(u.name);
   const games = publishedGames || [], visits = games.reduce((total, game) => total + (Number(game.visits) || 0), 0);
   const badges = [...new Set([...badgesOf(u), ...(games.length ? ['creator'] : []), ...(games.length >= 5 ? ['builder_5'] : []), ...(games.length >= 10 ? ['builder_10'] : []), ...(visits >= 100 ? ['popular_100'] : []), ...(visits >= 1000 ? ['popular_1000'] : [])])];
   const badge = u.badge === 'none' ? null : (badges.includes(u.badge) ? u.badge : badges[0] || null);
@@ -624,11 +658,8 @@ app.get('/api/admin/users/:name/inventory', auth, async (req, res) => {
 // ---------- Game management (admin panel) ----------
 app.get('/api/admin/games', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
-  let query = supabase.from('games').select('id, name, creator, visits, likes, dislikes, unpublished, featured, created').order('visits', { ascending: false }).limit(100);
-  if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
-  const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
-  res.json((data || []).map(g => ({ ...g, featured: !!g.featured || featuredGames.has(g.id) })));
+  try { res.json(await adminGamesList(q)); }
+  catch (e) { return res.status(500).json({ error: e.message }); }
 });
 app.post('/api/admin/games/:id/command', auth, adminOnly, async (req, res) => {
   const { data: g } = await supabase.from('games').select('*').eq('id', req.params.id).maybeSingle();
@@ -637,7 +668,7 @@ app.post('/api/admin/games/:id/command', auth, adminOnly, async (req, res) => {
   let message;
   if (command === 'toggle_publish') {
     const { error } = await supabase.from('games').update({ unpublished: !g.unpublished }).eq('id', g.id);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return res.status(500).json({ error: /unpublished/i.test(error.message) ? 'Database is missing the games.unpublished column — run the SQL from chat, then retry.' : error.message });
     message = g.unpublished ? `Published "${g.name}"` : `Unpublished "${g.name}" (hidden from Discover)`;
   } else if (command === 'feature') {
     await setFeatured(g.id, true); message = `Featured "${g.name}" on Discover`;
@@ -1116,10 +1147,7 @@ app.delete('/api/friends/:name', auth, async (req, res) => {
 
 app.get('/api/games', auth, async (req, res) => {
   const q = key(String(req.query.q || ''));
-  let query = supabase.from('games').select('*').eq('unpublished', false);
-  if (q) query = query.or(`name.ilike.%${q}%,creator.ilike.%${q}%`);
-  const { data: games } = await query;
-  const list = (games || []).map(gameSummary);
+  const list = await discoverGames(q);
   list.sort((a, b) => ((b.featured ? 1 : 0) - (a.featured ? 1 : 0)) || (b.playing - a.playing) || (b.visits - a.visits));
   res.json(list);
 });
