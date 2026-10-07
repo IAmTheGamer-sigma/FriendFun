@@ -524,8 +524,14 @@ async function dmPage(name) {
     <form class="dm-form"><input maxlength="500" placeholder="Message ${esc(name)}..." autocomplete="off"><button class="btn-primary">Send</button></form>`, () => {
     const thread = app.querySelector('.dm-thread');
     const render = () => {
-      thread.innerHTML = msgs.map(m => `<div class="dm-msg ${m.sender === me.name ? 'me' : ''}"><span>${esc(m.text)}</span><i>${timeAgo(m.created)}</i></div>`).join('');
+      thread.innerHTML = msgs.map(m => `<div class="dm-msg ${m.sender === me.name ? 'me' : ''}"><span>${esc(m.text)}</span><i>${timeAgo(m.created)}</i>${m.sender === me.name ? `<button class="dm-del" data-id="${m.id}" title="Delete message">&times;</button>` : ''}</div>`).join('');
       thread.scrollTop = thread.scrollHeight;
+      thread.querySelectorAll('.dm-del').forEach(b => b.onclick = async e => {
+        e.stopPropagation();
+        if (!confirm('Delete this message?')) return;
+        try { await api('DELETE', '/api/dm/' + b.dataset.id); msgs = msgs.filter(m => String(m.id) !== b.dataset.id); render(); }
+        catch (err) { toast(err.message, true); }
+      });
     };
     render();
     const t = setInterval(async () => {
