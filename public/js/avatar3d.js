@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=31ccb953';
-import { renderToDataURL } from './three-util.js?v=6bc4de5a';
+import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
 
 const faceCache = {}, shirtCache = {};
 function faceTexture(id) {
