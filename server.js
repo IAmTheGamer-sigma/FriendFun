@@ -44,6 +44,9 @@ const money = u => ({ funtix: Number(u.funtix) || 0 });
 const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
 // Owner-granted moderators (used when the users.moderator column is missing).
 const extraMods = new Set();
+// Gifted FunPanel access (used when the users.funpanel column is missing).
+// Gifting FunPanel also grants the mod-level powers its buttons need.
+const funpanelGifted = new Set();
 // Featured games (used when the games.featured column is missing).
 const featuredGames = new Set();
 async function setFeatured(id, on) {
@@ -138,6 +141,7 @@ async function publicUser(u) {
 
   return {
     name: u.name, club: isClub(u), admin: isAdmin(u), moderator: isMod(u), owner: isOwner(u), role: roleOf(u), badges, badge,
+    funpanel: hasFunpanel(u),
     avatar: u.avatar, created: u.created, bio: u.bio || '', friends: list(u, 'friends').length,
     ...(await statusOf(u.name))
   };
@@ -530,6 +534,16 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     if (isOwner(user)) return res.status(400).json({ error: 'Cannot demote an owner' });
     await setModerator(user.name, false);
     updates = {}; message = `Removed moderator from ${user.name}`;
+  } else if (command === 'grant_funpanel') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    if (isAdmin(user)) return res.status(400).json({ error: `${user.name} already has FunPanel access` });
+    await setFunpanel(user.name, true);
+    updates = {}; message = `Gifted FunPanel to ${user.name} (moderator-level powers in games)`;
+  } else if (command === 'revoke_funpanel') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
+    if (isAdmin(user) || MODERATORS.includes(key(user.name))) return res.status(400).json({ error: `${user.name} keeps FunPanel through their staff role` });
+    await setFunpanel(user.name, false);
+    updates = {}; message = `Revoked FunPanel from ${user.name}`;
   } else if (command === 'grant_item') {
     if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
     const itemId = String(req.body?.item || '').trim();
@@ -697,7 +711,16 @@ async function setModerator(name, on) {
     extraMods.delete(k);
   } catch { on ? extraMods.add(k) : extraMods.delete(k); }
 }
-function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || MODERATORS.includes(String(u.name || '').toLowerCase()) || extraMods.has(String(u.name || '').toLowerCase())); }
+async function setFunpanel(name, on) {
+  const k = key(name);
+  try {
+    const { error } = await supabase.from('users').update({ funpanel: !!on }).eq('name', k);
+    if (error) throw error;
+    funpanelGifted.delete(k);
+  } catch { on ? funpanelGifted.add(k) : funpanelGifted.delete(k); }
+}
+function hasFunpanel(u) { return !!u && (!!u.funpanel || funpanelGifted.has(String(u.name || '').toLowerCase())); }
+function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || hasFunpanel(u) || MODERATORS.includes(String(u.name || '').toLowerCase()) || extraMods.has(String(u.name || '').toLowerCase())); }
 const modOnly = (req, res, next) => isMod(req.user) ? next() : res.status(403).json({ error: 'Moderators only' });
 const modLog = [];
 function logMod(by, action, target, reason) { modLog.unshift({ t: Date.now(), by, action, target, reason: String(reason || '').slice(0, 200) }); if (modLog.length > 200) modLog.length = 200; }
