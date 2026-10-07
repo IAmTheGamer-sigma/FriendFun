@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=6bc4de5a';
+import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH } from './avatar3d.js?v=fd05cda4';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=31ccb953';
