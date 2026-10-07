@@ -79,6 +79,7 @@ export class Game {
       <div class="hud-topleft">
         <button class="hud-btn menu-btn" title="Menu (Esc)"><span class="ff-mini">${LOGO}</span></button>
         <button class="hud-btn chat-toggle" title="Chat">${chatIcon}</button>
+        ${['owner', 'admin', 'moderator'].includes(this.me.role) ? '<button class="hud-btn funpanel-btn" title="FunPanel (F4)">🛡️</button>' : ''}
       </div>
       <div class="chat-box"><div class="chat-log"></div><input class="chat-input" maxlength="200" placeholder="To chat click here or press &quot;/&quot; key"></div>
       <div class="hud-topright">
@@ -90,6 +91,16 @@ export class Game {
       <div class="inv-bar" title="Your gear inventory (click or press 1-9)"></div>
       <div class="kill-feed"></div>
       <div class="big-msg"></div>
+      ${['owner', 'admin', 'moderator'].includes(this.me.role) ? `<div class="funpanel hidden">
+        <h3>🛡️ FunPanel <button class="funpanel-close">×</button></h3>
+        <h4>Players</h4>
+        <div class="fp-players"></div>
+        <h4>Self</h4>
+        <div class="fp-row"><button class="btn-secondary fp-fly">✈️ Fly: OFF</button><button class="btn-secondary fp-spawn">TP to Spawn</button></div>
+        ${['owner', 'admin'].includes(this.me.role) ? `<h4>Server</h4>
+        <div class="fp-row"><input class="fp-announce" placeholder="Announce to server..." maxlength="200"><button class="btn-primary fp-announce-send">Send</button></div>
+        ${this.me.role === 'owner' ? '<div class="fp-row"><button class="btn-danger fp-kickall">Kick everyone</button></div>' : ''}` : ''}
+      </div>` : ''}
       <div class="esc-menu hidden">
         <div class="esc-panel">
           <div class="esc-tabs"><b>${esc(this.o.gameName || 'Game')}</b></div>
@@ -113,6 +124,26 @@ export class Game {
     this.healthFill = q('.health-fill'); this.txCount = q('.tx-count'); this.root = q('.game-root');
     q('.menu-btn').onclick = () => this.toggleMenu();
     q('.chat-toggle').onclick = () => q('.chat-box').classList.toggle('hidden');
+    const fpb = q('.funpanel-btn');
+    if (fpb) fpb.onclick = () => this.toggleFunPanel();
+    const fpc = q('.funpanel-close');
+    if (fpc) fpc.onclick = () => this.toggleFunPanel(false);
+    const flyB = q('.fp-fly');
+    if (flyB) flyB.onclick = () => { this.fly = !this.fly; flyB.textContent = `✈️ Fly: ${this.fly ? 'ON' : 'OFF'}`; this.sys(`Fly ${this.fly ? 'enabled (Space up / C down)' : 'disabled'}`); };
+    const spB = q('.fp-spawn');
+    if (spB) spB.onclick = () => this.spawn();
+    const annS = q('.fp-announce-send');
+    if (annS) annS.onclick = async () => {
+      const v = q('.fp-announce')?.value.trim();
+      if (!v) return;
+      try { await this.fpApi('POST', '/api/mod/announce', { text: v }); q('.fp-announce').value = ''; this.sys('Announcement sent'); }
+      catch (e) { this.sys('Announce failed: ' + e.message); }
+    };
+    const kaB = q('.fp-kickall');
+    if (kaB) kaB.onclick = async () => {
+      if (!confirm('Kick EVERYONE from this game server?')) return;
+      try { await this.fpApi('POST', '/api/admin/site/command', { command: 'kick_all' }); } catch (e) { this.sys('Kick failed: ' + e.message); }
+    };
     if (q('.stop-btn')) q('.stop-btn').onclick = () => this.exit();
     this.escMenu.onclick = (e) => {
       const a = e.target.closest('[data-a]')?.dataset.a;
@@ -198,6 +229,48 @@ export class Game {
   renderEscPlayers() {
     const list = [this.me, ...this.players.values()];
     this.c.querySelector('.esc-players').innerHTML = list.map(p => `<div class="esc-player"><img src="${avatarImage(p.avatar)}"><span>${badgeIcon(p.badge)}${esc(p.name)}</span></div>`).join('');
+  }
+  isStaff() { return ['owner', 'admin', 'moderator'].includes(this.me.role); }
+  async fpApi(method, path, body) {
+    const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + this.o.token }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Failed');
+    return j;
+  }
+  toggleFunPanel(show) {
+    if (!this.isStaff()) return;
+    const p = this.c.querySelector('.funpanel');
+    if (!p) return;
+    const willShow = show === undefined ? p.classList.contains('hidden') : show;
+    p.classList.toggle('hidden', !willShow);
+    if (willShow) this.renderFunPanel();
+  }
+  renderFunPanel() {
+    const box = this.c.querySelector('.fp-players');
+    if (!box) return;
+    const list = [...this.players.values()];
+    box.innerHTML = list.length ? list.map(p => `<div class="fp-player"><img src="${avatarImage(p.avatar)}"><span class="fp-name">${esc(p.name)}</span>
+      <button class="btn-secondary" data-fp="tp" data-id="${p.id}" title="Teleport to them">TP</button>
+      <button class="btn-secondary" data-fp="mute" data-id="${p.id}" title="Mute 10 min">Mute</button>
+      <button class="btn-secondary" data-fp="kick" data-id="${p.id}" title="Kick from server">Kick</button>
+      <button class="btn-danger" data-fp="ban" data-id="${p.id}" title="Start a ban (needs a second staff to confirm)">Ban</button>
+    </div>`).join('') : '<p class="muted small">No other players here.</p>';
+    box.querySelectorAll('[data-fp]').forEach(b => b.onclick = () => this.funPanelAction(b.dataset.fp, b.dataset.id));
+  }
+  async funPanelAction(a, id) {
+    const p = this.players.get(id);
+    if (!p) return;
+    try {
+      if (a === 'tp') { this.pos.copy(p.char.position); this.pos.y += 4; this.vel.set(0, 0, 0); this.sys(`Teleported to ${p.name}`); }
+      else if (a === 'mute') { await this.fpApi('POST', '/api/mod/mute', { name: p.name, minutes: 10, reason: 'Muted in-game via FunPanel' }); this.sys(`Muted ${p.name} for 10 min`); }
+      else if (a === 'kick') { if (!confirm(`Kick ${p.name} from the server?`)) return; await this.fpApi('POST', '/api/mod/kick', { name: p.name, reason: 'Kicked in-game via FunPanel' }); this.sys(`Kicked ${p.name}`); }
+      else if (a === 'ban') {
+        if (!confirm(`Start a BAN for ${p.name}? A second staff member must confirm it on the Moderation page.`)) return;
+        const r = await this.fpApi('POST', '/api/mod/ban/initiate', { name: p.name, reason: 'Banned in-game via FunPanel', duration: 0 });
+        this.sys(r.message || `Ban started for ${p.name}`);
+        alert((r.message || 'Ban initiated') + '\n\nA second staff member must confirm it on the Moderation page.');
+      }
+    } catch (e) { this.sys('FunPanel: ' + e.message); }
   }
   updateLeaderboard() {
     const list = [this.me, ...this.players.values()];
@@ -625,6 +698,7 @@ export class Game {
         return;
       }
       if (down && e.key === 'Shift' && !e.repeat) this.toggleShiftLock();
+      if (down && !e.repeat && e.code === 'F4' && this.isStaff()) { e.preventDefault(); this.toggleFunPanel(); return; }
       if (down && !e.repeat && /^Digit[1-9]$/.test(e.code)) { this.equipGearByIndex(+e.code.slice(5) - 1); return; }
       this.keys[e.code] = down;
       if (e.code === 'Space') {
@@ -711,6 +785,7 @@ export class Game {
       else if (m.t === 'money') { this.setMoney(m); if (m.reason === 'play') this.sys(`+${m.amount} FunTix for playing!`); if (m.looneyCoins != null) { this.showBig(`🪙 Looney Coin earned! (${m.looneyCoins}/20)`, 3500); sfx.win(); } }
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
       else if (m.t === 'gearHit') { if (!this.dead) this.die(); }
+      else if (m.t === 'sys') this.sys(m.text);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
@@ -771,10 +846,15 @@ export class Game {
     if (this.onGround) { this.coyote = 0.12; this.jumping = false; }
     else this.coyote = Math.max(0, (this.coyote || 0) - dt);
     this.jumpBuf = Math.max(0, (this.jumpBuf || 0) - dt);
-    if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
-      this.vel.y = JUMP; this.onGround = false; this.coyote = 0; this.jumpBuf = 0; this.jumping = true; sfx.jump();
+    if (this.fly && this.isStaff()) {
+      this.vel.y = (this.keys.Space ? 34 : 0) - (this.keys.KeyC ? 34 : 0);
+      this.onGround = false; this.jumping = false;
+    } else {
+      if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
+        this.vel.y = JUMP; this.onGround = false; this.coyote = 0; this.jumpBuf = 0; this.jumping = true; sfx.jump();
+      }
+      this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
     }
-    this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
     this.wasGround = this.onGround; this.onGround = false; this.ground = null;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(this.vel.x), Math.abs(this.vel.y), Math.abs(this.vel.z)) * dt / 0.4));
     const sdt = dt / steps;
