@@ -385,19 +385,30 @@ export function buildCharacter(avatar, opts = {}) {
 
 export function animateCharacter(ch, state, t, dt) {
   const L = ch.userData.limbs; if (!L) return;
+  // Classic Roblox style: idle is statue-still, walk swings big, jump = arms straight up, fall = arms out
   // rotation.x > 0 swings a limb backwards (character faces +z); arms up ~ -PI
-  let la = 0, ra = 0, ll = 0, rl = 0;
-  if (state === 'walk') { const s = Math.sin(t * 9) * 0.9; la = s; ra = -s; ll = -s; rl = s; }
-  else if (state === 'jump' || state === 'fall') { la = ra = -Math.PI * 0.9; }
+  if (L.torso.userData.baseY === undefined) L.torso.userData.baseY = L.torso.position.y;
+  let la = 0, ra = 0, ll = 0, rl = 0, laz = 0, raz = 0, bob = 0;
+  if (state === 'walk') {
+    const s = Math.sin(t * 10);
+    la = s * 1.05; ra = -s * 1.05; ll = -s * 1.05; rl = s * 1.05;
+    laz = 0.14; raz = -0.14;
+    bob = Math.abs(Math.cos(t * 10)) * 0.14;
+  }
+  else if (state === 'jump') { la = ra = -Math.PI; laz = 0.15; raz = -0.15; }
+  else if (state === 'fall') { laz = 1.45; raz = -1.45; ll = 0.15; rl = 0.15; }
   else if (state === 'wave') { ra = -(Math.PI * 0.85 + Math.sin(t * 12) * 0.3); }
   else if (state === 'dance') { const s = Math.sin(t * 8); la = -Math.PI * 0.5 - s; ra = -Math.PI * 0.5 + s; ll = s * 0.4; rl = -s * 0.4; }
   else if (state === 'sit') { ll = rl = -Math.PI / 2; la = ra = -0.6; }
-  else { const s = Math.sin(t * 2) * 0.05; la = s; ra = -s; }
+  // idle: perfectly still, like classic Roblox
   const k = Math.min(1, dt * 15);
   L.larm.rotation.x += (la - L.larm.rotation.x) * k;
   L.rarm.rotation.x += (ra - L.rarm.rotation.x) * k;
   L.lleg.rotation.x += (ll - L.lleg.rotation.x) * k;
   L.rleg.rotation.x += (rl - L.rleg.rotation.x) * k;
+  L.larm.rotation.z += (laz - L.larm.rotation.z) * k;
+  L.rarm.rotation.z += (raz - L.rarm.rotation.z) * k;
+  L.torso.position.y += ((L.torso.userData.baseY + bob) - L.torso.position.y) * k;
 }
 
 export const CLUB_PATH = 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z';
