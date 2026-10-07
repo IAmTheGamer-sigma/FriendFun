@@ -32,6 +32,7 @@ export const CATALOG = [
   { id: 'face_beak', type: 'face', name: 'Duck Bill', price: 0, limited: true },
   { id: 'head_bugs', type: 'head', name: 'Bugs Bunny', price: 0, limited: true },
   { id: 'head_daffy', type: 'head', name: 'Daffy Duck', price: 0, limited: true },
+  { id: 'head_slimebody', type: 'head', name: 'Slime Skin', price: 0, limited: true, color: '#66bb6a' },
   { id: 'pet_none', type: 'pet', name: 'No Pet', price: 0, free: true, emoji: '❌' },
   { id: 'pet_puppy', type: 'pet', name: 'Puppy', price: 200, emoji: '🐶', color: '#c98f4e' },
   { id: 'pet_kitty', type: 'pet', name: 'Kitty', price: 200, emoji: '🐱', color: '#9aa0a6' },
