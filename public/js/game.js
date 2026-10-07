@@ -696,7 +696,7 @@ export class Game {
   // ---------- network ----------
   connect() {
     const ws = this.ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', token: this.o.token, gameId: this.o.gameId }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', token: this.o.token, gameId: this.o.gameId, server: this.o.server || null }));
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data);
       if (m.t === 'welcome') {
