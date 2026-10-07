@@ -127,7 +127,8 @@ async function publicUser(u) {
   };
 }
 function gameSummary(g) {
-  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing: rooms.get(g.id)?.players.size || 0, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky, maxPlayers: g.max_players || 30 };
+  let playing = 0; for (const [k, r] of rooms) if (k === g.id || k.startsWith(g.id + ':')) playing += r.players.size;
+  return { id: g.id, name: g.name, creator: g.creator, visits: g.visits, likes: g.likes, dislikes: g.dislikes, playing, thumbnail: g.thumbnail, updated: g.updated, sky: g.world?.sky, maxPlayers: g.max_players || 30 };
 }
 const BAD = ['damn', 'hell', 'stupid', 'idiot', 'dumb', 'crap', 'shut up', 'loser'];
 function filter(text) {
@@ -934,6 +935,15 @@ app.delete('/api/dm/:id', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/games/:id/private', auth, async (req, res) => {
+  const { data: g } = await supabase.from('games').select('id').eq('id', req.params.id).maybeSingle();
+  if (!g) return res.status(404).json({ error: 'Game not found' });
+  const ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code; do { code = Array.from({ length: 6 }, () => ABC[Math.floor(Math.random() * ABC.length)]).join(''); } while (privateServers.has(code));
+  privateServers.set(code, { gameId: g.id, owner: req.user.name, created: Date.now() });
+  res.json({ code });
+});
+
 app.get('/api/notifications', auth, async (req, res) => {
   const me = req.user.name;
   const { data } = await supabase.from('notifications').select('*').eq('username', me).order('created', { ascending: false }).limit(30);
@@ -952,6 +962,7 @@ app.post('/api/notifications/read', auth, async (req, res) => {
 
 // realtime
 const rooms = new Map();
+const privateServers = new Map(); // CODE -> { gameId, owner, created }
 let nextPid = 1;
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
@@ -977,8 +988,14 @@ wss.on('connection', (ws) => {
       const g = gameRes.data;
 
       if (!u || !g) return send(ws, { t: 'error', error: 'Could not join' });
-      if (!rooms.has(g.id)) rooms.set(g.id, { players: new Map(), coins: new Set((g.world?.parts || []).filter(p => p.k === 'coin').map(p => p.id)) });
-      room = rooms.get(g.id);
+      let roomKey = g.id;
+      if (m.server) {
+        const ps = privateServers.get(String(m.server).toUpperCase());
+        if (!ps || ps.gameId !== g.id) return send(ws, { t: 'error', error: 'Private server not found' });
+        roomKey = g.id + ':' + String(m.server).toUpperCase();
+      }
+      if (!rooms.has(roomKey)) rooms.set(roomKey, { players: new Map(), coins: new Set((g.world?.parts || []).filter(p => p.k === 'coin').map(p => p.id)), private: roomKey });
+      room = rooms.get(roomKey);
       if (room.players.size >= (g.max_players || 30)) return send(ws, { t: 'error', error: 'Server is full' });
       for (const p of room.players.values()) if (p.user === u) { send(p.ws, { t: 'error', error: 'You joined from another window' }); p.ws.close(); }
       player = { id: nextPid++, gameId: g.id, game: g, ws, user: u, name: u.name, avatar: u.avatar, s: null, coins: new Set(), lastCoin: 0, lastTix: Date.now() };
@@ -1052,6 +1069,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     if (!player || !room) return;
     room.players.delete(player.id);
+    if (room.private && !room.players.size) { rooms.delete(room.private); privateServers.delete(room.private.split(':')[1]); }
     broadcast(room, { t: 'left', id: player.id });
     broadcast(room, { t: 'chat', system: true, text: `${player.name} has left the game.` });
     touch(player.name, null);
