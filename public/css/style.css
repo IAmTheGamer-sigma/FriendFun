@@ -514,3 +514,7 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .mod-act { background: #444; border-radius: 6px; padding: 1px 8px; font-size: 12px; }
 .modal label { display: block; margin: 10px 0; font-size: 14px; }
 .modal select, .modal textarea { width: 100%; margin-top: 4px; box-sizing: border-box; }
+.role-tag { font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 10px; background: #555; color: #ccc; margin-left: 6px; vertical-align: middle; }
+.role-owner { background: #ffd400; color: #000; }
+.role-admin { background: #7c4dff; color: #fff; }
+.role-moderator { background: #2ec4ff; color: #000; }
