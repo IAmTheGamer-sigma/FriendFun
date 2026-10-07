@@ -468,7 +468,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=b1c8225d');
+  const { Game } = await import('./game.js?v=3513bd26');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -539,7 +539,7 @@ function itemImage(item) {
 async function catalogPage(filter = 'all') {
   mount('catalog', `
     <h1>Marketplace</h1>
-    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt', 'pet', 'gear'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets', gear: 'Gears' }[f]}</a>`).join('')}</div>
+    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt', 'pet', 'gear', 'vehicle'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets', gear: 'Gears', vehicle: 'Vehicles' }[f]}</a>`).join('')}</div>
     <div class="cat-grid">${CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter)).map(i => `
       <div class="cat-item">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : i.type === 'gear' ? (GEAR_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="gear-voxel" width="120" height="120" data-gear="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
         <div class="cat-price">${priceHtml(i)}</div>
@@ -968,7 +968,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=b1c8225d');
+      const { Game: GameClass } = await import('./game.js?v=3513bd26');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
