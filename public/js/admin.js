@@ -3,7 +3,9 @@ export async function adminPage(D, q = '', gq = '') {
   const me = D.me, BADGE_DEFS = D.BADGE_DEFS;
   if (!me.admin) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
-  const games = await api('GET', '/api/admin/games?q=' + encodeURIComponent(gq));
+  let games = [], gamesError = '';
+  try { games = await api('GET', '/api/admin/games?q=' + encodeURIComponent(gq)); }
+  catch (e) { gamesError = e.message || 'Could not load games'; }
   const badgeOpts = Object.values(BADGE_DEFS).map(b => `<option value="${esc(b.id)}">${esc(b.icon || '')} ${esc(b.name)}${b.custom ? ' (custom)' : ''}</option>`).join('');
   const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('admin', `<h1>Admin Panel</h1>
@@ -34,6 +36,7 @@ export async function adminPage(D, q = '', gq = '') {
       <div class="site-state muted small"></div>
     </section>` : ''}
     <section class="admin-section"><h3>🎮 Games <span class="muted small">publish, feature & manage</span></h3>
+      ${gamesError ? `<p style="color:#ff6b6b">⚠️ Games list unavailable: ${esc(gamesError)} — the rest of the panel still works.</p>` : ''}
       <form class="game-search admin-search"><input name="gq" placeholder="Search games" value="${esc(gq)}"><button class="btn-primary">Search</button></form>
       <div class="lbp">${games.map(g => `
       <div class="lbp-row admin-row-wrap">
