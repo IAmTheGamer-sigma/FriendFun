@@ -203,6 +203,8 @@ export class Game {
   // ---------- vehicles ----------
   ownedVehicle() {
     const inv = this.me?.inventory || [];
+    const sel = this.me?.avatar?.vehicle;
+    if (sel && sel !== 'vehicle_none' && inv.includes(sel) && VEHICLES.includes(sel)) return sel;
     return VEHICLES.find(id => inv.includes(id)) || null;
   }
   toggleVehicle() {
