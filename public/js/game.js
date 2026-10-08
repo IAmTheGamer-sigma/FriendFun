@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=360165c8';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=b6510283';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=80abb485';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
-const VEHICLES = ['vehicle_car', 'vehicle_truck']; // net code = index + 1
+const VEHICLES = ['vehicle_car', 'vehicle_truck', 'vehicle_kart', 'vehicle_taxi', 'vehicle_race', 'vehicle_icecream']; // net code = index + 1
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
 
 // ---------- Halloween in-game decor (Oct 24 - Nov 2) ----------
@@ -240,7 +240,7 @@ export class Game {
     const d = target - this.carSpeed;
     this.carSpeed += Math.sign(d) * Math.min(Math.abs(d), accel * dt);
     const dir = Math.sign(this.carSpeed) || (throttle >= 0 ? 1 : -1);
-    if (Math.abs(this.carSpeed) > 0.5) this.facing -= steer * turnRate * dt * dir;
+    if (Math.abs(this.carSpeed) > 0.5) this.facing += steer * turnRate * dt * dir;
     const mx = Math.sin(this.facing) * this.carSpeed, mz = Math.cos(this.facing) * this.carSpeed;
     this.vel.y = Math.max(this.vel.y - GRAVITY * dt, -160);
     this.wasGround = this.onGround; this.onGround = false; this.ground = null;
