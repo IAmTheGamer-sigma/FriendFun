@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=80abb485';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=0cd14a11';
 import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
 
 const faceCache = {}, shirtCache = {};
@@ -436,30 +436,46 @@ export function animateCharacter(ch, state, t, dt) {
 }
 
 export const CLUB_PATH = 'M2 17h20v3H2zM4 16a8 8 0 0 1 16 0zM10.5 7h3v5h-3z';
-// Blocky drivable vehicles. Returns a THREE.Group, ~4 wide x 7 long, facing +Z.
+// Blocky drivable vehicles. Returns a THREE.Group facing +Z. Style from catalog (car/truck/kart/race).
 export function buildVehicle(id) {
   const spec = ITEM[id] || {};
   const color = spec.color || '#e53935';
-  const truck = id === 'vehicle_truck';
+  const style = spec.style || 'car';
   const g = new THREE.Group();
-  const bodyH = truck ? 1.6 : 1.1, bodyY = truck ? 1.9 : 1.35;
-  const body = box(4, bodyH, 7, color); body.position.y = bodyY; g.add(body);
-  const cab = box(3.4, truck ? 1.4 : 1.0, truck ? 2.2 : 3.0, '#b0bec5');
-  cab.position.set(0, bodyY + bodyH / 2 + cab.geometry.parameters.height / 2 - 0.1, truck ? 1.2 : -0.6); g.add(cab);
-  const winShield = box(3.0, 0.7, 0.15, '#e1f5fe');
-  winShield.position.set(0, cab.position.y + 0.1, cab.position.z + cab.geometry.parameters.depth / 2); g.add(winShield);
-  const wheelG = new THREE.CylinderGeometry(truck ? 0.85 : 0.65, truck ? 0.85 : 0.65, 0.6, 12);
+  const dims = {
+    kart: { w: 3, l: 4.5, bh: 0.8, by: 0.95, cab: false, wr: 0.5 },
+    car: { w: 4, l: 7, bh: 1.1, by: 1.35, cab: true, wr: 0.65 },
+    truck: { w: 4, l: 7, bh: 1.6, by: 1.9, cab: true, wr: 0.85 },
+    race: { w: 4, l: 7.5, bh: 0.9, by: 1.15, cab: true, wr: 0.65, spoiler: true },
+  }[style] || { w: 4, l: 7, bh: 1.1, by: 1.35, cab: true, wr: 0.65 };
+  const body = box(dims.w, dims.bh, dims.l, color); body.position.y = dims.by; g.add(body);
+  if (dims.cab) {
+    const cab = box(dims.w - 0.6, 1.0, dims.l * 0.42, '#b0bec5');
+    cab.position.set(0, dims.by + dims.bh / 2 + 0.4, -dims.l * 0.08); g.add(cab);
+    const shield = box(dims.w - 1.0, 0.7, 0.15, '#e1f5fe');
+    shield.position.set(0, cab.position.y + 0.1, cab.position.z + dims.l * 0.21); g.add(shield);
+  } else {
+    const seat = box(1.6, 0.9, 1.6, '#212121'); seat.position.set(0, dims.by + dims.bh / 2 + 0.35, -0.8); g.add(seat);
+    const col = box(0.3, 0.3, 2.2, '#212121'); col.position.set(0, dims.by + 0.5, 1.4); col.rotation.x = 0.5; g.add(col);
+  }
+  if (dims.spoiler) {
+    const sz = -dims.l / 2 + 0.6;
+    const sp = box(dims.w - 0.4, 0.25, 1.0, color); sp.position.set(0, dims.by + dims.bh + 0.9, sz); g.add(sp);
+    for (const x of [-1.2, 1.2]) { const sup = box(0.25, 0.9, 0.25, '#212121'); sup.position.set(x, dims.by + dims.bh + 0.45, sz); g.add(sup); }
+  }
+  const wheelG = new THREE.CylinderGeometry(dims.wr, dims.wr, 0.6, 12);
   const wheelM = mat('#212121');
   const wheels = [];
-  for (const [x, z] of [[-2.1, 2.2], [2.1, 2.2], [-2.1, -2.2], [2.1, -2.2]]) {
+  const wx = dims.w / 2 + 0.1, wz = dims.l / 2 - 1.1;
+  for (const [x, z] of [[-wx, wz], [wx, wz], [-wx, -wz], [wx, -wz]]) {
     const w = new THREE.Mesh(wheelG, wheelM); w.rotation.z = Math.PI / 2;
-    w.position.set(x, truck ? 0.85 : 0.65, z); w.castShadow = true;
+    w.position.set(x, dims.wr, z); w.castShadow = true;
     g.add(w); wheels.push(w);
   }
   const lightM = new THREE.MeshStandardMaterial({ color: '#fff9c4', emissive: '#ffeb3b', emissiveIntensity: 0.8 });
-  for (const x of [-1.3, 1.3]) {
+  for (const x of [-dims.w / 4, dims.w / 4]) {
     const l = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.15), lightM);
-    l.position.set(x, bodyY, 3.55); g.add(l);
+    l.position.set(x, dims.by, dims.l / 2 + 0.05); g.add(l);
   }
   g.userData.wheels = wheels;
   return g;
