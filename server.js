@@ -298,10 +298,15 @@ app.get('/api/me', auth, async (req, res) => {
     const { error } = await supabase.from('users').update({ moderator: true }).eq('name', u.name);
     if (!error) u.moderator = true;
   }
-  // Slime Skin gift for @gimkid
+  // Slime Skin is exclusive to @gimkid: grant it, strip it from everyone else
   if (u.name.toLowerCase() === 'gimkid' && !u.inventory.includes('head_slimebody')) {
     u.inventory = [...u.inventory, 'head_slimebody'];
     await supabase.from('users').update({ inventory: u.inventory }).eq('name', u.name);
+  } else if (u.name.toLowerCase() !== 'gimkid' && u.inventory.includes('head_slimebody')) {
+    u.inventory = u.inventory.filter(i => i !== 'head_slimebody');
+    const upd = { inventory: u.inventory };
+    if (u.avatar?.head === 'head_slimebody') { u.avatar = { ...u.avatar, head: 'head_classic' }; upd.avatar = u.avatar; }
+    await supabase.from('users').update(upd).eq('name', u.name);
   }
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
 });
@@ -582,6 +587,7 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
     const itemId = String(req.body?.item || '').trim();
     if (!CATALOG.some(i => i.id === itemId)) return res.status(400).json({ error: 'Unknown item id' });
+    if (itemId === 'head_slimebody' && user.name.toLowerCase() !== 'gimkid') return res.status(400).json({ error: 'The Slime Skin is exclusive to @gimkid' });
     updates = { inventory: [...new Set([...(user.inventory || []), itemId])] };
     message = `Gave ${itemId} to ${user.name}`;
   } else if (command === 'revoke_item') {
