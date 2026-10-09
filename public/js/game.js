@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=b6510283';
 import { sfx } from './sound.js?v=89850e26';
-import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=80abb485';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=53383877';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const VEHICLES = ['vehicle_car', 'vehicle_truck', 'vehicle_kart', 'vehicle_taxi', 'vehicle_race', 'vehicle_icecream']; // net code = index + 1
@@ -230,6 +230,44 @@ export class Game {
     if (this.avatarKids) { this.avatarKids.forEach(c => c.visible = true); this.avatarKids = null; }
     this.vehicleId = null; this.carSpeed = 0;
   }
+  // ---------- NPCs ----------
+  spawnNPC(p) {
+    const seed = [...String(p.id)].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const torsos = ['#0d69ac', '#c4281c', '#287f47', '#7c4dff', '#ff8f00', '#00acc1'];
+    const avatar = {
+      colors: { head: '#f5cd30', torso: torsos[seed % torsos.length], larm: '#f5cd30', rarm: '#f5cd30', lleg: '#5c6bc0', rleg: '#5c6bc0' },
+      hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none', gear: 'gear_none',
+    };
+    const char = buildCharacter(avatar, { pet: false, gear: false });
+    const tag = makeNameTag(p.name || 'NPC'); tag.userData.isTag = true; char.add(tag);
+    const baseY = p.p[1] - p.s[1] / 2;
+    char.position.set(p.p[0], baseY, p.p[2]);
+    this.scene.add(char);
+    const bubble = document.createElement('div');
+    bubble.className = 'npc-bubble hidden';
+    bubble.textContent = (p.dialog || '').slice(0, 200) || 'Hello!';
+    this.c.appendChild(bubble);
+    this.npcs.push({ p, char, bubble, base: new THREE.Vector3(p.p[0], baseY, p.p[2]), phase: (seed % 100) / 100 * Math.PI * 2, radius: 5 + (seed % 4) });
+  }
+  updateNPCs(dt) {
+    const w = this.c.clientWidth, h = this.c.clientHeight;
+    for (const n of this.npcs) {
+      const a = this.t * 0.3 + n.phase;
+      if (n.p.wander !== false) {
+        n.char.position.set(n.base.x + Math.cos(a) * n.radius, n.base.y, n.base.z + Math.sin(a) * n.radius);
+        n.char.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a));
+      }
+      animateCharacter(n.char, 'idle', this.t, dt);
+      const d = n.char.position.distanceTo(this.pos);
+      if (d < 14 && (n.p.dialog || '').trim()) {
+        const v = n.char.position.clone(); v.y += 7; v.project(this.camera);
+        if (v.z > 1) { n.bubble.classList.add('hidden'); continue; }
+        n.bubble.classList.remove('hidden');
+        n.bubble.style.left = ((v.x * 0.5 + 0.5) * w) + 'px';
+        n.bubble.style.top = ((-v.y * 0.5 + 0.5) * h) + 'px';
+      } else n.bubble.classList.add('hidden');
+    }
+  }
   drivePhysics(dt) {
     const k = this.keys;
     const spec = ITEM[this.vehicleId] || {};
@@ -415,6 +453,7 @@ export class Game {
     this.meshes = buildWorld(this.scene, this.world);
     this.solids = []; this.triggers = [];
     for (const p of this.world.parts) {
+      if (p.k === 'npc') continue;
       const box = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2], _arrs: [] };
       const addBox = arr => { arr.push(box); box._arrs.push(arr); };
       (p._boxes ||= []).push(box);
@@ -422,7 +461,13 @@ export class Game {
       if (p.cc !== false) addBox(this.solids);
       if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) addBox(this.triggers);
     }
-    this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
+    this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.k !== 'npc' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
+    this.npcs = [];
+    for (const p of this.world.parts) {
+      if (p.k !== 'npc') continue;
+      const m = this.meshes.get(p.id); if (m) { this.scene.remove(m); this.meshes.delete(p.id); }
+      this.spawnNPC(p);
+    }
     this.char = buildCharacter(this.me.avatar, { pet: false, gear: false });
     this.scene.add(this.char);
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
@@ -1053,9 +1098,10 @@ export class Game {
       if (p.pet) { p.pet.visible = ch.visible; if (ch.visible) this.updatePet(p.pet, ch.position, ch.rotation.y, dt); }
       animateCharacter(ch, anim, this.t, dt);
     }
+    // NPCs
+    this.updateNPCs(dt);
     // gear swing animation
-    if (this.gearSwingT > 0 && !this.dead) {
-      this.gearSwingT -= dt;
+    if (this.gearSwingT > 0 && !this.dead) {      this.gearSwingT -= dt;
       const rarm = this.char.userData.limbs?.rarm;
       if (rarm) rarm.rotation.x = -2.2 * Math.sin((0.35 - this.gearSwingT) / 0.35 * Math.PI);
       if (this.gearSwingT <= 0 && rarm) rarm.rotation.x = 0;
