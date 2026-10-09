@@ -196,6 +196,8 @@ section { margin-bottom: 34px; }
 .st-side { width: 290px; display: flex; flex-direction: column; background: #2e2e2e; border-left: 1px solid #1a1a1a; }
 .st-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid #1a1a1a; }
 .st-panel-h { background: #3a3a3a; padding: 5px 8px; font-weight: 700; border-bottom: 1px solid #1a1a1a; }
+.st-ex-h { display: flex; align-items: center; gap: 8px; }
+.ex-search { flex: 1; min-width: 0; background: #262626; border: 1px solid #1a1a1a; color: #eee; border-radius: 4px; padding: 3px 7px; font-size: 12px; font-weight: 400; }
 .st-explorer, .st-props { flex: 1; overflow-y: auto; }
 .ex-root { padding: 4px 8px; font-weight: 600; } .ex-item { padding: 3px 8px 3px 26px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ex-item:hover { background: #3a3a3a; } .ex-item.sel { background: #1f4d80; }
 .st-empty { padding: 14px; color: #888; }
