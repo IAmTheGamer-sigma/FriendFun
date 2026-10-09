@@ -239,7 +239,7 @@ export class Game {
       hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none', gear: 'gear_none',
     };
     const char = buildCharacter(avatar, { pet: false, gear: false });
-    const tag = makeNameTag(p.name || 'NPC'); tag.userData.isTag = true; char.add(tag);
+    const tag = makeNameTag(p.enemy ? '👹 ' + (p.name || 'Enemy') : (p.name || 'NPC')); tag.userData.isTag = true; char.add(tag);
     const baseY = p.p[1] - p.s[1] / 2;
     char.position.set(p.p[0], baseY, p.p[2]);
     this.scene.add(char);
@@ -253,12 +253,33 @@ export class Game {
     const w = this.c.clientWidth, h = this.c.clientHeight;
     for (const n of this.npcs) {
       const a = this.t * 0.3 + n.phase;
+      const d = n.char.position.distanceTo(this.pos);
+      if (n.p.enemy && !this.dead) {
+        // 👹 enemy: chase the player (leashed to its spawn area)
+        const dx = this.pos.x - n.char.position.x, dz = this.pos.z - n.char.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.6) {
+          const step = 17 * dt;
+          const nx = n.char.position.x + dx / (dist || 1) * step, nz = n.char.position.z + dz / (dist || 1) * step;
+          if (Math.hypot(nx - n.base.x, nz - n.base.z) < 50) { n.char.position.x = nx; n.char.position.z = nz; }
+          n.char.rotation.y = Math.atan2(dx, dz);
+        }
+        animateCharacter(n.char, 'walk', this.t, dt);
+        n._hitCd = Math.max(0, (n._hitCd || 0) - dt);
+        if (dist < 4.5 && n._hitCd <= 0) {
+          n._hitCd = 1;
+          this.health -= 20; this.updateHud(); sfx.oof();
+          this.vel.x = -dx / (dist || 1) * 60; this.vel.z = -dz / (dist || 1) * 60; this.vel.y = 45;
+          if (this.health <= 0) this.die(); else this.showBig('👹 Ouch! An enemy got you!', 1200);
+        }
+        n.bubble.classList.add('hidden');
+        continue;
+      }
       if (n.p.wander !== false) {
         n.char.position.set(n.base.x + Math.cos(a) * n.radius, n.base.y, n.base.z + Math.sin(a) * n.radius);
         n.char.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a));
       }
       animateCharacter(n.char, 'idle', this.t, dt);
-      const d = n.char.position.distanceTo(this.pos);
       if (d < 14 && (n.p.dialog || '').trim()) {
         const v = n.char.position.clone(); v.y += 7; v.project(this.camera);
         if (v.z > 1) { n.bubble.classList.add('hidden'); continue; }
@@ -457,11 +478,11 @@ export class Game {
       const box = { p, min: [p.p[0] - p.s[0] / 2, p.p[1] - p.s[1] / 2, p.p[2] - p.s[2] / 2], max: [p.p[0] + p.s[0] / 2, p.p[1] + p.s[1] / 2, p.p[2] + p.s[2] / 2], _arrs: [] };
       const addBox = arr => { arr.push(box); box._arrs.push(arr); };
       (p._boxes ||= []).push(box);
-      if (p.k === 'coin') { box.min = box.min.map(v => v - 0.3); box.max = box.max.map(v => v + 0.3); addBox(this.triggers); continue; }
+      if (p.k === 'coin' || p.k === 'heal') { box.min = box.min.map(v => v - 0.3); box.max = box.max.map(v => v + 0.3); addBox(this.triggers); continue; }
       if (p.cc !== false) addBox(this.solids);
       if (p.k !== 'part' && p.k !== 'spawn' || p.script?.onTouch) addBox(this.triggers);
     }
-    this.camMeshes = [...this.meshes.values()].filter(m => m.userData.part.k !== 'coin' && m.userData.part.k !== 'npc' && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
+    this.camMeshes = [...this.meshes.values()].filter(m => !['coin', 'heal', 'npc'].includes(m.userData.part.k) && m.userData.part.cc !== false && !(m.userData.part.tr > 0.5));
     this.npcs = [];
     for (const p of this.world.parts) {
       if (p.k !== 'npc') continue;
@@ -1021,6 +1042,14 @@ export class Game {
       if (!touching) continue;
       if (p.k === 'kill') { this.die(); return; }
       if (p.k === 'bounce' && this.vel.y <= 0.1) { this.vel.y = 110; this.onGround = false; sfx.bounce(); }
+      if (p.k === 'jump' && this.vel.y <= 0.1) { this.vel.y = 180; this.onGround = false; sfx.bounce(); this.showBig('Boing! 🚀', 900); }
+      if (p.k === 'heal' && !this.collected.has('heal:' + p.id) && this.health < 100 && !this.dead) {
+        this.collected.add('heal:' + p.id);
+        this.health = Math.min(100, this.health + 30); this.updateHud(); sfx.checkpoint();
+        this.showBig('+30 Health! ❤️', 1200);
+        const hm = this.meshes.get(p.id); if (hm) hm.visible = false;
+        setTimeout(() => { this.collected.delete('heal:' + p.id); const mm = this.meshes.get(p.id); if (mm) mm.visible = true; }, 15000);
+      }
       if (p.k === 'speed') { if (this.speedTimer <= 0) this.showBig('Speed boost!', 1200); this.speedTimer = 5; }
       if (p.k === 'checkpoint') {
         const cp = new THREE.Vector3(p.p[0], p.p[1] + p.s[1] / 2, p.p[2]);
