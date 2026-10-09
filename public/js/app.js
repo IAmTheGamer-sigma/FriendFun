@@ -1,4 +1,4 @@
-import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js';
+import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js?v=4a030db';
 
 // Badge definitions
 let BADGE_DEFS = {};
@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=76feaaaa').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=b6510283').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=80abb485';
+import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=53383877';
 import { templates } from './worlds.js?v=542bb3d8';
 import { startSpooky, stopSpooky } from './sound.js?v=89850e26';
 
@@ -468,7 +468,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=c6dfb109');
+  const { Game } = await import('./game.js?v=650fc3ff');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -962,13 +962,13 @@ async function studioPage(id, tpl) {
   else { g = await api('GET', '/api/games/' + id); if (g.creator.toLowerCase() !== me.name.toLowerCase()) { toast('You can only edit your own games', true); location.hash = '#/games/' + id; return; } }
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
-  const { Studio } = await import('./studio.js?v=5bdff803');
+  const { Studio } = await import('./studio.js?v=445a9c6a');
   const studio = new Studio(app.querySelector('.studio-container'), {
     gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=c6dfb109');
+      const { Game: GameClass } = await import('./game.js?v=650fc3ff');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1091,7 +1091,7 @@ async function moderationPage() {
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=8b51a0e5');
+  const m = await import('./admin.js?v=6c8729ac');
   return m.adminPage(adminDeps, q);
 }
 
