@@ -66,7 +66,8 @@ function buildCharacter(avatar) {
 }
 import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=53383877';
 import { templates } from './worlds.js?v=542bb3d8';
-import { startSpooky, stopSpooky } from './sound.js?v=89850e26';
+import { startSpooky, stopSpooky, sfx } from './sound.js?v=89850e26';
+try { sfx.enabled = localStorage.getItem('ff_sfx') !== '0'; } catch {}
 
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -111,6 +112,7 @@ const icons = {
   puzzle: '<svg viewBox="0 0 24 24"><path d="M10 2h4v3a2 2 0 1 0 3 0h3v4h-3a2 2 0 1 0 0 3v3h-4v-3a2 2 0 1 0-3 0H7v-4h3a2 2 0 1 0 0-3z" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   chat: '<svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1z"/></svg>',
   news: '<svg viewBox="0 0 24 24"><path d="M4 4h13v12H6l-2 2zm15 1h3v13l-3-2M7 8h8M7 11h8M7 14h5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4z"/></svg>',
 };
 
 const ADMIN = '<span class="admin-badge">ADMIN</span>';
@@ -190,6 +192,44 @@ const UPDATES = [
 ];
 function hasNewUpdates() { try { return localStorage.getItem('updatesSeen') !== UPDATES[0].id; } catch { return true; } }
 function markUpdatesSeen() { try { localStorage.setItem('updatesSeen', UPDATES[0].id); } catch {} }
+function settingsPage() {
+  const sfxOn = localStorage.getItem('ff_sfx') !== '0';
+  const musicOn = localStorage.getItem('ff_music') !== '0';
+  mount('settings', `<h1>⚙️ Settings</h1>
+    <p class="muted">Make Funtopia yours.</p>
+    <section class="admin-section"><h3>🔊 Sound</h3>
+      <label class="set-row"><span>Sound effects</span><input type="checkbox" class="set-sfx" ${sfxOn ? 'checked' : ''}></label>
+      <label class="set-row"><span>Music</span><input type="checkbox" class="set-music" ${musicOn ? 'checked' : ''}></label>
+    </section>
+    <section class="admin-section"><h3>🔒 Account</h3>
+      <div class="set-row"><span>Change password</span></div>
+      <input type="password" class="set-curpw" placeholder="Current password" maxlength="64" autocomplete="current-password">
+      <input type="password" class="set-newpw" placeholder="New password (4+ characters)" maxlength="64" autocomplete="new-password">
+      <button class="btn-primary set-pw-btn">Update password</button>
+    </section>`, () => {
+    app.querySelector('.set-sfx').onchange = e => {
+      const on = e.target.checked;
+      try { localStorage.setItem('ff_sfx', on ? '1' : '0'); } catch {}
+      sfx.enabled = on;
+      toast(on ? 'Sound effects on' : 'Sound effects off');
+    };
+    app.querySelector('.set-music').onchange = e => {
+      const on = e.target.checked;
+      try { localStorage.setItem('ff_music', on ? '1' : '0'); } catch {}
+      if (!on) { try { stopSpooky(); } catch {} }
+      toast(on ? 'Music on' : 'Music off');
+    };
+    app.querySelector('.set-pw-btn').onclick = async () => {
+      const cur = app.querySelector('.set-curpw').value, nw = app.querySelector('.set-newpw').value;
+      if (!cur || !nw) { toast('Fill in both password fields', true); return; }
+      try {
+        await api('POST', '/api/me/password', { current: cur, password: nw });
+        toast('Password updated'); settingsPage();
+      } catch (e) { toast(e.message, true); }
+    };
+  });
+}
+
 function updatesPage() {
   markUpdatesSeen();
   mount('updates', `<h1>Updates</h1><p class="muted">What's new in Funtopia.</p>
@@ -224,8 +264,8 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ...(me.admin ? [['admin', 'Admin', icons.shield]] : [])]
-      .map(([h, l, i, badge]) => `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ['settings', 'Settings', icons.gear], ['https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj', '📺 Puzzlevision', icons.news], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : []), ...(me.owner ? [['https://muse.ai', '🤖 Muse AI', icons.chat]] : [])]
+      .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
   <main class="content">${content}</main>`;
@@ -962,7 +1002,7 @@ async function studioPage(id, tpl) {
   else { g = await api('GET', '/api/games/' + id); if (g.creator.toLowerCase() !== me.name.toLowerCase()) { toast('You can only edit your own games', true); location.hash = '#/games/' + id; return; } }
   app.className = 'fullscreen'; app.innerHTML = '<div class="studio-container"></div>';
   let game = null;
-  const { Studio } = await import('./studio.js?v=445a9c6a');
+  const { Studio } = await import('./studio.js?v=b413cd90');
   const studio = new Studio(app.querySelector('.studio-container'), {
     gameId: g.id, name: g.name, description: g.description, world: g.world, api, toast, aiAccess: me.aiAccess,
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
@@ -1091,8 +1131,12 @@ async function moderationPage() {
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=6c8729ac');
+  const m = await import('./admin.js?v=2404bbb1');
   return m.adminPage(adminDeps, q);
+}
+async function ownerPage(q = '') {
+  const m = await import('./admin.js?v=2404bbb1');
+  return m.ownerPage(adminDeps, q);
 }
 
 function clubPage() {
@@ -1178,6 +1222,7 @@ function maybeSpooky() {
   const seg = (location.hash.slice(1).split('?')[0] || '/home').split('/').filter(Boolean);
   const inGame = seg[0] === 'play' || seg[0] === 'studio';
   if (inGame || !halloweenActive()) { try { stopSpooky(); } catch {} return; }
+  if (localStorage.getItem('ff_music') === '0') { try { stopSpooky(); } catch {} return; }
   if (audioUnlocked) { try { startSpooky(); } catch {} }
 }
 function unlockAudio() {
@@ -1225,6 +1270,8 @@ async function route() {
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
       case 'admin': return await adminPage();
+      case 'settings': return settingsPage();
+      case 'owner': return await ownerPage();
       case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
       case 'horror': return horrorPage();
