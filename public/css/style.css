@@ -557,3 +557,9 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .ai-user .ai-text { background: #335fff; color: #fff; }
 .ai-form { display: flex; gap: 8px; }
 .ai-form .ai-input { flex: 1; }
+
+/* Settings page */
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; font-weight: 600; }
+.set-row input[type=checkbox] { width: 22px; height: 22px; accent-color: #335fff; }
+.set-curpw, .set-newpw { display: block; width: 100%; max-width: 320px; margin: 6px 0; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.15); background: rgba(0,0,0,.25); color: inherit; font: inherit; }
+.set-pw-btn { margin-top: 8px; }
