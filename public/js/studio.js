@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { setupLighting, applyLighting, makePartMesh, findSpawn, worldThumbnail } from './three-util.js?v=ac3e6f2b';
-import { CATALOG } from './catalog.js?v=93b57b2c';
+import { CATALOG } from './catalog.js?v=53383877';
 
 const GEARS = CATALOG.filter(i => i.type === 'gear' && i.id !== 'gear_none');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,11 +18,12 @@ const PRESETS = {
   ice: { name: 'Ice', s: [4, 1, 4], c: '#a0e8ff', k: 'part', m: 'glass' },
   wall: { name: 'Wall', s: [1, 12, 12], c: '#c0c0c0', k: 'part', m: 'brick' },
   platform: { name: 'Platform', s: [12, 1, 12], c: '#8b9a6b', k: 'part', m: 'grass' },
+  npc: { name: 'NPC', s: [2, 5, 2], c: '#ffd400', k: 'npc', m: 'plastic' },
   gem: { name: 'Gem', s: [1.5, 1.5, 1.5], c: '#00ffcc', k: 'coin', m: 'neon' },
   pillar: { name: 'Pillar', s: [2, 12, 2], c: '#a3a2a5', k: 'part', m: 'concrete' },
 };
 const MATERIALS = ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'metal', 'baseplate', 'spawn'];
-const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed'];
+const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc'];
 const toHex = c => '#' + new THREE.Color(c).getHexString();
 // ---------- Visual (no-code) script specs ----------
 const VS_TRIGGERS = [
@@ -523,6 +524,9 @@ export class Studio {
       <div class="pr-sec">Behavior</div>
       <div class="pr-row"><span>Type</span><select data-f="k">${KINDS.map(k => `<option ${k === p.k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
       <div class="pr-row"><span>CanCollide</span><input type="checkbox" data-f="cc" ${p.cc !== false ? 'checked' : ''}></div>
+      ${p.k === 'npc' ? `<div class="pr-sec">NPC</div>
+      <div class="pr-row"><span>Dialog</span><input data-f="dialog" maxlength="200" placeholder="Hello!" value="${esc(p.dialog || '')}"></div>
+      <div class="pr-row"><span>Wander</span><input type="checkbox" data-f="wander" ${p.wander !== false ? 'checked' : ''}></div>` : ''}
       <div class="pr-sec">Scripting — On Touch</div>
       <div class="pr-row"><span>Action</span><select data-script="action">${scriptActions.map(a => `<option value="${a}" ${script.action === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div>
       <div class="pr-row"><span>Message</span><input data-script="text" placeholder="Hello!" value="${esc(script.text || '')}"></div>
@@ -555,7 +559,7 @@ export class Studio {
         this.markDirty(); return;
       }
       if (inp.dataset.v3) { const v = parseFloat(inp.value); if (!isNaN(v)) p[inp.dataset.v3][+inp.dataset.i] = inp.dataset.v3 === 's' ? Math.max(0.05, v) : v; }
-      else { const f = inp.dataset.f; if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; } else if (f === 'tr') { const t = Math.max(0, Math.min(1, parseFloat(inp.value) || 0)); if (t) p.tr = t; else delete p.tr; } else p[f] = inp.value; }
+      else { const f = inp.dataset.f; if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; } else if (f === 'wander') { p.wander = inp.checked; } else if (f === 'dialog') { p.dialog = String(inp.value).slice(0, 200); } else if (f === 'tr') { const t = Math.max(0, Math.min(1, parseFloat(inp.value) || 0)); if (t) p.tr = t; else delete p.tr; } else p[f] = inp.value; }
       this.refresh(p);
     }));
   }
@@ -571,6 +575,7 @@ export class Studio {
     const hit = this.ray.intersectObjects([...this.meshes.values()], false)[0];
     const at = hit ? hit.point : this.camPos.clone().add(new THREE.Vector3(0, 0, -20).applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')));
     const p = { id: this.newId(), name: pr.name, p: [Math.round(at.x), +(at.y + pr.s[1] / 2).toFixed(2), Math.round(at.z)], s: [...pr.s], c: pr.c, k: pr.k, m: pr.m };
+    if (pr.k === 'npc') { p.dialog = 'Hello!'; p.wander = true; }
     this.world.parts.push(p); this.addMesh(p); this.renderExplorer(); this.select(p); this.markDirty();
     if (this.tool === 'select') this.setTool('move');
   }
