@@ -1,0 +1,43 @@
+export async function aiPage(D) {
+  const { api, mount, esc } = D;
+  const me = D.me;
+  if (!me.owner) { location.hash = '#/home'; return; }
+  mount('ai', `<h1>🤖 Muse AI</h1>
+    <p class="muted">Chat with the AI, just like Zayd does. Owner-only.</p>
+    <div class="ai-chat"></div>
+    <form class="ai-form"><input class="ai-input" placeholder="Ask anything..." maxlength="2000" autocomplete="off"><button class="btn-primary">Send</button></form>`, () => {
+    const box = app.querySelector('.ai-chat');
+    const input = app.querySelector('.ai-input');
+    const hist = [];
+    const scroll = () => { box.scrollTop = box.scrollHeight; };
+    const addMsg = (role, text) => {
+      const div = document.createElement('div');
+      div.className = 'ai-msg ai-' + role;
+      div.innerHTML = `<span class="ai-who">${role === 'user' ? esc(me.name) : '🤖 Muse'}</span><span class="ai-text">${esc(text)}</span>`;
+      box.appendChild(div); scroll();
+      return div;
+    };
+    addMsg('assistant', 'Hey! I\'m Muse. Ask me anything — building ideas, Studio help, whatever.');
+    app.querySelector('.ai-form').onsubmit = async e => {
+      e.preventDefault();
+      const v = input.value.trim();
+      if (!v) return;
+      input.value = '';
+      addMsg('user', v);
+      hist.push({ role: 'user', content: v });
+      const thinking = addMsg('assistant', '...');
+      const btn = app.querySelector('.ai-form button');
+      btn.disabled = true;
+      try {
+        const r = await api('POST', '/api/ai/chat', { messages: hist.slice(-20) });
+        thinking.querySelector('.ai-text').textContent = r.reply;
+        hist.push({ role: 'assistant', content: r.reply });
+      } catch (err) {
+        thinking.querySelector('.ai-text').textContent = '⚠️ ' + (err.message || 'Something went wrong');
+        hist.pop();
+      }
+      btn.disabled = false; scroll(); input.focus();
+    };
+    input.focus();
+  });
+}
