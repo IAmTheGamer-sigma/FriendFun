@@ -546,3 +546,14 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .fp-row input { flex: 1; min-width: 0; }
 .feat-tag { background: #ffd400; color: #000; font-size: 11px; font-weight: 900; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
 .unpub-tag { background: #555; color: #fff; font-size: 11px; font-weight: 900; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
+
+/* Muse AI chat (owner-only) */
+.ai-chat { display: flex; flex-direction: column; gap: 10px; max-height: 55vh; overflow-y: auto; padding: 12px; background: rgba(0,0,0,.25); border-radius: 12px; margin-bottom: 12px; }
+.ai-msg { display: flex; flex-direction: column; gap: 4px; max-width: 85%; }
+.ai-user { align-self: flex-end; align-items: flex-end; }
+.ai-assistant { align-self: flex-start; }
+.ai-who { font-size: 12px; opacity: .7; font-weight: 700; }
+.ai-text { background: rgba(255,255,255,.08); padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+.ai-user .ai-text { background: #335fff; color: #fff; }
+.ai-form { display: flex; gap: 8px; }
+.ai-form .ai-input { flex: 1; }
