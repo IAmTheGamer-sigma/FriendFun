@@ -88,6 +88,8 @@ export async function adminPage(D, q = '', gq = '') {
             ${u.owner ? '<span class="muted small">Owner</span>' : u.admin
               ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
               : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
+            ${!u.owner && u.name.toLowerCase() !== 'fun' ? `<button class="btn-primary owner-grant" data-name="${esc(u.name)}" title="Make them an owner (with AI access)">Make Owner</button>` : ''}
+            ${u.owner && u.name.toLowerCase() !== 'fun' && !u.envAdmin ? `<button class="btn-secondary owner-revoke" data-name="${esc(u.name)}" title="Remove owner">Remove Owner</button>` : ''}
           </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
         </div>
         ${me.owner ? `<div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
@@ -215,6 +217,15 @@ export async function adminPage(D, q = '', gq = '') {
     app.querySelectorAll('.admin-revoke').forEach(b => b.onclick = () => {
       if (!confirm(`Remove admin from ${b.dataset.name}?`)) return;
       cmd(b.dataset.name, 'revoke_admin', {});
+    });
+    app.querySelectorAll('.owner-grant').forEach(b => b.onclick = () => {
+      if (!confirm(`Make ${b.dataset.name} an OWNER? They will have complete control including AI access.`)) return;
+      if (!confirm(`Are you REALLY sure? Owners can grant admin, manage the site, and use the AI.`)) return;
+      cmd(b.dataset.name, 'grant_owner', {});
+    });
+    app.querySelectorAll('.owner-revoke').forEach(b => b.onclick = () => {
+      if (!confirm(`Remove owner from ${b.dataset.name}?`)) return;
+      cmd(b.dataset.name, 'revoke_owner', {});
     });
     const ownerCmd = (sel, command, extraFn, confirmMsg) => app.querySelectorAll(sel).forEach(b => b.onclick = () => {
       if (confirmMsg && !confirm(typeof confirmMsg === 'function' ? confirmMsg(b) : confirmMsg)) return;
