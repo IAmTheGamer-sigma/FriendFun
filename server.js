@@ -312,6 +312,18 @@ app.get('/api/me', auth, async (req, res) => {
   res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isOwner(u) || isAdmin(u) || !!u.aiAccess });
 });
 
+// Change own password
+app.post('/api/me/password', auth, async (req, res) => {
+  const cur = String(req.body?.current || ''), nw = String(req.body?.password || '');
+  if (nw.length < 4 || nw.length > 64) return res.status(400).json({ error: 'New password must be 4-64 characters' });
+  const u = req.user;
+  if (hash(cur, u.salt) !== u.pw) return res.status(400).json({ error: 'Current password is incorrect' });
+  const salt = crypto.randomBytes(8).toString('hex');
+  const { error } = await supabase.from('users').update({ salt, pw: hash(nw, salt) }).eq('name', u.name);
+  if (error) return res.status(500).json({ error: 'Could not update password' });
+  res.json({ ok: true });
+});
+
 app.post('/api/ping', auth, async (req, res) => {
   touch(req.user.name, null);
   const { amount: daily } = await dailyTix(req.user);
@@ -1330,9 +1342,9 @@ function sanitizeWorld(w) {
     id: String(p.id || 'p' + i).slice(0, 20), name: String(p.name || 'Part').slice(0, 40),
     p: [0, 1, 2].map(j => num(p.p?.[j])), s: [0, 1, 2].map(j => Math.max(0.05, Math.min(2048, num(p.s?.[j]) || 1))),
     c: /^(#[0-9a-fA-F]{6}|hsl\(\d+,\d+%\,\d+%\))$/.test(p.c) ? p.c : '#a3a2a5',
-    k: ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc'].includes(p.k) ? p.k : 'part',
+    k: ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc', 'jump', 'heal'].includes(p.k) ? p.k : 'part',
     m: ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'baseplate', 'spawn', 'metal'].includes(p.m) ? p.m : 'plastic',
-    ...(p.k === 'npc' ? { dialog: String(p.dialog || '').slice(0, 200), wander: p.wander !== false } : {}),
+    ...(p.k === 'npc' ? { dialog: String(p.dialog || '').slice(0, 200), wander: p.wander !== false, enemy: p.enemy === true } : {}),
     ...(p.cc === false ? { cc: false } : {}), ...(p.tr ? { tr: Math.max(0, Math.min(1, num(p.tr))) } : {}),
     ...(sanitizeScript(p.script) ? { script: sanitizeScript(p.script) } : {}),
     ...(p.folder ? { folder: String(p.folder).slice(0, 20) } : {}),
@@ -1981,6 +1993,32 @@ app.post('/api/ai/coder', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'AI coder failed: ' + e.message });
   }
+});
+
+// Muse AI chat for owners (proxied to Anthropic; needs ANTHROPIC_API_KEY env)
+app.post('/api/ai/chat', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can chat with the AI.' });
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return res.status(503).json({ error: 'AI is not set up yet. Ask Zayd to add an Anthropic API key.' });
+  const msgs = Array.isArray(req.body?.messages) ? req.body.messages.slice(-20) : [];
+  const messages = msgs.filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
+  if (!messages.length) return res.status(400).json({ error: 'No messages' });
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.AI_MODEL || 'claude-sonnet-4-5-20250929',
+        max_tokens: 1024,
+        system: 'You are Muse, a friendly AI assistant inside Funtopia, a social block-building game where players build worlds, play games, earn FunTix, and chat. Keep answers short and casual unless asked for detail. You can help with building ideas, Studio help, moderation advice, and general questions.',
+        messages
+      })
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(502).json({ error: data?.error?.message || 'AI request failed' });
+    const reply = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').slice(0, 8000);
+    res.json({ reply: reply || 'No reply' });
+  } catch (e) { res.status(502).json({ error: 'AI request failed: ' + e.message }); }
 });
 
 // ---------- iknow easter egg (horror link) ----------
