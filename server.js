@@ -44,6 +44,7 @@ const money = u => ({ funtix: Number(u.funtix) || 0 });
 const list = (u, field) => Array.isArray(u?.[field]) ? u[field] : [];
 // Owner-granted moderators (used when the users.moderator column is missing).
 const extraMods = new Set();
+const extraOwners = new Set();
 // Gifted FunPanel access (used when the users.funpanel column is missing).
 // Gifting FunPanel also grants the mod-level powers its buttons need.
 const funpanelGifted = new Set();
@@ -147,7 +148,7 @@ function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin;
 // Staff tiers: owner (env admins) > admin (DB flag) > moderator (named group) > player.
 // Owners can do everything including granting/revoking admin. Admins get the full
 // admin panel except managing other admins. Moderators get mute/kick/review only.
-function isOwner(u) { const n = String(u?.name || '').toLowerCase(); return n === 'fun' || ADMINS.includes(n); }
+function isOwner(u) { const n = String(u?.name || '').toLowerCase(); return n === 'fun' || ADMINS.includes(n) || !!u?.owner || extraOwners.has(n); }
 function roleOf(u) { if (isOwner(u)) return 'owner'; if (u && u.admin) return 'admin'; if (isMod(u)) return 'moderator'; return 'player'; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
@@ -308,7 +309,7 @@ app.get('/api/me', auth, async (req, res) => {
     if (u.avatar?.head === 'head_slimebody') { u.avatar = { ...u.avatar, head: 'head_classic' }; upd.avatar = u.avatar; }
     await supabase.from('users').update(upd).eq('name', u.name);
   }
-  res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isAdmin(u) || !!u.aiAccess });
+  res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isOwner(u) || isAdmin(u) || !!u.aiAccess });
 });
 
 app.post('/api/ping', auth, async (req, res) => {
@@ -454,7 +455,7 @@ app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
   const q = key(String(req.query.q || ''));
   const { data: users, error } = await supabase.from('users').select('*').ilike('name', `%${q}%`).order('name').limit(100);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0, admin: isAdmin(u), owner: isOwner(u), envAdmin: ADMINS.includes(u.name.toLowerCase()) }))));
+  res.json(await Promise.all((users || []).map(async u => ({ ...await publicUser(u), clubForever: isAdmin(u) || !!u.clubForever, clubUntil: u.clubUntil || 0, funtix: u.funtix, aiAccess: isOwner(u) || isAdmin(u) || !!u.aiAccess, banned: !!u.banned && (!u.bannedUntil || u.bannedUntil > Date.now()), banReason: u.banReason || '', bannedUntil: u.bannedUntil || 0, admin: isAdmin(u), owner: isOwner(u), envAdmin: ADMINS.includes(u.name.toLowerCase()) }))));
 });
 
 app.post('/api/admin/club/:name', auth, adminOnly, async (req, res) => {
@@ -559,6 +560,18 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     if (isOwner(user)) return res.status(400).json({ error: 'Cannot revoke an owner' });
     updates = { admin: false };
     message = `Revoked admin from ${user.name}`;
+  } else if (command === 'grant_owner') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can grant owner' });
+    if (isOwner(user)) return res.status(400).json({ error: 'Already an owner' });
+    await setOwner(user.name, true);
+    updates = { aiAccess: true };
+    message = `Made ${user.name} an owner (with AI access)`;
+  } else if (command === 'revoke_owner') {
+    if (!isOwner(req.user)) return res.status(403).json({ error: 'Only owners can revoke owner' });
+    const n = user.name.toLowerCase();
+    if (n === 'fun' || ADMINS.includes(n)) return res.status(400).json({ error: 'Cannot revoke a root owner' });
+    await setOwner(user.name, false);
+    message = `Revoked owner from ${user.name}`;
   } else if (command === 'take_tix') {
     if (!isOwner(req.user)) return res.status(403).json({ error: 'Owner only' });
     const amount = Math.max(1, Math.min(100000, Math.floor(Number(req.body?.amount) || 100)));
@@ -650,7 +663,7 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
   const { data: updated, error } = await supabase.from('users').update(updates).eq('name', user.name).select().single();
   if (error) return res.status(500).json({ error: error.message });
   const isBanned = !!updated.banned && (!updated.bannedUntil || updated.bannedUntil > Date.now());
-  res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever, aiAccess: isAdmin(updated) || !!updated.aiAccess, banned: isBanned, banReason: updated.banReason || '', bannedUntil: updated.bannedUntil || 0, admin: isAdmin(updated) } });
+  res.json({ ok: true, message, user: { ...await publicUser(updated), funtix: updated.funtix, clubForever: isAdmin(updated) || !!updated.clubForever, aiAccess: isOwner(updated) || isAdmin(updated) || !!updated.aiAccess, banned: isBanned, banReason: updated.banReason || '', bannedUntil: updated.bannedUntil || 0, admin: isAdmin(updated), owner: isOwner(updated) } });
 });
 
 // View a player's inventory (owner only).
@@ -755,6 +768,14 @@ async function setFunpanel(name, on) {
     if (error) throw error;
     funpanelGifted.delete(k);
   } catch { on ? funpanelGifted.add(k) : funpanelGifted.delete(k); }
+}
+async function setOwner(name, on) {
+  const k = key(name);
+  try {
+    const { error } = await supabase.from('users').update({ owner: !!on }).eq('name', k);
+    if (error) throw error;
+    extraOwners.delete(k);
+  } catch { on ? extraOwners.add(k) : extraOwners.delete(k); }
 }
 function hasFunpanel(u) { return !!u && (!!u.funpanel || funpanelGifted.has(String(u.name || '').toLowerCase())); }
 function isMod(u) { return !!u && (isAdmin(u) || !!u.moderator || hasFunpanel(u) || MODERATORS.includes(String(u.name || '').toLowerCase()) || extraMods.has(String(u.name || '').toLowerCase())); }
@@ -1309,8 +1330,9 @@ function sanitizeWorld(w) {
     id: String(p.id || 'p' + i).slice(0, 20), name: String(p.name || 'Part').slice(0, 40),
     p: [0, 1, 2].map(j => num(p.p?.[j])), s: [0, 1, 2].map(j => Math.max(0.05, Math.min(2048, num(p.s?.[j]) || 1))),
     c: /^(#[0-9a-fA-F]{6}|hsl\(\d+,\d+%\,\d+%\))$/.test(p.c) ? p.c : '#a3a2a5',
-    k: ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed'].includes(p.k) ? p.k : 'part',
+    k: ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc'].includes(p.k) ? p.k : 'part',
     m: ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'baseplate', 'spawn', 'metal'].includes(p.m) ? p.m : 'plastic',
+    ...(p.k === 'npc' ? { dialog: String(p.dialog || '').slice(0, 200), wander: p.wander !== false } : {}),
     ...(p.cc === false ? { cc: false } : {}), ...(p.tr ? { tr: Math.max(0, Math.min(1, num(p.tr))) } : {}),
     ...(sanitizeScript(p.script) ? { script: sanitizeScript(p.script) } : {}),
     ...(p.folder ? { folder: String(p.folder).slice(0, 20) } : {}),
@@ -1948,7 +1970,7 @@ onStart(() => {
   return scripts;
 }
 app.post('/api/ai/coder', auth, async (req, res) => {
-  if (!req.user.admin && !req.user.aiAccess) return res.status(403).json({ error: 'AI coder is restricted. Ask an admin for access.' });
+  if (!isOwner(req.user) && !req.user.admin && !req.user.aiAccess) return res.status(403).json({ error: 'AI coder is restricted. Ask an admin for access.' });
   const prompt = String(req.body?.prompt || '').trim().slice(0, 500);
   if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
   try {
