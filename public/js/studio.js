@@ -19,11 +19,13 @@ const PRESETS = {
   wall: { name: 'Wall', s: [1, 12, 12], c: '#c0c0c0', k: 'part', m: 'brick' },
   platform: { name: 'Platform', s: [12, 1, 12], c: '#8b9a6b', k: 'part', m: 'grass' },
   npc: { name: 'NPC', s: [2, 5, 2], c: '#ffd400', k: 'npc', m: 'plastic' },
+  jump: { name: 'JumpPad', s: [4, 0.5, 4], c: '#b366ff', k: 'jump', m: 'neon' },
+  heal: { name: 'HealPack', s: [1.6, 1.6, 1.6], c: '#ff5b5b', k: 'heal', m: 'neon' },
   gem: { name: 'Gem', s: [1.5, 1.5, 1.5], c: '#00ffcc', k: 'coin', m: 'neon' },
   pillar: { name: 'Pillar', s: [2, 12, 2], c: '#a3a2a5', k: 'part', m: 'concrete' },
 };
 const MATERIALS = ['plastic', 'neon', 'grass', 'wood', 'brick', 'glass', 'concrete', 'sand', 'metal', 'baseplate', 'spawn'];
-const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc'];
+const KINDS = ['part', 'spawn', 'kill', 'checkpoint', 'win', 'bounce', 'coin', 'speed', 'npc', 'jump', 'heal'];
 const toHex = c => '#' + new THREE.Color(c).getHexString();
 // ---------- Visual (no-code) script specs ----------
 const VS_TRIGGERS = [
@@ -570,6 +572,7 @@ export class Studio {
       <div class="pr-row"><span>Type</span><select data-f="k">${KINDS.map(k => `<option ${k === p.k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
       <div class="pr-row"><span>CanCollide</span><input type="checkbox" data-f="cc" ${p.cc !== false ? 'checked' : ''}></div>
       ${p.k === 'npc' ? `<div class="pr-sec">NPC</div>
+      <div class="pr-row"><span>Behavior</span><select data-f="enemy"><option value="0">😊 Friendly</option><option value="1"${p.enemy ? ' selected' : ''}>👹 Enemy (chases players)</option></select></div>
       <div class="pr-row"><span>Dialog</span><input data-f="dialog" maxlength="200" placeholder="Hello!" value="${esc(p.dialog || '')}"></div>
       <div class="pr-row"><span>Wander</span><input type="checkbox" data-f="wander" ${p.wander !== false ? 'checked' : ''}></div>` : ''}
       <div class="pr-sec">Scripting — On Touch</div>
@@ -604,7 +607,7 @@ export class Studio {
         this.markDirty(); return;
       }
       if (inp.dataset.v3) { const v = parseFloat(inp.value); if (!isNaN(v)) p[inp.dataset.v3][+inp.dataset.i] = inp.dataset.v3 === 's' ? Math.max(0.05, v) : v; }
-      else { const f = inp.dataset.f; if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; } else if (f === 'wander') { p.wander = inp.checked; } else if (f === 'dialog') { p.dialog = String(inp.value).slice(0, 200); } else if (f === 'tr') { const t = Math.max(0, Math.min(1, parseFloat(inp.value) || 0)); if (t) p.tr = t; else delete p.tr; } else p[f] = inp.value; }
+      else { const f = inp.dataset.f; if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; } else if (f === 'wander') { p.wander = inp.checked; } else if (f === 'enemy') { if (inp.value === '1') p.enemy = true; else delete p.enemy; } else if (f === 'dialog') { p.dialog = String(inp.value).slice(0, 200); } else if (f === 'tr') { const t = Math.max(0, Math.min(1, parseFloat(inp.value) || 0)); if (t) p.tr = t; else delete p.tr; } else p[f] = inp.value; }
       this.refresh(p);
     }));
   }
