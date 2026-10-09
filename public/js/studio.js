@@ -59,7 +59,7 @@ export class Studio {
     if (!Array.isArray(this.world.folders)) this.world.folders = [];
     if (!Array.isArray(this.world.scripts)) this.world.scripts = [];
     this.gameId = o.gameId || null; this.name = o.name || 'Untitled Game'; this.description = o.description || '';
-    this.meshes = new Map(); this.sel = null; this.closedFolders = new Set(); this.undoStack = []; this.redoStack = []; this.dirty = false;
+    this.meshes = new Map(); this.sel = null; this.multi = []; this.exFilter = ''; this.closedFolders = new Set(); this.undoStack = []; this.redoStack = []; this.dirty = false;
     this.snap = true; this.keys = {};
     this.dom(); this.three(); this.bind(); this.rebuildAll();
     const sp = findSpawn(this.world);
@@ -105,9 +105,9 @@ export class Studio {
         </div><div class="rb-label">Lighting</div></div>
       </div>
       <div class="st-main">
-        <div class="st-view"><canvas class="st-canvas"></canvas><div class="st-hint">Right-drag to look &middot; WASD/QE to fly &middot; Wheel to zoom &middot; F to focus &middot; Click to select</div></div>
+        <div class="st-view"><canvas class="st-canvas"></canvas><div class="st-hint">Right-drag to look &middot; WASD/QE to fly &middot; Wheel to zoom &middot; F to focus &middot; Click to select &middot; Shift+click for multi-select</div></div>
         <div class="st-side">
-          <div class="st-panel"><div class="st-panel-h">Explorer</div><div class="st-explorer"></div></div>
+          <div class="st-panel"><div class="st-panel-h st-ex-h">Explorer<input class="ex-search" placeholder="Filter..."></div><div class="st-explorer"></div></div>
           <div class="st-panel"><div class="st-panel-h">Properties</div><div class="st-props"><div class="st-empty">Select a part to see its properties</div></div></div>
           ${this.o.aiAccess ? `<div class="st-panel"><div class="st-panel-h">AI Coder</div><div class="st-ai">
             <textarea class="ai-prompt" placeholder="Describe what to build... e.g. 'make an obby with lava and coins'"></textarea>
@@ -127,8 +127,9 @@ export class Studio {
       if (a === 'dup') this.duplicate(); if (a === 'del') this.remove(); if (a === 'undo') this.undo(); if (a === 'redo') this.redo();
       if (a === 'play') this.play(); if (a === 'save') this.save(); if (a === 'publish') this.publishDialog(); if (a === 'exit') this.exit();
     });
-    q('.rb-color').oninput = e => { if (this.sel) { this.pushUndo(); this.sel.c = e.target.value; this.refresh(this.sel); } };
-    q('.rb-mat').onchange = e => { if (this.sel) { this.pushUndo(); this.sel.m = e.target.value; this.refresh(this.sel); } };
+    q('.rb-color').oninput = e => { if (this.multi.length) { this.pushUndo(); for (const p of this.multi) { p.c = e.target.value; this.refresh(p); } } };
+    q('.rb-mat').onchange = e => { if (this.multi.length) { this.pushUndo(); for (const p of this.multi) { p.m = e.target.value; this.refresh(p); } } };
+    q('.ex-search').oninput = e => { this.exFilter = e.target.value.trim().toLowerCase(); this.renderExplorer(); };
     q('.rb-snap').onchange = e => { this.snap = e.target.checked; this.applySnap(); };
     q('.rb-sky').oninput = e => { this.world.sky = e.target.value; const si = this.props.querySelector('[data-lf="sky"]'); if (si) si.value = toHex(e.target.value); this.applyLight(); this.markDirty(); };
     const lightUpd = () => {
@@ -210,8 +211,8 @@ export class Studio {
     this.tc = new TransformControls(this.camera, this.canvas);
     this.tc.addEventListener('dragging-changed', e => {
       this.tcDragging = e.value;
-      if (e.value) this.pushUndo();
-      else this.bakeTransform();
+      if (e.value) { this.pushUndo(); this._dragStart = this.multi.map(p => ({ id: p.id, p: [...p.p] })); }
+      else { this.bakeTransform(); this._dragStart = null; }
     });
     this.tc.addEventListener('objectChange', () => this.liveTransform());
     this.scene.add(this.tc);
@@ -235,8 +236,9 @@ export class Studio {
     for (const m of this.meshes.values()) { this.scene.remove(m); if (m.userData.part.k !== 'coin') m.geometry.dispose(); }
     this.meshes.clear(); this.tc.detach();
     for (const p of this.world.parts) this.addMesh(p);
-    if (this.sel) this.sel = this.world.parts.find(p => p.id === this.sel.id) || null;
-    this.select(this.sel);
+    this.multi = this.multi.map(m => this.world.parts.find(p => p.id === m.id)).filter(Boolean);
+    this.sel = this.multi.length ? this.multi[this.multi.length - 1] : null;
+    this._syncSel();
     this.renderExplorer();
   }
   addMesh(p) { const m = makePartMesh(p); if (p.k === 'coin') m.userData.spin = false; this.scene.add(m); this.meshes.set(p.id, m); return m; }
@@ -252,16 +254,28 @@ export class Studio {
 
   // ---------- selection ----------
   selectService(name) {
-    this.sel = null; this.selSvc = name; this.tc.detach(); this.selBox.visible = false;
+    this.sel = null; this.multi = []; this.selSvc = name; this.tc.detach(); this.selBox.visible = false;
     this.explorer.querySelectorAll('.ex-item').forEach(e => e.classList.toggle('sel', e.dataset.service === name));
     this.renderProps();
   }
-  select(p) {
-    this.sel = p || null; this.selSvc = null;
+  select(p, additive) {
+    this.selSvc = null;
+    if (!additive) this.multi = [];
+    if (p) {
+      const i = this.multi.findIndex(x => x.id === p.id);
+      if (additive && i >= 0) this.multi.splice(i, 1);
+      else if (i < 0) this.multi.push(p);
+    }
+    this.sel = this.multi.length ? this.multi[this.multi.length - 1] : null;
+    this._syncSel();
+  }
+  _syncSel() {
+    const p = this.sel;
     if (p && this.tool !== 'select') this.tc.attach(this.meshes.get(p.id)); else this.tc.detach();
     this.selBox.visible = !!p;
     if (p) { this.c.querySelector('.rb-color').value = toHex(p.c); this.c.querySelector('.rb-mat').value = p.m; }
-    this.explorer.querySelectorAll('.ex-item').forEach(e => e.classList.toggle('sel', !!p && e.dataset.id === p.id));
+    const ids = new Set(this.multi.map(x => x.id));
+    this.explorer.querySelectorAll('.ex-item').forEach(e => e.classList.toggle('sel', !!e.dataset.id && ids.has(e.dataset.id)));
     const el = p && this.explorer.querySelector(`[data-id="${p.id}"]`); if (el) el.scrollIntoView({ block: 'nearest' });
     this.renderProps();
   }
@@ -271,6 +285,9 @@ export class Studio {
     const parts = this.world.parts || [];
     const folderMap = {};
     folders.forEach(f => folderMap[f.id] = f);
+    const qf = this.exFilter;
+    const match = n => !qf || String(n || '').toLowerCase().includes(qf);
+    const selIds = new Set(this.multi.map(x => x.id));
     // Parts grouped by folder
     const partsByFolder = { '': [] };
     parts.forEach(p => { const fid = p.folder || ''; if (!partsByFolder[fid]) partsByFolder[fid] = []; partsByFolder[fid].push(p); });
@@ -279,7 +296,7 @@ export class Studio {
 
     const renderFolder = (fid, depth) => {
       const f = fid ? folderMap[fid] : null;
-      const isOpen = fid ? !this.closedFolders.has(fid) : true;
+      const isOpen = fid ? (qf ? true : !this.closedFolders.has(fid)) : true;
       let html = '';
       if (f) {
         html += `<div class="ex-folder" data-fid="${f.id}" style="padding-left:${depth * 12}px">
@@ -296,15 +313,15 @@ export class Studio {
         // Subfolders
         folders.filter(sf => (sf.parent || '') === fid).forEach(sf => { html += renderFolder(sf.id, depth + 1); });
         // Scripts in this folder
-        (scriptsByFolder[fid] || []).forEach(s => {
+        (scriptsByFolder[fid] || []).filter(s => match(s.name)).forEach(s => {
           html += `<div class="ex-item ex-script" data-sid="${s.id}" style="padding-left:${(depth + 1) * 12 + 16}px">
             <span class="ex-sico">&#x1F4DD;</span>${esc(s.name)}
             <span class="ex-actions"><button class="ex-act" data-act="del-script" title="Delete">✕</button></span>
           </div>`;
         });
         // Parts in this folder
-        (partsByFolder[fid] || []).forEach(p => {
-          html += `<div class="ex-item" data-id="${p.id}" style="padding-left:${(depth + 1) * 12 + 16}px"><i class="sw" style="background:${p.c}"></i>${esc(p.name)}</div>`;
+        (partsByFolder[fid] || []).filter(p => match(p.name)).forEach(p => {
+          html += `<div class="ex-item${selIds.has(p.id) ? ' sel' : ''}" data-id="${p.id}" style="padding-left:${(depth + 1) * 12 + 16}px"><i class="sw" style="background:${p.c}"></i>${esc(p.name)}</div>`;
         });
       }
       return html;
@@ -332,7 +349,7 @@ export class Studio {
       const svcEl = e.target.closest('.ex-service');
       if (svcEl) { this.selectService(svcEl.dataset.service); return; }
       const it = e.target.closest('.ex-item');
-      if (it) this.select(this.world.parts.find(p => p.id === it.dataset.id));
+      if (it) this.select(this.world.parts.find(p => p.id === it.dataset.id), e.shiftKey);
     };
   }
   explorerAction(act, btn) {
@@ -507,8 +524,36 @@ export class Studio {
       this.applyLight(); this.markDirty();
     }));
   }
+  renderMultiProps() {
+    const n = this.multi.length;
+    this.props.innerHTML = `
+      <div class="pr-sec">${n} parts selected</div>
+      <div class="pr-row"><span>Color</span><input type="color" data-mf="c" value="#a3a2a5"></div>
+      <div class="pr-row"><span>Material</span><select data-mf="m">${MATERIALS.map(m => `<option>${m}</option>`).join('')}</select></div>
+      <div class="pr-row"><span>Type</span><select data-mf="k">${KINDS.map(k => `<option>${k}</option>`).join('')}</select></div>
+      <div class="pr-row"><span>CanCollide</span><input type="checkbox" data-mf="cc" checked></div>
+      <div class="modal-actions" style="margin-top:10px">
+        <button class="btn-secondary" data-mf-act="dup">Duplicate (${n})</button>
+        <button class="btn-danger" data-mf-act="del">Delete (${n})</button>
+      </div>
+      <p class="muted small">Shift+click parts to add/remove. Dragging the move gizmo moves the whole selection together.</p>`;
+    this.props.querySelectorAll('[data-mf]').forEach(inp => inp.addEventListener('change', () => {
+      this.pushUndo();
+      const f = inp.dataset.mf;
+      for (const p of this.multi) {
+        if (f === 'cc') { if (inp.checked) delete p.cc; else p.cc = false; }
+        else p[f] = inp.value;
+        this.refresh(p);
+      }
+      this.renderExplorer();
+    }));
+    this.props.querySelectorAll('[data-mf-act]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.mfAct === 'del') this.remove(); else this.duplicate();
+    }));
+  }
   renderProps() {
     if (this.selSvc === 'lighting') { this.renderLightProps(); return; }
+    if (this.multi.length > 1) { this.renderMultiProps(); return; }
     const p = this.sel;
     if (!p) { this.props.innerHTML = '<div class="st-empty">Select a part to see its properties</div>'; return; }
     const v3 = (k, label) => `<div class="pr-row"><span>${label}</span><div class="pr-v3">${[0, 1, 2].map(i => `<input type="number" step="0.5" data-v3="${k}" data-i="${i}" value="${+p[k][i].toFixed(2)}">`).join('')}</div></div>`;
@@ -580,19 +625,40 @@ export class Studio {
     if (this.tool === 'select') this.setTool('move');
   }
   duplicate() {
-    if (!this.sel) return; this.pushUndo();
-    const p = { ...structuredClone(this.sel), id: this.newId() }; p.p[1] += p.s[1];
-    this.world.parts.push(p); this.addMesh(p); this.renderExplorer(); this.select(p); this.markDirty();
+    if (!this.multi.length) return; this.pushUndo();
+    const copies = this.multi.map(s => {
+      const p = { ...structuredClone(s), id: this.newId() }; p.p[1] += p.s[1];
+      this.world.parts.push(p); this.addMesh(p); return p;
+    });
+    this.multi = copies; this.sel = copies[copies.length - 1];
+    this.renderExplorer(); this._syncSel(); this.markDirty();
   }
   remove() {
-    if (!this.sel) return; this.pushUndo();
-    const m = this.meshes.get(this.sel.id); this.tc.detach(); this.scene.remove(m); this.meshes.delete(this.sel.id);
-    this.world.parts = this.world.parts.filter(p => p !== this.sel);
-    this.sel = null; this.renderExplorer(); this.select(null); this.markDirty();
+    if (!this.multi.length) return; this.pushUndo();
+    this.tc.detach();
+    const ids = new Set(this.multi.map(s => s.id));
+    for (const id of ids) { const m = this.meshes.get(id); if (m) { this.scene.remove(m); this.meshes.delete(id); } }
+    this.world.parts = this.world.parts.filter(p => !ids.has(p.id));
+    this.multi = []; this.sel = null;
+    this.renderExplorer(); this._syncSel(); this.markDirty();
   }
   liveTransform() {
     const m = this.tc.object; if (!m) return; const p = m.userData.part;
-    if (this.tc.mode === 'translate') { p.p = [m.position.x, m.position.y, m.position.z].map(v => +v.toFixed(3)); }
+    if (this.tc.mode === 'translate') {
+      p.p = [m.position.x, m.position.y, m.position.z].map(v => +v.toFixed(3));
+      if (this._dragStart && this._dragStart.length > 1) {
+        const s0 = this._dragStart.find(s => s.id === p.id);
+        if (s0) {
+          const dx = m.position.x - s0.p[0], dy = m.position.y - s0.p[1], dz = m.position.z - s0.p[2];
+          for (const s of this._dragStart) {
+            if (s.id === p.id) continue;
+            const op = this.world.parts.find(x => x.id === s.id); if (!op) continue;
+            op.p = [s.p[0] + dx, s.p[1] + dy, s.p[2] + dz];
+            const om = this.meshes.get(s.id); if (om) om.position.set(op.p[0], op.p[1], op.p[2]);
+          }
+        }
+      }
+    }
   }
   bakeTransform() {
     const m = this.tc.object; if (!m) return; const p = m.userData.part;
@@ -601,7 +667,11 @@ export class Studio {
       if (p.k !== 'coin') p.s = [p.s[0] * Math.abs(m.scale.x), p.s[1] * Math.abs(m.scale.y), p.s[2] * Math.abs(m.scale.z)].map(v => Math.max(0.05, +v.toFixed(3)));
       m.scale.set(1, 1, 1);
     }
-    this.refresh(p);
+    const moved = this._dragStart && this._dragStart.length > 1 ? this._dragStart.map(s => s.id) : [p.id];
+    for (const id of moved) {
+      const part = this.world.parts.find(x => x.id === id);
+      if (part) { part.p = part.p.map(v => +v.toFixed(3)); this.refresh(part); }
+    }
   }
 
   // ---------- input ----------
@@ -622,7 +692,7 @@ export class Studio {
         const r = this.canvas.getBoundingClientRect();
         this.ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), this.camera);
         const hit = this.ray.intersectObjects([...this.meshes.values()], false)[0];
-        this.select(hit ? hit.object.userData.part : null);
+        this.select(hit ? hit.object.userData.part : null, e.shiftKey);
       }
       downAt = null;
     });
