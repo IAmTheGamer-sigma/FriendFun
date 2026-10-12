@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=1046eb00';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=4b390e65';
 import { NEWSBOY_AVATAR, buildNewsStudio } from './news-studio.js?v=9285cfef';
 import { sfx } from './sound.js?v=89850e26';
-import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=d76f1cb9';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=94017c68';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const VEHICLES = ['vehicle_car', 'vehicle_truck', 'vehicle_kart', 'vehicle_taxi', 'vehicle_race', 'vehicle_icecream']; // net code = index + 1
@@ -1008,7 +1008,9 @@ export class Game {
       g.position.set(spawn.x + Math.cos(a) * r, spawn.y, spawn.z + Math.sin(a) * r);
       g.rotation.y = Math.atan2(-(Math.cos(a) * r), -(Math.sin(a) * r));
       this.scene.add(g); hw.pumpkins.push(g);
+      g.userData.treatCd = 0;
     }
+    hw.treatCheck = 0;
     // bats circling overhead
     for (let i = 0; i < 5; i++) {
       const b = new THREE.Group();
@@ -1399,6 +1401,29 @@ export class Game {
     this.scene.traverse(o => {
       if (o.userData.bubble) { o.userData.bubbleT -= dt; if (o.userData.bubbleT <= 0) { o.remove(o.userData.bubble); o.userData.bubble = null; } }
     });
+    // trick-or-treat: touch pumpkins for candy
+    if (this.hwDecor && halloweenNow()) {
+      const hw = this.hwDecor;
+      hw.treatCheck -= dt;
+      if (hw.treatCheck <= 0) {
+        hw.treatCheck = 0.3;
+        for (const g of hw.pumpkins) {
+          if (g.userData.treatCd > 0) { g.userData.treatCd -= 0.3; continue; }
+          const d = g.position.distanceTo(this.pos);
+          if (d < 4) {
+            g.userData.treatCd = 30;
+            this.send({ t: 'treat' });
+            this.showBig('🍬 Trick or Treat! +10', 1500);
+            sfx.coin();
+            // pumpkin bounce
+            const origY = g.position.y;
+            let bt = 0;
+            const bounce = () => { bt += 0.05; g.position.y = origY + Math.sin(bt * Math.PI) * 1.5; if (bt < 1) requestAnimationFrame(bounce); else g.position.y = origY; };
+            bounce();
+          }
+        }
+      }
+    }
     // halloween decor animation
     const hw = this.hwDecor;
     if (hw) {
