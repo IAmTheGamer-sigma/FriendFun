@@ -482,6 +482,29 @@ export class Game {
     this.showBig(won ? '✅ ROUND WON' : '❌ ROUND LOST', 2200);
     won ? sfx.win() : sfx.oof();
   }
+  showNews(video, title) {
+    if (!video || document.querySelector('.news-overlay')) return;
+    const ov = document.createElement('div');
+    ov.className = 'news-overlay news-glitch';
+    ov.innerHTML = `<div class="news-static"></div><div class="news-glitch-text">📡 SIGNAL INTERRUPTED</div>`;
+    this.c.appendChild(ov);
+    setTimeout(() => {
+      if (this.destroyed) { ov.remove(); return; }
+      ov.classList.remove('news-glitch');
+      ov.innerHTML = `
+        <div class="news-frame">
+          <div class="news-banner">📡 FUNTOPIA NEWS</div>
+          <video class="news-video-el" src="${esc(video)}" controls autoplay playsinline></video>
+          <div class="news-lower3rd"><b>${esc(title)}</b></div>
+          <button class="news-close">✕</button>
+        </div>`;
+      const close = () => ov.remove();
+      ov.querySelector('.news-close').onclick = close;
+      const v = ov.querySelector('video');
+      v.onended = close;
+      v.play().catch(() => {});
+    }, 2600);
+  }
   onTourneyEnd(m) {
     const wasRivals = !!this.rivals;
     this.rivals = null; this.tourney = null;
@@ -1100,6 +1123,7 @@ export class Game {
       else if (m.t === 'rivalsRound') { this.onRivalsRound(m); }
       else if (m.t === 'rivalsRoundEnd') { this.onRivalsRoundEnd(m); }
       else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
+      else if (m.t === 'news') this.showNews(m.video, m.title);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
