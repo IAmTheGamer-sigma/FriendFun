@@ -1652,6 +1652,16 @@ wss.on('connection', (ws) => {
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned });
     }
+    else if (m.t === 'treat') {
+      const now = Date.now();
+      if (now - (player.lastTreat || 0) < 30000) return;
+      player.lastTreat = now;
+      const earned = 10;
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + earned }).eq('name', player.user.name).select().single();
+      if (error || !updated) return;
+      player.user = updated;
+      send(ws, { t: 'money', ...money(updated), earned });
+    }
     else if (m.t === 'scriptTix') {
       const now = Date.now();
       const amt = Math.max(1, Math.min(100, Math.floor(Number(m.amount) || 0)));
