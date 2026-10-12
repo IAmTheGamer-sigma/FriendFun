@@ -269,7 +269,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield], ['newsmaker', '📡 News Maker', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -325,39 +325,11 @@ function eggConfetti(n = 120) {
   }
 }
 // ============ NEWS BROADCAST ============
-function showNewsBroadcast(video, title) {
-  if (document.querySelector('.news-overlay')) return;
-  const ov = document.createElement('div');
-  ov.className = 'news-overlay news-glitch';
-  ov.innerHTML = `<div class="news-static"></div><div class="news-glitch-text">📡 SIGNAL INTERRUPTED</div>`;
-  document.body.appendChild(ov);
-  setTimeout(() => {
-    ov.classList.remove('news-glitch');
-    ov.innerHTML = `
-      <div class="news-frame">
-        <div class="news-banner">📡 FUNTOPIA NEWS</div>
-        <video class="news-video-el" src="${esc(video)}" controls autoplay playsinline></video>
-        <div class="news-lower3rd"><b>${esc(title)}</b></div>
-        <button class="news-close">✕</button>
-      </div>`;
-    const close = () => ov.remove();
-    ov.querySelector('.news-close').onclick = close;
-    const v = ov.querySelector('video');
-    v.onended = close;
-    v.play().catch(() => {});
-  }, 2600);
+async function showNewsBroadcast(b) {
+  const m = await import('./news-player.js?v=227ee6a3');
+  return m.showNewsBroadcast({ esc, me, ensureAvatar3d }, b);
 }
-async function checkNews() {
-  if (!token || !me || document.querySelector('.news-overlay')) return;
-  try {
-    const r = await api('GET', '/api/news');
-    const b = r.broadcast;
-    if (!b) return;
-    const seen = +(localStorage.newsSeenAt || 0);
-    if (b.at > seen) { localStorage.newsSeenAt = b.at; showNewsBroadcast(b.video, b.title); }
-  } catch {}
-}
-setInterval(checkNews, 5000);
+
 
 function initEasterEggs() {
   // 1. Konami code
@@ -1519,6 +1491,7 @@ async function route() {
       case 'admin': return await adminPage();
       case 'settings': return settingsPage();
       case 'owner': return await ownerPage();
+      case 'newsmaker': { const m = await import('./news-maker.js?v=4695664c'); return m.newsMakerPage({ mount, api, toast, esc, me, ensureAvatar3d, app: document.getElementById('app') }); }
       case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
       case 'horror': return horrorPage();
