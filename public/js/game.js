@@ -482,27 +482,56 @@ export class Game {
     this.showBig(won ? '✅ ROUND WON' : '❌ ROUND LOST', 2200);
     won ? sfx.win() : sfx.oof();
   }
-  showNews(video, title) {
-    if (!video || document.querySelector('.news-overlay')) return;
+  showNews(b) {
+    if (typeof b === 'string') b = { type: 'video', video: b, title: 'Breaking News' };
+    if (!b || document.querySelector('.news-overlay')) return;
     const ov = document.createElement('div');
     ov.className = 'news-overlay news-glitch';
     ov.innerHTML = `<div class="news-static"></div><div class="news-glitch-text">📡 SIGNAL INTERRUPTED</div>`;
     this.c.appendChild(ov);
+    const close = () => { try { speechSynthesis.cancel(); } catch {} ov.remove(); };
     setTimeout(() => {
       if (this.destroyed) { ov.remove(); return; }
       ov.classList.remove('news-glitch');
-      ov.innerHTML = `
-        <div class="news-frame">
-          <div class="news-banner">📡 FUNTOPIA NEWS</div>
-          <video class="news-video-el" src="${esc(video)}" controls autoplay playsinline></video>
-          <div class="news-lower3rd"><b>${esc(title)}</b></div>
-          <button class="news-close">✕</button>
-        </div>`;
-      const close = () => ov.remove();
-      ov.querySelector('.news-close').onclick = close;
-      const v = ov.querySelector('video');
-      v.onended = close;
-      v.play().catch(() => {});
+      if (b.type === 'live' && b.script) {
+        ov.innerHTML = `
+          <div class="news-frame">
+            <div class="news-banner">📡 FUNTOPIA NEWS LIVE</div>
+            <div class="news-live-stage"><canvas class="news-anchor-canvas" width="400" height="400"></canvas></div>
+            <div class="news-lower3rd"><b>${esc(b.title)}</b><div class="news-script">${esc(b.script)}</div></div>
+            <button class="news-close">✕</button>
+          </div>`;
+        ov.querySelector('.news-close').onclick = close;
+        try {
+          const canvas = ov.querySelector('.news-anchor-canvas');
+          const av = b.anchor === 'bot' ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' } : (b.avatar || this.me.avatar);
+          const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+          const sc = new THREE.Scene();
+          const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100); cam.position.set(0, 4.2, 15); cam.lookAt(0, 3, 0);
+          sc.add(new THREE.AmbientLight(0xffffff, 1.3));
+          const ch = buildCharacter(av); sc.add(ch);
+          let talking = true;
+          const tick = () => { if (!ov.isConnected) return; requestAnimationFrame(tick); const t = Date.now(); ch.rotation.y = Math.sin(t / 2500) * 0.15; if (talking) ch.position.y = Math.abs(Math.sin(t / 180)) * 0.12; r.render(sc, cam); };
+          tick();
+          const u = new SpeechSynthesisUtterance(b.script);
+          const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
+          if (v) u.voice = v;
+          u.onend = () => { talking = false; };
+          speechSynthesis.cancel(); speechSynthesis.speak(u);
+        } catch {}
+      } else if (b.video) {
+        ov.innerHTML = `
+          <div class="news-frame">
+            <div class="news-banner">📡 FUNTOPIA NEWS</div>
+            <video class="news-video-el" src="${esc(b.video)}" controls autoplay playsinline></video>
+            <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
+            <button class="news-close">✕</button>
+          </div>`;
+        ov.querySelector('.news-close').onclick = close;
+        const v = ov.querySelector('video');
+        v.onended = close;
+        v.play().catch(() => {});
+      } else close();
     }, 2600);
   }
   onTourneyEnd(m) {
@@ -1123,7 +1152,7 @@ export class Game {
       else if (m.t === 'rivalsRound') { this.onRivalsRound(m); }
       else if (m.t === 'rivalsRoundEnd') { this.onRivalsRoundEnd(m); }
       else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
-      else if (m.t === 'news') this.showNews(m.video, m.title);
+      else if (m.t === 'news') this.showNews(m);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
