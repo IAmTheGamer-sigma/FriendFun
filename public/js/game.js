@@ -55,6 +55,14 @@ const GEAR_BEHAVIOR = { gear_sword: 'melee', gear_slingshot: 'pellet', gear_rock
   gear_lasersword: 'melee', gear_cannon: 'rocket', gear_bazooka: 'rocket' };
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+const RIVALS_WEAPONS = {
+  rifle:   { name: 'Rifle',   dmg: 22, hs: 34,  interval: 0.13, range: 70,  mag: 30, reload: 1.8, auto: true,  spread: 0.012, tracer: '#ffeb3b' },
+  smg:     { name: 'SMG',     dmg: 14, hs: 22,  interval: 0.075, range: 38, mag: 32, reload: 1.6, auto: true,  spread: 0.028, tracer: '#e040fb' },
+  shotgun: { name: 'Shotgun', dmg: 9,  hs: 14,  interval: 0.9,  range: 20, mag: 6,  reload: 2.3, auto: false, spread: 0.085, pellets: 8, tracer: '#ff9800' },
+  sniper:  { name: 'Sniper',  dmg: 90, hs: 140, interval: 1.5,  range: 130, mag: 5,  reload: 2.9, auto: false, spread: 0.001, tracer: '#69f0ae' },
+  pistol:  { name: 'Pistol',  dmg: 18, hs: 28,  interval: 0.24, range: 48,  mag: 12, reload: 1.5,  auto: false, spread: 0.018, tracer: '#cfd8dc' },
+};
+
 export class Game {
   constructor(container, opts) {
     this.c = container; this.o = opts;
@@ -334,7 +342,6 @@ export class Game {
   }
   onKill(name) {
     this.kills++;
-    if (this.tourney) this.send({ t: 'tourneyKill', victim: name });
     const feed = this.c.querySelector('.kill-feed');
     if (feed) {
       const d = document.createElement('div');
@@ -346,24 +353,145 @@ export class Game {
     }
     this.updateLeaderboard();
   }
-  showTourneyHUD() {
-    let el = this.c.querySelector('.tourney-hud');
-    if (!el) { el = document.createElement('div'); el.className = 'tourney-hud'; this.c.appendChild(el); }
-    this.updateTourneyHUD();
+  // ============ RIVALS ============
+  startRivals(m) {
+    this.rivals = { opponent: m.opponent, loadout: m.loadout || { primary: 'rifle', secondary: 'pistol' },
+      weapon: (m.loadout || {}).primary || 'rifle', ammo: {}, reloading: false,
+      rounds: m.rounds || {}, round: m.round || 0, p1: m.p1, p2: m.p2, roundsToWin: m.roundsToWin || 5 };
+    for (const k of Object.keys(RIVALS_WEAPONS)) this.rivals.ammo[k] = RIVALS_WEAPONS[k].mag;
+    this.c.querySelector('.inv-bar') && (this.c.querySelector('.inv-bar').style.display = 'none');
+    let el = this.c.querySelector('.rivals-hud');
+    if (!el) { el = document.createElement('div'); el.className = 'rivals-hud'; el.innerHTML = `<div class="rv-round"></div><div class="rv-hitmark">✕</div><div class="rv-bottom"><div class="rv-hp"><div class="rv-hpfill"></div></div><div class="rv-ammo"></div></div>`; this.c.appendChild(el); }
+    this.updateRivalsHUD();
+    this.sys(`🎃 Rivals vs <b>${esc(m.opponent)}</b> — first to ${this.rivals.roundsToWin} rounds!`);
   }
-  updateTourneyHUD() {
-    const el = this.c.querySelector('.tourney-hud'); if (!el || !this.tourney) return;
-    const s = this.tourney.scores || {}, me = this.me.name;
-    const opp = this.tourney.opponent || Object.keys(s).find(n => n !== me) || '?';
-    el.innerHTML = `🎃 <b>${esc(me)}</b> ${s[me] || 0} — ${s[opp] || 0} <b>${esc(opp)}</b> <span class="muted">first to ${this.tourney.killsToWin}</span>`;
+  rivalsWeapon() { return RIVALS_WEAPONS[this.rivals.weapon]; }
+  updateRivalsHUD() {
+    const el = this.c.querySelector('.rivals-hud'); if (!el || !this.rivals) return;
+    const r = this.rivals, me = this.me.name;
+    const a = r.rounds[r.p1] || 0, b = r.rounds[r.p2] || 0;
+    const leftFirst = r.p1 === me;
+    el.querySelector('.rv-round').innerHTML = `ROUND ${r.round} &nbsp; <b>${esc(leftFirst ? me : r.p2)}</b> ${leftFirst ? a : b} — ${leftFirst ? b : a} <b>${esc(leftFirst ? r.p2 : me)}</b>`;
+    const w = this.rivalsWeapon();
+    el.querySelector('.rv-hpfill').style.width = Math.max(0, this.health) + '%';
+    el.querySelector('.rv-ammo').textContent = this.rivals.reloading ? 'RELOADING…' : `${w.name}  ${this.rivals.ammo[this.rivals.weapon]} / ${w.mag}`;
+  }
+  showHitmarker(hs, kill) {
+    const el = this.c.querySelector('.rv-hitmark'); if (!el) return;
+    el.className = 'rv-hitmark show' + (hs ? ' hs' : '') + (kill ? ' kill' : '');
+    clearTimeout(this._hmT);
+    this._hmT = setTimeout(() => el.classList.remove('show', 'hs', 'kill'), 180);
+  }
+  rivalsTracer(to, color) {
+    const from = this.pos.clone(); from.y += 3.4;
+    const g = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 }));
+    this.scene.add(line);
+    setTimeout(() => { this.scene.remove(line); g.dispose(); }, 90);
+  }
+  fireRivals() {
+    const r = this.rivals; if (!r || this.dead || r.reloading) return;
+    const w = this.rivalsWeapon(), now = this.t;
+    if (now - (r.lastShot || -9) < w.interval) return;
+    if (r.ammo[r.weapon] <= 0) { this.rivalsReload(); return; }
+    r.lastShot = now; r.ammo[r.weapon]--;
+    const pellets = w.pellets || 1;
+    let best = null; // {player, point, hs, dmg}
+    for (let i = 0; i < pellets; i++) {
+      const dir = new THREE.Vector3();
+      this.camera.getWorldDirection(dir);
+      dir.x += (Math.random() - 0.5) * w.spread * 2; dir.y += (Math.random() - 0.5) * w.spread * 2; dir.z += (Math.random() - 0.5) * w.spread * 2;
+      dir.normalize();
+      const ray = new THREE.Raycaster(this.camera.position.clone(), dir, 0.5, w.range);
+      const targets = [];
+      for (const p of this.players.values()) { p.char.updateMatrixWorld(); targets.push(p.char); }
+      const hits = ray.intersectObjects(targets, true);
+      let pHit = null, pDist = Infinity, pObj = null;
+      for (const h of hits) {
+        let o = h.object, pl = null;
+        while (o) { for (const p of this.players.values()) if (p.char === o) { pl = p; break; } if (pl || !o.parent) break; o = o.parent; }
+        if (pl && h.distance < pDist) { pDist = h.distance; pHit = h; pObj = pl; }
+      }
+      const wallHits = ray.intersectObjects([...this.meshes.values()], false);
+      const wDist = wallHits.length ? wallHits[0].distance : Infinity;
+      if (pHit && pDist < wDist) {
+        const localY = pHit.point.y - pObj.char.position.y;
+        const hs = localY > 4.6; // head region
+        const dmg = hs ? w.hs : w.dmg;
+        if (!best || dmg > best.dmg) best = { player: pObj, point: pHit.point, hs, dmg };
+        this.rivalsTracer(pHit.point, w.tracer);
+      } else if (wDist < Infinity) {
+        this.rivalsTracer(wallHits[0].point, w.tracer);
+      } else {
+        this.rivalsTracer(this.camera.position.clone().addScaledVector(dir, w.range), w.tracer);
+      }
+    }
+    sfx.shoot?.() || sfx.click?.();
+    if (best) {
+      this.send({ t: 'gearHit', id: best.player.id, dmg: best.dmg });
+      const willKill = (best.player._rhp ?? 100) - best.dmg <= 0;
+      this.showHitmarker(best.hs, willKill);
+      best.player._rhp = (best.player._rhp ?? 100) - best.dmg;
+    }
+    this.updateRivalsHUD();
+  }
+  rivalsReload() {
+    const r = this.rivals; if (!r || r.reloading || this.dead) return;
+    const w = this.rivalsWeapon();
+    if (r.ammo[r.weapon] >= w.mag) return;
+    r.reloading = true; this.updateRivalsHUD();
+    sfx.click?.();
+    setTimeout(() => { if (this.destroyed) return; r.reloading = false; r.ammo[r.weapon] = w.mag; this.updateRivalsHUD(); }, w.reload * 1000);
+  }
+  rivalsSwitch(slot) {
+    const r = this.rivals; if (!r || this.dead) return;
+    const id = slot === 1 ? r.loadout.primary : r.loadout.secondary;
+    if (!RIVALS_WEAPONS[id] || r.weapon === id) return;
+    r.weapon = id; r.reloading = false;
+    sfx.click?.(); this.updateRivalsHUD();
+  }
+  applyRivalsDamage(dmg, from) {
+    if (this.dead || !this.rivals) return;
+    this.health -= dmg; this.updateHud(); this.updateRivalsHUD();
+    sfx.oof();
+    if (this.health <= 0) {
+      this.health = 0;
+      if (this.rivals) this.rivals.noRespawn = true; // server starts next round
+      this.send({ t: 'rivalsDeath', by: from });
+      this.die();
+    }
+  }
+  onRivalsRound(m) {
+    if (!this.rivals) return;
+    this.rivals.rounds = m.rounds; this.rivals.round = m.round;
+    this.rivals.noRespawn = false;
+    this.health = 100;
+    for (const k of Object.keys(RIVALS_WEAPONS)) this.rivals.ammo[k] = RIVALS_WEAPONS[k].mag;
+    for (const p of this.players.values()) p._rhp = 100;
+    this.spawn();
+    this.updateHud(); this.updateRivalsHUD();
+    this.showBig(`ROUND ${m.round}`, 1800);
+    sfx.click?.();
+  }
+  onRivalsRoundEnd(m) {
+    if (!this.rivals) return;
+    this.rivals.rounds = m.rounds;
+    this.rivals.noRespawn = true;
+    this.updateRivalsHUD();
+    const won = m.winner === this.me.name;
+    this.showBig(won ? '✅ ROUND WON' : '❌ ROUND LOST', 2200);
+    won ? sfx.win() : sfx.oof();
   }
   onTourneyEnd(m) {
-    this.tourney = null;
+    const wasRivals = !!this.rivals;
+    this.rivals = null; this.tourney = null;
+    this.c.querySelector('.rivals-hud')?.remove();
     this.c.querySelector('.tourney-hud')?.remove();
     const won = m.winner === this.me.name;
-    this.showBig(won ? '🏆 YOU WIN!' : `😞 ${esc(m.winner)} wins`, 5000);
+    const score = m.rounds ? ` (${m.rounds[this.me.name] || 0}–${m.rounds[Object.keys(m.rounds).find(k => k !== this.me.name)] || 0})` : '';
+    this.showBig(won ? '🏆 YOU WIN THE MATCH!' : `😞 ${esc(m.winner)} wins${score}`, 5000);
     sfx.win();
-    this.sys(won ? '🎃 Tournament win recorded! +1 on the leaderboard.' : `🎃 ${esc(m.winner)} takes the match.`);
+    if (wasRivals) this.sys(won ? '🎃 Tournament win recorded! +1 on the leaderboard.' : `🎃 ${esc(m.winner)} takes the match.`);
   }
   toggleMenu(v) {
     const show = v ?? this.escMenu.classList.contains('hidden');
@@ -714,6 +842,7 @@ export class Game {
     }
   }
   useGear() {
+    if (this.rivals) { this.fireRivals(); return; }
     const id = this.me.avatar?.gear;
     if (!id || id === 'gear_none' || this.dead || this.o.test) return;
     const now = this.t;
@@ -853,7 +982,7 @@ export class Game {
     this.debris = breakApart(this.scene, this.char, this.vel);
     this.char.visible = false;
     if (this.pet) this.pet.visible = false;
-    setTimeout(() => { if (!this.destroyed) this.spawn(); }, 3000);
+    setTimeout(() => { if (!this.destroyed && !(this.rivals && this.rivals.noRespawn)) this.spawn(); }, 3000);
   }
 
   // ---------- input ----------
@@ -872,7 +1001,8 @@ export class Game {
       if (down && !e.repeat && e.code === 'F4' && this.isStaff()) { e.preventDefault(); this.toggleFunPanel(); return; }
       if (down && !e.repeat && e.code === 'KeyV') { this.toggleVehicle(); return; }
       if (down && !e.repeat && e.code === 'KeyE' && this.vehicleId) { this.exitVehicle(); return; }
-      if (down && !e.repeat && /^Digit[1-9]$/.test(e.code)) { this.equipGearByIndex(+e.code.slice(5) - 1); return; }
+      if (down && !e.repeat && /^Digit[1-9]$/.test(e.code)) { if (this.rivals && +e.code.slice(5) <= 2) { this.rivalsSwitch(+e.code.slice(5)); return; } this.equipGearByIndex(+e.code.slice(5) - 1); return; }
+      if (down && !e.repeat && e.code === 'KeyR' && this.rivals) { this.rivalsReload(); return; }
       this.keys[e.code] = down;
       if (e.code === 'Space') {
         if (down) { if (!e.repeat) this.jumpBuf = 0.15; e.preventDefault(); }
@@ -885,12 +1015,12 @@ export class Game {
     this.canvas.addEventListener('contextmenu', e => e.preventDefault());
     this.canvas.addEventListener('pointerdown', e => {
       this.chatInput.blur();
-      if (e.button === 0 && e.pointerType !== 'touch' && !this.o.test) { this.useGear(); return; }
+      if (e.button === 0 && e.pointerType !== 'touch' && !this.o.test) { this.firing = true; this.useGear(); return; }
       if (e.button !== 2 && e.pointerType !== 'touch') return;
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); this.canvas.setPointerCapture(e.pointerId);
       if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a.x - b.x, a.y - b.y); }
     });
-    const ptrUp = e => { ptrs.delete(e.pointerId); pinch = 0; };
+    const ptrUp = e => { ptrs.delete(e.pointerId); pinch = 0; if (e.button === 0) this.firing = false; };
     this.canvas.addEventListener('pointerup', ptrUp); this.canvas.addEventListener('pointercancel', ptrUp);
     this.canvas.addEventListener('pointermove', e => {
       if (document.pointerLockElement === this.canvas) { this.rotateCam(e.movementX, e.movementY); return; }
@@ -957,6 +1087,7 @@ export class Game {
       } else if (m.t === 'chat') this.onChat(m);
       else if (m.t === 'money') { this.setMoney(m); if (m.reason === 'play') this.sys(`+${m.amount} FunTix for playing!`); if (m.looneyCoins != null) { this.showBig(`🪙 Looney Coin earned! (${m.looneyCoins}/20)`, 3500); sfx.win(); } }
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
+      else if (m.t === 'gearHit' && this.rivals && m.dmg) { this.applyRivalsDamage(m.dmg, m.from); }
       else if (m.t === 'gearHit') { if (!this.dead) this.die(); }
       else if (m.t === 'tp') { this.pos.set(m.x, m.y, m.z); this.vel.set(0, 0, 0); this.sys('Teleported by a moderator'); }
       else if (m.t === 'freeze') {
@@ -965,8 +1096,9 @@ export class Game {
         this.sys(this.frozen ? '❄️ You were frozen by a moderator' : 'You were unfrozen');
       }
       else if (m.t === 'sys') this.sys(m.text);
-      else if (m.t === 'tourney') { this.tourney = m; this.showTourneyHUD(); this.sys(`🎃 Tournament match vs <b>${esc(m.opponent)}</b> — first to ${m.killsToWin}!`); }
-      else if (m.t === 'tourneyScore' && this.tourney) { this.tourney.scores = m.scores; this.updateTourneyHUD(); }
+      else if (m.t === 'rivals') { this.startRivals(m); }
+      else if (m.t === 'rivalsRound') { this.onRivalsRound(m); }
+      else if (m.t === 'rivalsRoundEnd') { this.onRivalsRoundEnd(m); }
       else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
@@ -1119,6 +1251,7 @@ export class Game {
     for (const fn of (this._scriptState?.tickFns || [])) { try { fn(dt, this.t); } catch (e) { console.warn('onTick error:', e); } }
     if (!this.dead) {
       this.physics(dt);
+      if (this.firing && this.rivals && this.rivalsWeapon().auto) this.fireRivals();
       this.char.position.copy(this.pos);
       let dy = (this.facing ?? 0) - this.char.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       this.char.rotation.y += dy * Math.min(1, dt * 14);
