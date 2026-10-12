@@ -165,6 +165,7 @@ export async function ownerPage(D, q = '') {
   const status = u => u.owner ? 'Owner' : u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('owner', `<h1>👑 Owner Panel</h1>
     <p class="muted">Owner-only tools. For everyday admin work (badges, FunTix, bans) use the <a href="#/admin">Admin Panel</a>.</p>
+    <p><a class="btn-secondary" href="https://muse.ai" target="_blank" rel="noopener">🤖 Muse AI</a></p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <section class="admin-section owner-tools"><h3>📢 Site Tools <span class="muted small">site-wide</span></h3>
       <div class="owner-grid">
