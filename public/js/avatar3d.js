@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=0cd14a11';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=d76f1cb9';
 import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
 
 const faceCache = {}, shirtCache = {};
@@ -77,10 +77,11 @@ function faceTexture(id) {
 function shirtTexture(id) {
   if (shirtCache[id]) return shirtCache[id];
   const it = ITEM[id];
+  const ugcT = (id.startsWith('ugc_') && it && it.template) ? it.template : null;
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const g = c.getContext('2d');
   const C = (it && it.color) || '#aaaaaa';
-  const st = id.slice(6).split('_')[0];
+  const st = ugcT ? ugcT.slice(6).split('_')[0] : id.slice(6).split('_')[0];
   const star = (cx, cy, R, r) => { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R; g.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad); } g.closePath(); g.fill(); };
   g.fillStyle = C; g.fillRect(0, 0, 128, 128);
   switch (st) {
@@ -121,6 +122,7 @@ function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 
 function box(w, h, d, color) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color)); m.castShadow = true; m.receiveShadow = true; return m; }
 
 function hatStyle(id) {
+  if (id.startsWith('ugc_')) { const u = ITEM[id]; return u && u.template ? hatStyle(u.template) : 'cap'; }
   const s = id.slice(4);
   const styles = ['tophat', 'clubhat', 'bunnyears', 'ducktuft', 'catears', 'bearears', 'foxears', 'wolfears', 'flowercrown', 'propeller', 'beanie', 'crown', 'wizard', 'pirate', 'cowboy', 'santa', 'party', 'sombrero', 'ninja', 'chef', 'ushanka', 'beret', 'detective', 'visor', 'sun', 'fez', 'frog', 'shark', 'chicken', 'pizza', 'burger', 'taco', 'donut', 'icecream', 'popcorn', 'helm', 'cap', 'cone', 'horns', 'halo', 'headphones', 'witch'];
   for (const k of styles) if (s === k || s.startsWith(k + '_')) return k;
