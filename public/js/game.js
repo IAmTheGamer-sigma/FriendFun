@@ -523,14 +523,19 @@ export class Game {
         ov.innerHTML = `
           <div class="news-frame">
             <div class="news-banner">📡 FUNTOPIA NEWS</div>
-            <video class="news-video-el" src="${esc(b.video)}" controls autoplay playsinline></video>
+            <div class="news-video-wrap">
+              <video class="news-video-el" src="${esc(b.video)}" playsinline loop></video>
+              <button class="news-unmute">🔊 Tap for sound</button>
+            </div>
             <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
             <button class="news-close">✕</button>
           </div>`;
         ov.querySelector('.news-close').onclick = close;
         const v = ov.querySelector('video');
+        const unmute = ov.querySelector('.news-unmute');
+        unmute.onclick = () => { v.muted = false; v.play().catch(() => {}); unmute.remove(); };
+        v.muted = true; v.play().catch(() => {});
         v.onended = close;
-        v.play().catch(() => {});
       } else close();
     }, 2600);
   }
