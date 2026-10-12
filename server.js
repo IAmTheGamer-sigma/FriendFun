@@ -2,10 +2,11 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import { createClient } from '@supabase/supabase-js';
+import { createTourney } from './tourney.js';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase, shooterArena, shooterFort, shooterRooftop } from './public/js/worlds.js';
+import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase, shooterArena, shooterFort, shooterRooftop, spookyRivals } from './public/js/worlds.js';
 import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES, UGC_TEMPLATES, UGC_MAX_PRICE, UGC_CREATOR_CUT } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +21,8 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const supabaseAdmin = SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY) : supabase;
 
 // ---- Custom badges (admin-created) ----
 let CUSTOM_BADGES = {};
@@ -52,7 +55,7 @@ function validUgcTransform(t) {
 }
 async function ensureUgcBucket() {
   try {
-    const { error } = await supabase.storage.createBucket(UGC_BUCKET, { public: true });
+    const { error } = await supabaseAdmin.storage.createBucket(UGC_BUCKET, { public: true });
     if (error && !/exists|duplicate/i.test(error.message)) throw error;
     ugcBucketOk = true;
   } catch (e) { console.error('UGC bucket setup failed:', e.message); }
@@ -871,9 +874,9 @@ app.post('/api/ugc/model', auth, async (req, res) => {
     if (!ugcBucketOk) await ensureUgcBucket();
     if (!ugcBucketOk) return res.status(500).json({ error: 'Model storage is not ready yet' });
     const key = `ugc/${crypto.randomUUID()}.glb`;
-    const { error } = await supabase.storage.from(UGC_BUCKET).upload(key, buf, { contentType: 'model/gltf-binary', upsert: false });
+    const { error } = await supabaseAdmin.storage.from(UGC_BUCKET).upload(key, buf, { contentType: 'model/gltf-binary', upsert: false });
     if (error) throw error;
-    const { data: pub } = supabase.storage.from(UGC_BUCKET).getPublicUrl(key);
+    const { data: pub } = supabaseAdmin.storage.from(UGC_BUCKET).getPublicUrl(key);
     res.json({ url: pub.publicUrl });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1676,6 +1679,7 @@ app.post('/api/notifications/read', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+
 // realtime
 const rooms = new Map();
 const privateServers = new Map(); // CODE -> { gameId, owner, created }
@@ -1687,6 +1691,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (const p of room.players.values()) if (p.ws !== except && p.ws.readyState === 1) p.ws.send(s); }
+const T = createTourney({ app, auth, supabase, privateServers, notify, key, list, broadcast, send });
 
 wss.on('connection', (ws) => {
   let player = null, room = null;
@@ -1729,6 +1734,7 @@ wss.on('connection', (ws) => {
 
       touch(u.name, g.id);
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
+      T.tourneyJoin(player, room, ws);
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
       broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
@@ -1785,9 +1791,11 @@ wss.on('connection', (ws) => {
       const target = room.players.get(m.id);
       if (target && target.ws && target.id !== player.id) send(target.ws, { t: 'gearHit', from: player.name });
     }
+    else if (m.t === 'tourneyKill' && typeof m.victim === 'string') T.tourneyKill(player, room, m.victim);
   });
   ws.on('close', () => {
     if (!player || !room) return;
+    T.tourneyLeave(player, room);
     room.players.delete(player.id);
     if (room.private && !room.players.size) { rooms.delete(room.private); privateServers.delete(room.private.split(':')[1]); }
     broadcast(room, { t: 'left', id: player.id });
@@ -2306,6 +2314,7 @@ const SHOOTER_GAMES = [
   { id: 'g_arena1', name: 'Block Arena', desc: 'Close-quarters shooter arena. Grab a gear and fight! 🔫', build: shooterArena },
   { id: 'g_arena2', name: 'Fort Battle', desc: 'Storm the enemy fort in this team-style shooter battleground! 🏰', build: shooterFort },
   { id: 'g_arena3', name: 'Rooftop Rumble', desc: 'Night-city rooftop shootout. Watch your step! 🌃', build: shooterRooftop },
+  { id: 'g_spookyrivals', name: '🎃 Spooky Rivals', desc: 'Tournament 1v1 arena. Most wins by Wednesday takes the Champion Pumpkin! 👑', build: spookyRivals, tourney: true, maxPlayers: 2 },
 ];
 async function seedShooterGames() {
   try {
@@ -2317,7 +2326,7 @@ async function seedShooterGames() {
       const world = cfg.build();
       const { error } = await supabase.from('games').insert({ id: cfg.id, name: cfg.name, creator: 'Funtopia',
         description: cfg.desc, world: sanitizeWorld(world), event: 'shooter',
-        visits: 0, likes: 0, dislikes: 0, max_players: 24, created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false });
+        visits: 0, likes: 0, dislikes: 0, max_players: cfg.maxPlayers || 24, created: Date.now(), updated: Date.now(), thumbnail: '', unpublished: false });
       if (error) console.warn('shooter fail', cfg.id, error.message); else created++;
     }
     return { created };
