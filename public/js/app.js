@@ -1359,11 +1359,11 @@ async function ugcGlbModal(u) {
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, ensureAvatar3d, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=16f2582b');
+  const m = await import('./admin.js?v=a5ede81a');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=16f2582b');
+  const m = await import('./admin.js?v=a5ede81a');
   return m.ownerPage(adminDeps, q);
 }
 
