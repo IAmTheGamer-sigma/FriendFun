@@ -34,12 +34,22 @@ async function loadCustomBadges() {
 let UGC_ITEMS = {}; // 'ugc_<id>' -> { id, type, name, price, color, template, creator, sales, ugc: true }
 let ugcTableOk = true;
 function ugcDef(row) {
-  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, model_url: row.model_url || null, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
+  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, model_url: row.model_url || null, model_transform: row.model_transform || null, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
 }
 // UGC custom 3D models (.glb) live in a public Supabase Storage bucket.
 const UGC_BUCKET = 'ugc-models';
 const UGC_GLB_MAX = 4 * 1024 * 1024;
 let ugcBucketOk = false;
+function validUgcTransform(t) {
+  if (!t) return null;
+  const n = v => typeof v === 'number' && Number.isFinite(v);
+  const dx = n(t.dx) ? t.dx : 0, dy = n(t.dy) ? t.dy : 0, dz = n(t.dz) ? t.dz : 0;
+  const ry = n(t.ry) ? t.ry : 0, s = n(t.s) ? t.s : 1;
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3 || Math.abs(dz) > 3) return 'Offset out of range (±3)';
+  if (ry < 0 || ry > 360) return 'Spin out of range (0–360)';
+  if (s < 0.2 || s > 3) return 'Size out of range (0.2–3)';
+  return { dx, dy, dz, ry, s };
+}
 async function ensureUgcBucket() {
   try {
     const { error } = await supabase.storage.createBucket(UGC_BUCKET, { public: true });
@@ -293,6 +303,12 @@ async function dailyTix(u) {
   return { amount: amt, user: updated };
 }
 
+app.get('/api/online', auth, (req, res) => {
+  const now = Date.now();
+  let count = 0;
+  for (const p of presence.values()) if (now - p.lastSeen < 90000) count++;
+  res.json({ count });
+});
 app.get('/api/me', auth, async (req, res) => {
   const u = req.user;
   // Repair corrupted FunTix balance (null/NaN from old coin-pickup bug)
@@ -843,7 +859,7 @@ function muteState(u) {
 }
 
 // ---------- UGC (player-created avatar items) ----------
-const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, sales: u.sales });
+const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, model_transform: u.model_transform || null, creator: u.creator, sales: u.sales });
 // Upload a .glb model file (base64). Returns a public URL; the item is created separately.
 app.post('/api/ugc/model', auth, async (req, res) => {
   try {
@@ -869,12 +885,14 @@ app.post('/api/ugc', auth, async (req, res) => {
   const b = req.body || {};
   const type = String(b.type || '');
   if (!['hat', 'shirt', 'gear'].includes(type)) return res.status(400).json({ error: 'Type must be hat, shirt, or gear' });
-  let template = null, color = null, model_url = null;
+  let template = null, color = null, model_url = null, model_transform = null;
   if (b.model_url) {
     // Custom 3D model (.glb) path — must be a URL from our own upload endpoint
     model_url = String(b.model_url);
     const okPrefix = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/' + UGC_BUCKET + '/';
     if (!model_url.startsWith(okPrefix)) return res.status(400).json({ error: 'Invalid model URL' });
+    model_transform = validUgcTransform(b.transform);
+    if (typeof model_transform === 'string') return res.status(400).json({ error: model_transform });
   } else {
     // Remix path (hats and shirts only)
     if (!['hat', 'shirt'].includes(type)) return res.status(400).json({ error: 'Remix only supports hats and shirts — use a 3D model for gears' });
@@ -893,10 +911,10 @@ app.post('/api/ugc', auth, async (req, res) => {
     if ((mine || []).filter(r => r.status === 'pending').length >= 5) return res.status(400).json({ error: 'You have 5 items awaiting review already' });
     if ((mine || []).length >= 50) return res.status(400).json({ error: 'Item limit reached (50)' });
     const id = crypto.randomBytes(4).toString('hex');
-    const row = { id, creator: req.user.name, type, template, color, model_url, name, price, status: 'pending', sales: 0 };
+    const row = { id, creator: req.user.name, type, template, color, model_url, model_transform, name, price, status: 'pending', sales: 0 };
     const { data, error } = await supabase.from('ugc_items').insert(row).select().single();
     if (error) {
-      if (/model_url/i.test(error.message)) return res.status(500).json({ error: '3D models need the updated SQL — run supabase_ugc.sql' });
+      if (/model_url|model_transform/i.test(error.message)) return res.status(500).json({ error: '3D models need the updated SQL — run supabase_ugc.sql' });
       throw error;
     }
     res.json({ ok: true, item: { ...ugcPublic(ugcDef(data)), status: 'pending' } });
