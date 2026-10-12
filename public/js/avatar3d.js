@@ -165,7 +165,7 @@ function attachUgcGlb(parent, url, targetSize, y = 0, t = null) {
 function hatStyle(id) {
   if (id.startsWith('ugc_')) { const u = ITEM[id]; return u && u.template ? hatStyle(u.template) : 'cap'; }
   const s = id.slice(4);
-  const styles = ['tophat', 'clubhat', 'bunnyears', 'ducktuft', 'catears', 'bearears', 'foxears', 'wolfears', 'flowercrown', 'propeller', 'beanie', 'crown', 'wizard', 'pirate', 'cowboy', 'santa', 'party', 'sombrero', 'ninja', 'chef', 'ushanka', 'beret', 'detective', 'visor', 'sun', 'fez', 'frog', 'shark', 'chicken', 'pizza', 'burger', 'taco', 'donut', 'icecream', 'popcorn', 'helm', 'cap', 'cone', 'horns', 'halo', 'headphones', 'witch'];
+  const styles = ['tophat', 'clubhat', 'bunnyears', 'ducktuft', 'catears', 'bearears', 'foxears', 'wolfears', 'flowercrown', 'propeller', 'beanie', 'crown', 'wizard', 'pirate', 'cowboy', 'santa', 'party', 'sombrero', 'ninja', 'chef', 'ushanka', 'beret', 'detective', 'visor', 'sun', 'fez', 'frog', 'shark', 'chicken', 'pizza', 'burger', 'taco', 'donut', 'icecream', 'popcorn', 'helm', 'cap', 'cone', 'horns', 'halo', 'headphones', 'witch', 'scarecrow', 'devilhorns'];
   for (const k of styles) if (s === k || s.startsWith(k + '_')) return k;
   return 'cap';
 }
@@ -206,6 +206,13 @@ function buildHat(id) {
       add(new THREE.CylinderGeometry(0.57, 0.6, 0.16, 20), '#ff9800', 0.02, 0.14);
       const tip = add(new THREE.ConeGeometry(0.16, 0.4, 10), C, 0.32, 1.42);
       tip.rotation.z = -0.7;
+      break; }
+    case 'scarecrow': {
+      add(new THREE.CylinderGeometry(1.0, 1.0, 0.08, 20), '#c9a227', 0, 0.02);
+      add(new THREE.SphereGeometry(0.55, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), '#d4a017', 0, 0.05);
+      break; }
+    case 'devilhorns': {
+      for (const sx of [-1, 1]) { const h = add(new THREE.ConeGeometry(0.18, 0.7, 10), '#c62828', sx * 0.45, 0.5); h.rotation.z = sx * -0.4; }
       break; }
     case 'catears': { for (const sx of [-1, 1]) { const e = add(new THREE.ConeGeometry(0.2, 0.55, 4), C, sx * 0.4, 0.35); e.rotation.y = Math.PI / 4; e.rotation.z = sx * -0.15; } break; }
     case 'bearears': for (const sx of [-1, 1]) { add(new THREE.SphereGeometry(0.24, 12, 10), C, sx * 0.45, 0.28); add(new THREE.SphereGeometry(0.12, 10, 8), '#f8bbd0', sx * 0.45, 0.28, 0.16); } break;
