@@ -47,7 +47,7 @@ export function showNewsBroadcast(D, b) {
           ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' }
           : (b.avatar || (me && me.avatar));
         if (!av) throw new Error('no avatar');
-        const { THREE } = await import('./three-util.js?v=ac3e6f2b');
+        const THREE = await import('three');
         const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
         r.setSize(400, 400);
         const sc = new THREE.Scene();
@@ -86,7 +86,7 @@ export function showNewsBroadcast(D, b) {
         if (A3 && ov.isConnected) {
           const canvas = ov.querySelector('.news-anchor-canvas');
           const av = { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' };
-          const { THREE } = await import('./three-util.js?v=ac3e6f2b');
+          const THREE = await import('three');
           const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
           const sc = new THREE.Scene();
           const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100); cam.position.set(0, 4.2, 15); cam.lookAt(0, 3, 0);
