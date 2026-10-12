@@ -184,7 +184,7 @@ export async function ownerPage(D, q = '') {
           <label>Script<textarea class="nm-script" rows="4" maxlength="500" placeholder="Hello Funtopia! This is your news anchor..."></textarea></label>
           <label>AI Voice<select class="nm-voice"></select></label>
           <label>Anchor<select class="nm-anchor"><option value="me">My avatar</option><option value="bot">Newsbot</option></select></label>
-          <div class="nm-actions"><button class="btn-secondary nm-preview-btn">▶ Preview</button><button class="btn-primary nm-broadcast">📡 Broadcast Live</button></div>
+          <div class="nm-actions"><button class="btn-secondary nm-preview-btn">▶ Voice</button><button class="btn-secondary nm-fullpreview-btn">👁 Preview Broadcast</button><button class="btn-primary nm-broadcast">📡 Broadcast Live</button></div>
           <div class="nm-status"></div>
         </div>
       </div>
@@ -402,6 +402,16 @@ export async function ownerPage(D, q = '') {
       } catch {}
     };
     refreshNmStatus();
+    const nmFullPreview = app.querySelector('.nm-fullpreview-btn');
+    if (nmFullPreview) nmFullPreview.onclick = async () => {
+      const title = app.querySelector('.nm-title')?.value.trim() || 'Breaking News';
+      const script = app.querySelector('.nm-script')?.value.trim();
+      if (!script) { toast('Write a script first', true); return; }
+      try {
+        const m = await import('./news-player.js?v=227ee6a3');
+        m.showNewsBroadcast({ esc, me, ensureAvatar3d }, { type: 'live', title, script, voice: nmVoice?.value, anchor: nmAnchorSel?.value, avatar: me.avatar });
+      } catch (e) { toast('Preview failed', true); }
+    };
     const nmBroadcast = app.querySelector('.nm-broadcast');
     if (nmBroadcast) nmBroadcast.onclick = async () => {
       const title = app.querySelector('.nm-title')?.value.trim() || 'Breaking News';
