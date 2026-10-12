@@ -326,7 +326,7 @@ function eggConfetti(n = 120) {
 }
 // ============ NEWS BROADCAST ============
 async function showNewsBroadcast(b) {
-  const m = await import('./news-player.js?v=227ee6a3');
+  const m = await import('./news-player.js?v=eb12f214');
   return m.showNewsBroadcast({ esc, me, ensureAvatar3d }, b);
 }
 async function checkNews() {
@@ -637,7 +637,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=d0a47305');
+  const { Game } = await import('./game.js?v=2aefe951');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -1179,7 +1179,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=d0a47305');
+      const { Game: GameClass } = await import('./game.js?v=2aefe951');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
