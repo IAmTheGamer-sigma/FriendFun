@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=b9dc4b76').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=c2a605a5').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -46,13 +46,13 @@ function avatarImage(avatar, mode = 'headshot') {
   // Placeholder; real avatar swaps in after load
   ensureAvatar3d().catch(() => {});
   const placeholder = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="35" r="20" fill="#888"/><rect x="25" y="60" width="50" height="35" rx="10" fill="#888"/></svg>');
-  // Return placeholder; refreshAvatars will swap it when 3D loads
-  // We embed avatar data in a way refreshAvatars can find via a queue
+  // Placeholder; refreshAvatars swaps when 3D loads
+  // Embed avatar data for refreshAvatars queue
   _pendingAvatars.push({ avatar, mode });
   return placeholder;
 }
 const _pendingAvatars = [];
-// Patch: intercept img creation - instead, use data-av attribute approach
+// Patch: intercept img creation
 function avatarImgTag(avatar, mode = 'headshot', cls = '', style = '') {
   if (_avatar3d) return `<img class="${cls}"${style ? ` style="${style}"` : ''} src="${_avatar3d.avatarImage(avatar, mode)}">`;
   ensureAvatar3d().catch(() => {});
@@ -206,6 +206,10 @@ function settingsPage() {
       <input type="password" class="set-curpw" placeholder="Current password" maxlength="64" autocomplete="current-password">
       <input type="password" class="set-newpw" placeholder="New password (4+ characters)" maxlength="64" autocomplete="new-password">
       <button class="btn-primary set-pw-btn">Update password</button>
+    </section>
+    <section class="admin-section"><h3>More</h3>
+      <a class="set-row set-link" href="#/addons"><span>🧩 Add-ons</span><span class="muted">›</span></a>
+      <a class="set-row set-link" href="#/updates"><span>📰 Updates</span>${hasNewUpdates() ? '<span class="badge">NEW</span>' : '<span class="muted">›</span>'}</a>
     </section>`, () => {
     app.querySelector('.set-sfx').onchange = e => {
       const on = e.target.checked;
@@ -244,7 +248,7 @@ function shell(active, content) {
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
     <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">Funtopia</span></a>
-    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a></nav>
+    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a><a href="https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj" target="_blank" rel="noopener">📺 Puzzlevision</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
       <div class="tb-user-wrap">
@@ -260,11 +264,12 @@ function shell(active, content) {
           <button class="tb-menu-item tb-logout-all"><span class="sb-ico">&#10006;</span>Log out all</button>
         </div>
       </div>
+      <span class="tb-online" title="Players online"><i class="dot"></i><b class="online-count">–</b></span>
       <a class="tb-bux" href="#/funtix" title="FunTix">${tix}<span class="me-tix">${fmt(me.funtix ?? 0)}</span></a>
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['ugc', '🎨 UGC', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ['settings', 'Settings', icons.gear], ['https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj', '📺 Puzzlevision', icons.news], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : []), ...(me.owner ? [['https://muse.ai', '🤖 Muse AI', icons.chat]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -281,6 +286,13 @@ async function refreshPartyBar() {
     bar.innerHTML = `<b>🎉 Party (${p.members.length})</b><span class="party-members">${p.members.map(m => `${esc(m)}${m === p.leader ? ' 👑' : ''}`).join(', ')}</span><button class="link party-leave">Leave</button>`;
     bar.querySelector('.party-leave').onclick = async () => { try { await api('POST', '/api/party/leave'); } catch {} refreshPartyBar(); toast('Left the party'); };
     app.querySelector('.topbar')?.after(bar);
+  } catch {}
+}
+let onlineTimer = null;
+async function refreshOnline() {
+  try {
+    const r = await api('GET', '/api/online');
+    document.querySelectorAll('.online-count').forEach(el => el.textContent = fmt(r.count));
   } catch {}
 }
 let siteStateCache = null, siteStateAt = 0;
@@ -304,6 +316,9 @@ function mount(active, html, after) {
   app.className = ''; app.innerHTML = shell(active, html);
   refreshPartyBar();
   refreshSiteBanner();
+  refreshOnline();
+  clearInterval(onlineTimer);
+  onlineTimer = setInterval(refreshOnline, 30000);
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
   if (userBtn && menu) {
@@ -508,7 +523,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=8effeef6');
+  const { Game } = await import('./game.js?v=5d121a2a');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -583,7 +598,7 @@ async function loadUgc() {
   try {
     const items = await api('GET', '/api/ugc');
     UGC_LIST = Array.isArray(items) ? items : [];
-    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, ugc: true };
+    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, model_transform: u.model_transform || null, creator: u.creator, ugc: true };
   } catch { UGC_LIST = []; }
 }
 
@@ -627,143 +642,9 @@ function ugcBuyModal(it, onDone) {
 }
 
 // ---------- UGC Studio (player item creator) ----------
-const UGC_PALETTE = ['#e53935', '#ff6d00', '#ffeb3b', '#43a047', '#26c6da', '#1e88e5', '#7b1fa2', '#f48fb1', '#ffffff', '#9e9e9e', '#212121', '#795548'];
-const UGC_MODEL_SLOTS = ['hat', 'shirt', 'gear'];
-const UGC_GLB_MAX = 4 * 1024 * 1024;
-// Card art for GLB items (their 3D loads async, so grids show a placeholder)
+// GLB card placeholder (3D loads async)
 const glbCardImg = () => '<div class="glb-ph">📦<span>3D</span></div>';
 const ugcCardImg = u => u.model_url ? glbCardImg() : `<img src="${itemImage(u)}">`;
-async function ugcPage() {
-  const A3 = await ensureAvatar3d().catch(() => null);
-  let mode = 'remix';
-  let type = 'hat', template = UGC_TEMPLATES.hat[0], color = '#e53935';
-  let slot = 'hat', glbFile = null, glbObjUrl = null;
-  let mine = [];
-  try { mine = await api('GET', '/api/ugc/mine'); } catch {}
-  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, model_url: m.model_url || null, creator: m.creator, ugc: true };
-  mount('ugc', `
-    <h1>🎨 UGC Studio</h1>
-    <p class="muted">Remix a template or upload your own .glb 3D model, pick where it goes, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
-    <div class="av-wrap">
-      <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Live preview</div></div>
-      <div class="av-panel">
-        <div class="av-tabs">${[['remix', 'Remix'], ['model', '3D Model']].map(([k, l]) => `<button data-ugcmode="${k}" class="${k === mode ? 'active' : ''}">${l}</button>`).join('')}</div>
-        <div class="ugc-remix">
-          <div class="av-tabs">${['hat', 'shirt'].map(t => `<button data-ugctype="${t}" class="${t === type ? 'active' : ''}">${t === 'hat' ? 'Hats' : 'Shirts'}</button>`).join('')}</div>
-          <div class="ugc-templates"></div>
-          <div class="swatches">${UGC_PALETTE.map(c => `<button class="swatch" data-c="${c}" style="background:${c}"></button>`).join('')}<label class="swatch custom" title="Custom color"><input type="color" value="${color}"></label></div>
-        </div>
-        <div class="ugc-model" hidden>
-          <p class="muted small" style="margin:8px 0 4px">Where should it go?</p>
-          <div class="av-tabs">${UGC_MODEL_SLOTS.map(s => `<button data-ugcsSlot="${s}" class="${s === slot ? 'active' : ''}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
-          <div class="ugc-drop">
-            <label class="btn-secondary btn-small">Choose .glb file<input type="file" class="ugc-glb" accept=".glb,model/gltf-binary" hidden></label>
-            <span class="muted small ugc-filename">No file chosen</span>
-          </div>
-          <p class="muted small">GLB up to 4MB. Uncompressed exports work best.</p>
-          <div class="ugc-model-err"></div>
-        </div>
-        <label>Item name<input class="ugc-name" maxlength="40" placeholder="My cool hat"></label>
-        <label>Price (FunTix)<input class="ugc-price" type="number" min="0" max="10000" value="100"></label>
-        <button class="btn-primary ugc-submit">Submit for review</button>
-      </div>
-    </div>
-    <section><div class="sec-h"><h2>My creations (${mine.length})</h2></div>
-      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img">${ugcCardImg(m)}</div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type}${m.model_url ? ' · 3D' : ''} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
-  () => {
-    const tplBox = app.querySelector('.ugc-templates');
-    let ch = null, alive = true, r = null, sc = null;
-    const rebuild = () => {
-      if (!A3 || !sc) return;
-      if (ch) sc.remove(ch);
-      ch = null;
-      const av = structuredClone(me.avatar);
-      if (mode === 'model') {
-        if (!glbObjUrl) return;
-        ITEM['ugc_preview'] = { id: 'ugc_preview', type: slot, model_url: glbObjUrl, ugc: true };
-        av[slot] = 'ugc_preview';
-      } else {
-        ITEM['ugc_preview'] = { id: 'ugc_preview', type, color, template };
-        av[type] = 'ugc_preview';
-      }
-      ch = A3.buildCharacter(av); sc.add(ch);
-    };
-    if (A3) {
-      const canvas = app.querySelector('.av-canvas');
-      r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); r.outputColorSpace = THREE.SRGBColorSpace;
-      sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#fff', '#888', 1.5));
-      const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 6, 8); sc.add(dl);
-      const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 3.6, 14); cam.lookAt(0, 3, 0);
-      const size = () => { const w = canvas.parentElement.clientWidth; r.setSize(w, w, false); };
-      size(); rebuild();
-      const tick = () => { if (!alive) return; requestAnimationFrame(tick); r.render(sc, cam); }; tick();
-      cleanup = () => { alive = false; r.dispose(); delete ITEM['ugc_preview']; };
-    }
-    // Remix tab
-    const renderTpls = () => {
-      tplBox.innerHTML = `<div class="item-grid">${UGC_TEMPLATES[type].map(tid => { const t = ITEM[tid]; return `<button class="item ${tid === template ? 'worn' : ''}" data-tpl="${tid}"><img src="${itemImage(t)}"><span>${esc(t.name)}</span></button>`; }).join('')}</div>`;
-      tplBox.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => { template = b.dataset.tpl; renderTpls(); rebuild(); });
-    };
-    renderTpls();
-    app.querySelectorAll('[data-ugctype]').forEach(b => b.onclick = () => {
-      type = b.dataset.ugctype; template = UGC_TEMPLATES[type][0];
-      app.querySelectorAll('[data-ugctype]').forEach(x => x.classList.toggle('active', x === b));
-      renderTpls(); rebuild();
-    });
-    app.querySelectorAll('.swatch[data-c]').forEach(b => b.onclick = () => { color = b.dataset.c; rebuild(); });
-    app.querySelector('.swatch.custom input[type=color]').onchange = e => { color = e.target.value; rebuild(); };
-    // Mode tabs
-    app.querySelectorAll('[data-ugcmode]').forEach(b => b.onclick = () => {
-      mode = b.dataset.ugcmode;
-      app.querySelectorAll('[data-ugcmode]').forEach(x => x.classList.toggle('active', x === b));
-      app.querySelector('.ugc-remix').hidden = mode !== 'remix';
-      app.querySelector('.ugc-model').hidden = mode !== 'model';
-      rebuild();
-    });
-    // 3D model tab
-    app.querySelectorAll('[data-ugcsSlot]').forEach(b => b.onclick = () => {
-      slot = b.dataset.ugcsSlot;
-      app.querySelectorAll('[data-ugcsSlot]').forEach(x => x.classList.toggle('active', x === b));
-      rebuild();
-    });
-    const errBox = app.querySelector('.ugc-model-err');
-    const showErr = msg => { errBox.textContent = msg || ''; errBox.classList.toggle('show', !!msg); };
-    app.querySelector('.ugc-glb').onchange = e => {
-      const f = e.target.files[0]; if (!f) return;
-      if (!/\.glb$/i.test(f.name)) { showErr('File must be a .glb'); return; }
-      if (f.size > UGC_GLB_MAX) { showErr('Model must be under 4MB'); return; }
-      showErr('');
-      glbFile = f;
-      if (glbObjUrl) URL.revokeObjectURL(glbObjUrl);
-      glbObjUrl = URL.createObjectURL(f);
-      app.querySelector('.ugc-filename').textContent = f.name;
-      rebuild();
-    };
-    app.querySelector('.ugc-submit').onclick = async () => {
-      const nm = app.querySelector('.ugc-name').value.trim();
-      const pr = Math.floor(Number(app.querySelector('.ugc-price').value));
-      try {
-        if (mode === 'model') {
-          if (!glbFile) throw new Error('Choose a .glb file first');
-          toast('Uploading model…');
-          const b64 = await new Promise((res, rej) => {
-            const rd = new FileReader();
-            rd.onload = () => res(String(rd.result).split(',')[1]);
-            rd.onerror = () => rej(new Error('Could not read file'));
-            rd.readAsDataURL(glbFile);
-          });
-          const up = await api('POST', '/api/ugc/model', { data: b64 });
-          await api('POST', '/api/ugc', { type: slot, model_url: up.url, name: nm, price: pr });
-        } else {
-          await api('POST', '/api/ugc', { type, template, color, name: nm, price: pr });
-        }
-        toast('Submitted for review! 🎨');
-        await loadUgc();
-        ugcPage();
-      } catch (e) { toast(e.message, true); }
-    };
-  });
-}
 function priceHtml(i) {
   if (i.club) return `<span class="club-price">${CLUB} FriendClub</span>`;
   return i.free ? '<span class="free">Free</span>' : `<span class="pc">${tix} ${i.price}</span>`;
@@ -1158,11 +1039,13 @@ async function createPage() {
   const tpls = [['baseplate', 'Baseplate', 'An empty grey baseplate. A blank canvas.'], ['obby', 'Obby', 'A 10-stage obstacle course to remix.'], ['hangout', 'Town', 'A small town with houses and trees.'], ['tower', 'Tower Climb', 'A spiral climbing challenge.'], ['coinRush', 'Islands', 'Floating islands full of coins.'], ['shooterArena', 'Shooter Arena', 'A PvP battle arena. Everyone gets a free blaster!']];
   mount('create', `
     <h1>Create</h1>
+    <div class="av-tabs"><button class="active">🎮 Experiences</button><button data-goto="#/ugc">🎨 UGC Studio</button></div>
     <section><div class="sec-h"><h2>Start a New Experience</h2></div><div class="tpl-grid">${tpls.map(([k, n, d]) => `
       <a class="tpl" href="#/studio/new/${k}"><div class="gc-thumb"><img data-tpl="${k}" src="${PLACEHOLDER}"></div><b>${n}</b><span class="muted small">${d}</span></a>`).join('')}</div></section>
     <section><div class="sec-h"><h2>My Experiences (${mine.length})</h2></div>
       <div class="my-games">${mine.map(g => `<div class="my-game"><img ${g.thumbnail ? `src="${g.thumbnail}"` : `src="${PLACEHOLDER}" data-thumb="${g.id}"`}><div class="mg-info"><b>${esc(g.name)}</b><span class="muted small">${g.unpublished ? 'Private (not published)' : 'Public'} &middot; ${fmt(g.visits)} visits &middot; ${fmt(g.playing)} playing</span></div>
         <a class="btn-secondary" href="#/studio/${g.id}">Edit</a><a class="btn-secondary" href="#/games/${g.id}">View</a><button class="btn-danger" data-del="${g.id}">Delete</button></div>`).join('') || '<p class="muted">You haven\'t made anything yet. Pick a template above to open Funtopia Studio!</p>'}</div></section>`, () => {
+    app.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => location.hash = b.dataset.goto);
     setTimeout(() => app.querySelectorAll('img[data-tpl]').forEach(img => { img.src = tplThumb(img.dataset.tpl); }), 30);
     app.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmModal('Delete Experience', 'This cannot be undone. Delete it?', 'Delete', async () => { await api('DELETE', '/api/games/' + b.dataset.del); createPage(); }));
   });
@@ -1182,7 +1065,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=8effeef6');
+      const { Game: GameClass } = await import('./game.js?v=5d121a2a');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1244,7 +1127,7 @@ async function moderationPage() {
     pending = await api('GET', '/api/mod/ban/pending').catch(() => []);
     log = await api('GET', '/api/mod/log').catch(() => []);
     ugcPending = await api('GET', '/api/ugc/pending').catch(() => []);
-    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, ugc: true };
+    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, model_transform: u.model_transform || null, creator: u.creator, ugc: true };
   }
   const badge = l => l === 'urgent' ? '<span class="mod-urgent">URGENT</span>' : l === 'review' ? '<span class="mod-review">REVIEW</span>' : '<span class="mod-clear">CLEAR</span>';
   const reload = () => moderationPage();
@@ -1353,19 +1236,20 @@ async function ugcGlbModal(u) {
     const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 6, 8); sc.add(dl);
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 0.5, 7); cam.lookAt(0, 0, 0);
     const holder = new THREE.Group(); sc.add(holder);
-    A3.loadUgcGlb(u.model_url, 2.4).then(g => { if (alive) holder.add(g); }).catch(() => toast('Could not load model', true));
+    A3.loadUgcGlb(u.model_url, 2.4, u.model_transform).then(g => { if (alive) holder.add(g); }).catch(() => toast('Could not load model', true));
     const tick = () => { if (!alive) { r.dispose(); return; } requestAnimationFrame(tick); holder.rotation.y += 0.012; r.render(sc, cam); };
     tick();
   }
 }
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
+const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=2404bbb1');
+  const m = await import('./admin.js?v=3fc342a5');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=2404bbb1');
+  const m = await import('./admin.js?v=3fc342a5');
   return m.ownerPage(adminDeps, q);
 }
 
@@ -1482,7 +1366,7 @@ async function route() {
       case 'play': return await playPage(seg[1], qp.get('server'));
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
-      case 'ugc': return await ugcPage();
+      case 'ugc': { const m = await import('./ugc-studio.js?v=46230619'); return m.ugcPage(ugcDeps); }
       case 'friends': return await friendsPage();
       case 'halloween': return await halloweenPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
