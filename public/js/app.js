@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=b6510283').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=d2e275e1').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=53383877';
+import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS, UGC_TEMPLATES, UGC_CREATOR_CUT } from './catalog.js?v=d76f1cb9';
 import { templates } from './worlds.js?v=542bb3d8';
 import { startSpooky, stopSpooky, sfx } from './sound.js?v=89850e26';
 try { sfx.enabled = localStorage.getItem('ff_sfx') !== '0'; } catch {}
@@ -264,7 +264,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ['settings', 'Settings', icons.gear], ['https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj', '📺 Puzzlevision', icons.news], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : []), ...(me.owner ? [['https://muse.ai', '🤖 Muse AI', icons.chat]] : [])]
+    ${[['home', 'Home', icons.home], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['club', 'FriendClub', icons.club], ['addons', 'Add-ons', icons.puzzle], ['discover', 'Discover', icons.discover], ['create', 'Create', icons.create], ['ugc', '🎨 UGC', icons.create], ['moderation', 'Moderation', icons.shield], ['updates', 'Updates', icons.news, hasNewUpdates() ? 'NEW' : null], ['settings', 'Settings', icons.gear], ['https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj', '📺 Puzzlevision', icons.news], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : []), ...(me.owner ? [['https://muse.ai', '🤖 Muse AI', icons.chat]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -508,7 +508,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=60939ece');
+  const { Game } = await import('./game.js?v=0d8bac19');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -558,7 +558,8 @@ async function avatarPage(tab = 'body') {
         body.querySelectorAll('[data-c]').forEach(b => b.onclick = () => apply(b.dataset.c));
         body.querySelector('input[type=color]').onchange = e => apply(e.target.value);
       } else {
-        const owned = CATALOG.filter(i => i.type === tab && (me.inventory.includes(i.id) || i.id === tab + '_none'));
+        const owned = CATALOG.filter(i => i.type === tab && (me.inventory.includes(i.id) || i.id === tab + '_none'))
+          .concat(UGC_LIST.filter(u => u.type === tab && me.inventory.includes(u.id)));
         body.innerHTML = `<div class="item-grid">${owned.map(i => `<button class="item ${av[tab] === i.id ? 'worn' : ''}" data-id="${i.id}">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas>` : `<span class="pet-emoji">${i.emoji}</span>`) : i.type === 'gear' ? (GEAR_MODELS[i.id] ? `<canvas class="gear-voxel" width="120" height="120" data-gear="${i.id}"></canvas>` : `<span class="pet-emoji">${i.emoji}</span>`) : `<img src="${itemImage(i)}">`}<span>${esc(i.name)}</span></button>`).join('')}
           <a class="item more" href="#/catalog/${tab}"><span class="plus">+</span><span>Get More</span></a></div>`;
         body.querySelectorAll('[data-id]').forEach(b => b.onclick = () => { av[tab] = b.dataset.id; rebuild(); render(); save(); });
@@ -576,18 +577,122 @@ function itemImage(item) {
   return avatarImage(a, item.type === 'shirt' ? 'full' : 'headshot');
 }
 
+// ---------- UGC (player-created avatar items) ----------
+let UGC_LIST = [];
+async function loadUgc() {
+  try {
+    const items = await api('GET', '/api/ugc');
+    UGC_LIST = Array.isArray(items) ? items : [];
+    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, ugc: true };
+  } catch { UGC_LIST = []; }
+}
+
 async function catalogPage(filter = 'all') {
+  const filters = ['all', 'head', 'hat', 'face', 'shirt', 'pet', 'gear', 'vehicle', 'ugc'];
+  const labels = { all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets', gear: 'Gears', vehicle: 'Vehicles', ugc: 'UGC 🎨' };
+  const list = filter === 'ugc' ? UGC_LIST : CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter));
   mount('catalog', `
     <h1>Marketplace</h1>
-    <div class="cat-filters">${['all', 'head', 'hat', 'face', 'shirt', 'pet', 'gear', 'vehicle'].map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${{ all: 'All', head: 'Heads', hat: 'Hats', face: 'Faces', shirt: 'Shirts', pet: 'Pets', gear: 'Gears', vehicle: 'Vehicles' }[f]}</a>`).join('')}</div>
-    <div class="cat-grid">${CATALOG.filter(i => !i.limited && (filter === 'all' || i.type === filter)).map(i => `
+    <div class="cat-filters">${filters.map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${labels[f]}</a>`).join('')}</div>
+    ${filter === 'ugc' ? '<p class="muted small">Player-created items. Creators earn 70% of every sale. <a href="#/ugc">Make your own →</a></p>' : ''}
+    <div class="cat-grid">${list.map(i => `
       <div class="cat-item">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : i.type === 'gear' ? (GEAR_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="gear-voxel" width="120" height="120" data-gear="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
+        ${i.ugc ? `<div class="muted small">by ${esc(i.creator)} · ${i.sales} sold</div>` : ''}
         <div class="cat-price">${priceHtml(i)}</div>
-        ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}">Buy</button>`}</div>`).join('')}</div>`, () => {
+        ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}"${i.ugc ? ' data-ugc="1"' : ''}>Buy</button>`}</div>`).join('') || '<p class="muted">Nothing here yet.</p>'}</div>`, () => {
     paintPetVoxels(app);
     app.querySelectorAll('.btn-buy').forEach(b => b.onclick = () => {
-      buyModal(ITEM[b.dataset.id], () => catalogPage(filter));
+      const it = ITEM[b.dataset.id];
+      if (b.dataset.ugc) ugcBuyModal(it, () => catalogPage(filter));
+      else buyModal(it, () => catalogPage(filter));
     });
+  });
+}
+function ugcBuyModal(it, onDone) {
+  const cut = Math.floor(it.price * UGC_CREATOR_CUT);
+  const d = document.createElement('div'); d.className = 'modal-bg';
+  d.innerHTML = `<div class="modal"><h2>Buy UGC Item</h2>
+    <div class="buy-row"><img src="${itemImage(it)}"><div><p>Buy <b>${esc(it.name)}</b> by <b>${esc(it.creator)}</b>?</p>
+    <p class="muted small">${tix} ${fmt(cut)} goes to the creator</p>
+    <p class="muted small">You have ${tix} ${fmt(me.funtix ?? 0)}</p></div></div>
+    <div class="modal-actions"><button class="btn-secondary">Cancel</button><button class="btn-primary" ${(me.funtix ?? 0) < it.price ? 'disabled title="Not enough"' : ''}>Buy for ${tix} ${it.price}</button></div></div>`;
+  document.body.appendChild(d);
+  d.querySelector('.btn-secondary').onclick = () => d.remove();
+  d.onclick = e => { if (e.target === d) d.remove(); };
+  d.querySelector('.btn-primary').onclick = async () => {
+    d.remove();
+    try { const r = await api('POST', '/api/ugc/' + it.id + '/buy'); me.inventory = r.inventory; setMoney(r); toast(`You bought ${it.name}!`); onDone(); }
+    catch (e) { toast(e.message, true); }
+  };
+}
+
+// ---------- UGC Studio (player item creator) ----------
+const UGC_PALETTE = ['#e53935', '#ff6d00', '#ffeb3b', '#43a047', '#26c6da', '#1e88e5', '#7b1fa2', '#f48fb1', '#ffffff', '#9e9e9e', '#212121', '#795548'];
+async function ugcPage() {
+  const A3 = await ensureAvatar3d().catch(() => null);
+  let type = 'hat', template = UGC_TEMPLATES.hat[0], color = '#e53935';
+  let mine = [];
+  try { mine = await api('GET', '/api/ugc/mine'); } catch {}
+  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, creator: m.creator, ugc: true };
+  mount('ugc', `
+    <h1>🎨 UGC Studio</h1>
+    <p class="muted">Remix a template, make it yours, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
+    <div class="av-wrap">
+      <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Live preview</div></div>
+      <div class="av-panel">
+        <div class="av-tabs">${['hat', 'shirt'].map(t => `<button data-ugctype="${t}" class="${t === type ? 'active' : ''}">${t === 'hat' ? 'Hats' : 'Shirts'}</button>`).join('')}</div>
+        <div class="ugc-templates"></div>
+        <div class="swatches">${UGC_PALETTE.map(c => `<button class="swatch" data-c="${c}" style="background:${c}"></button>`).join('')}<label class="swatch custom" title="Custom color"><input type="color" value="${color}"></label></div>
+        <label>Item name<input class="ugc-name" maxlength="40" placeholder="My cool hat"></label>
+        <label>Price (FunTix)<input class="ugc-price" type="number" min="0" max="10000" value="100"></label>
+        <button class="btn-primary ugc-submit">Submit for review</button>
+      </div>
+    </div>
+    <section><div class="sec-h"><h2>My creations (${mine.length})</h2></div>
+      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img"><img src="${itemImage(m)}"></div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
+  () => {
+    const tplBox = app.querySelector('.ugc-templates');
+    let ch = null, alive = true, r = null, sc = null;
+    const rebuild = () => {
+      if (!A3 || !sc) return;
+      ITEM['ugc_preview'] = { id: 'ugc_preview', type, color, template };
+      if (ch) sc.remove(ch);
+      const av = structuredClone(me.avatar); av[type] = 'ugc_preview';
+      ch = A3.buildCharacter(av); sc.add(ch);
+    };
+    if (A3) {
+      const canvas = app.querySelector('.av-canvas');
+      r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); r.outputColorSpace = THREE.SRGBColorSpace;
+      sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#fff', '#888', 1.5));
+      const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 6, 8); sc.add(dl);
+      const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 3.6, 14); cam.lookAt(0, 3, 0);
+      const size = () => { const w = canvas.parentElement.clientWidth; r.setSize(w, w, false); };
+      size(); rebuild();
+      const tick = () => { if (!alive) return; requestAnimationFrame(tick); r.render(sc, cam); }; tick();
+      cleanup = () => { alive = false; r.dispose(); delete ITEM['ugc_preview']; };
+    }
+    const renderTpls = () => {
+      tplBox.innerHTML = `<div class="item-grid">${UGC_TEMPLATES[type].map(tid => { const t = ITEM[tid]; return `<button class="item ${tid === template ? 'worn' : ''}" data-tpl="${tid}"><img src="${itemImage(t)}"><span>${esc(t.name)}</span></button>`; }).join('')}</div>`;
+      tplBox.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => { template = b.dataset.tpl; renderTpls(); rebuild(); });
+    };
+    renderTpls();
+    app.querySelectorAll('[data-ugctype]').forEach(b => b.onclick = () => {
+      type = b.dataset.ugctype; template = UGC_TEMPLATES[type][0];
+      app.querySelectorAll('[data-ugctype]').forEach(x => x.classList.toggle('active', x === b));
+      renderTpls(); rebuild();
+    });
+    app.querySelectorAll('.swatch[data-c]').forEach(b => b.onclick = () => { color = b.dataset.c; rebuild(); });
+    app.querySelector('.swatch.custom input[type=color]').onchange = e => { color = e.target.value; rebuild(); };
+    app.querySelector('.ugc-submit').onclick = async () => {
+      const nm = app.querySelector('.ugc-name').value.trim();
+      const pr = Math.floor(Number(app.querySelector('.ugc-price').value));
+      try {
+        await api('POST', '/api/ugc', { type, template, color, name: nm, price: pr });
+        toast('Submitted for review! 🎨');
+        await loadUgc();
+        ugcPage();
+      } catch (e) { toast(e.message, true); }
+    };
   });
 }
 function priceHtml(i) {
@@ -1008,7 +1113,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=60939ece');
+      const { Game: GameClass } = await import('./game.js?v=0d8bac19');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1064,11 +1169,13 @@ function reportModal(target, type = 'user') {
 async function moderationPage() {
   const mods = await api('GET', '/api/moderators').catch(() => []);
   const isMod = !!(me?.moderator || me?.admin);
-  let queue = [], pending = [], log = [];
+  let queue = [], pending = [], log = [], ugcPending = [];
   if (isMod) {
     queue = await api('GET', '/api/mod/queue').catch(() => []);
     pending = await api('GET', '/api/mod/ban/pending').catch(() => []);
     log = await api('GET', '/api/mod/log').catch(() => []);
+    ugcPending = await api('GET', '/api/ugc/pending').catch(() => []);
+    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, ugc: true };
   }
   const badge = l => l === 'urgent' ? '<span class="mod-urgent">URGENT</span>' : l === 'review' ? '<span class="mod-review">REVIEW</span>' : '<span class="mod-clear">CLEAR</span>';
   const reload = () => moderationPage();
@@ -1095,6 +1202,14 @@ async function moderationPage() {
         <div class="mod-report-actions">${p.by.toLowerCase() === me.name.toLowerCase()
           ? '<span class="muted small">Waiting for someone else to confirm</span>'
           : `<button class="btn-danger btn-small" data-confirm-ban="${p.token}" data-name="${esc(p.name)}">Confirm ban (2/2)</button>`}</div></div>`).join('') || '<p class="muted">None pending.</p>'}</section>
+    <section><div class="sec-h"><h2>UGC Review (${ugcPending.length})</h2></div>
+      ${ugcPending.map(u => `<div class="mod-report"><div class="cat-img"><img src="${itemImage(u)}"></div>
+        <div class="mod-report-body"><b>${esc(u.name)}</b><div>${u.type} · ${tix} ${u.price}</div>
+        <div class="muted small">by ${esc(u.creator)}</div></div>
+        <div class="mod-report-actions">
+          <button class="btn-primary btn-small" data-ugc-ok="${u.id}">Approve</button>
+          <button class="btn-danger btn-small" data-ugc-no="${u.id}">Reject</button>
+        </div></div>`).join('') || '<p class="muted">No UGC awaiting review.</p>'}</section>
     <section><div class="sec-h"><h2>Action Log</h2></div>
       <div>${log.map(e => `<div class="mod-log-row"><span class="muted small">${new Date(e.t).toLocaleString()}</span><b>${esc(e.by)}</b><span class="mod-act">${esc(e.action)}</span><span>${esc(e.target)}</span><span class="muted small">${esc(e.reason || '')}</span></div>`).join('') || '<p class="muted">No actions yet.</p>'}</div></section>` : ''}`,
   () => {
@@ -1126,6 +1241,14 @@ async function moderationPage() {
       try { const r = await api('POST', '/api/mod/ban/confirm', { token: b.dataset.confirmBan }); toast(r.message || 'Banned'); reload(); }
       catch (e) { toast(e.message, true); }
     }));
+    app.querySelectorAll('[data-ugc-ok]').forEach(b => b.onclick = async () => {
+      try { await api('POST', '/api/ugc/' + b.dataset.ugcOk + '/approve'); await loadUgc(); toast('UGC item approved'); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
+    app.querySelectorAll('[data-ugc-no]').forEach(b => b.onclick = async () => {
+      try { await api('POST', '/api/ugc/' + b.dataset.ugcNo + '/reject'); toast('UGC item rejected'); reload(); }
+      catch (e) { toast(e.message, true); }
+    });
   });
 }
 
@@ -1242,7 +1365,7 @@ async function route() {
   const seg = (path || '/home').split('/').filter(Boolean);
   if (!token && seg[0] !== 'horror') { if (seg[0] !== 'login') history.replaceState(null, '', '#/login'); return loginPage(); }
   try {
-    if (!me) { me = await api('GET', '/api/me'); dailyToast(me); }
+    if (!me) { me = await api('GET', '/api/me'); dailyToast(me); await loadUgc(); }
     if (my !== routing) return;
     const qp = new URLSearchParams(query || '');
     switch (seg[0]) {
@@ -1252,6 +1375,7 @@ async function route() {
       case 'play': return await playPage(seg[1], qp.get('server'));
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
+      case 'ugc': return await ugcPage();
       case 'friends': return await friendsPage();
       case 'halloween': return await halloweenPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
