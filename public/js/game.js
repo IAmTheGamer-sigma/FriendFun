@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=c2a605a5';
+import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=10814c87';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=d76f1cb9';
 
@@ -334,6 +334,7 @@ export class Game {
   }
   onKill(name) {
     this.kills++;
+    if (this.tourney) this.send({ t: 'tourneyKill', victim: name });
     const feed = this.c.querySelector('.kill-feed');
     if (feed) {
       const d = document.createElement('div');
@@ -344,6 +345,25 @@ export class Game {
       setTimeout(() => d.remove(), 6000);
     }
     this.updateLeaderboard();
+  }
+  showTourneyHUD() {
+    let el = this.c.querySelector('.tourney-hud');
+    if (!el) { el = document.createElement('div'); el.className = 'tourney-hud'; this.c.appendChild(el); }
+    this.updateTourneyHUD();
+  }
+  updateTourneyHUD() {
+    const el = this.c.querySelector('.tourney-hud'); if (!el || !this.tourney) return;
+    const s = this.tourney.scores || {}, me = this.me.name;
+    const opp = this.tourney.opponent || Object.keys(s).find(n => n !== me) || '?';
+    el.innerHTML = `🎃 <b>${esc(me)}</b> ${s[me] || 0} — ${s[opp] || 0} <b>${esc(opp)}</b> <span class="muted">first to ${this.tourney.killsToWin}</span>`;
+  }
+  onTourneyEnd(m) {
+    this.tourney = null;
+    this.c.querySelector('.tourney-hud')?.remove();
+    const won = m.winner === this.me.name;
+    this.showBig(won ? '🏆 YOU WIN!' : `😞 ${esc(m.winner)} wins`, 5000);
+    sfx.win();
+    this.sys(won ? '🎃 Tournament win recorded! +1 on the leaderboard.' : `🎃 ${esc(m.winner)} takes the match.`);
   }
   toggleMenu(v) {
     const show = v ?? this.escMenu.classList.contains('hidden');
@@ -945,6 +965,9 @@ export class Game {
         this.sys(this.frozen ? '❄️ You were frozen by a moderator' : 'You were unfrozen');
       }
       else if (m.t === 'sys') this.sys(m.text);
+      else if (m.t === 'tourney') { this.tourney = m; this.showTourneyHUD(); this.sys(`🎃 Tournament match vs <b>${esc(m.opponent)}</b> — first to ${m.killsToWin}!`); }
+      else if (m.t === 'tourneyScore' && this.tourney) { this.tourney.scores = m.scores; this.updateTourneyHUD(); }
+      else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
