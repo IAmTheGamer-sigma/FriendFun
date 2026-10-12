@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=d76f1cb9';
 import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const faceCache = {}, shirtCache = {};
 function faceTexture(id) {
@@ -120,17 +121,40 @@ function shirtTexture(id) {
 
 function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.75 }); }
 function box(w, h, d, color) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color)); m.castShadow = true; m.receiveShadow = true; return m; }
-// UGC custom 3D models: { boxes: [[x,y,z,w,h,d,color,rotZ?], ...] }
-function buildUgcModel(model) {
-  const g = new THREE.Group();
-  for (const b of (model && model.boxes) || []) {
-    if (!Array.isArray(b) || b.length < 7) continue;
-    const m = box(b[3], b[4], b[5], b[6]);
-    m.position.set(b[0], b[1], b[2]);
-    if (typeof b[7] === 'number') m.rotation.z = b[7];
-    g.add(m);
+// UGC custom 3D models (.glb). Loads async, cached per URL; each use gets a
+// fresh clone normalized so its longest dimension equals targetSize, centered.
+const gltfLoader = new GLTFLoader();
+const glbCache = new Map();
+function getGlbScene(url) {
+  if (!glbCache.has(url)) {
+    glbCache.set(url, new Promise((resolve, reject) => {
+      gltfLoader.load(url, gltf => resolve(gltf.scene), undefined,
+        err => { glbCache.delete(url); reject(err); });
+    }));
   }
-  return g;
+  return glbCache.get(url);
+}
+export function loadUgcGlb(url, targetSize = 2) {
+  return getGlbScene(url).then(raw => {
+    const obj = raw.clone(true);
+    const bbox = new THREE.Box3().setFromObject(obj);
+    const size = bbox.getSize(new THREE.Vector3());
+    const s = targetSize / (Math.max(size.x, size.y, size.z) || 1);
+    const center = bbox.getCenter(new THREE.Vector3()).multiplyScalar(s);
+    obj.scale.setScalar(s);
+    obj.position.sub(center);
+    obj.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    return obj;
+  });
+}
+// Attach a GLB to a parent; adds the model when it finishes loading (no-op if
+// the anchor was removed meanwhile).
+function attachUgcGlb(parent, url, targetSize, y = 0) {
+  const anchor = new THREE.Group();
+  anchor.position.y = y;
+  parent.add(anchor);
+  loadUgcGlb(url, targetSize).then(g => { if (anchor.parent) anchor.add(g); }).catch(() => {});
+  return anchor;
 }
 
 function hatStyle(id) {
@@ -345,7 +369,7 @@ export function buildCharacter(avatar, opts = {}) {
   const torsoW = isBugs ? 1.8 : 2;
   const torso = box(torsoW, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
   const shirtIt = ITEM[avatar.shirt];
-  if (shirtIt && shirtIt.ugc && shirtIt.model) { torso.add(buildUgcModel(shirtIt.model)); }
+  if (shirtIt && shirtIt.ugc && shirtIt.model_url) { attachUgcGlb(torso, shirtIt.model_url, 2.2); }
   else if (avatar.shirt && avatar.shirt !== 'shirt_none') {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(torsoW, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
     d.position.z = 0.501; torso.add(d);
@@ -362,7 +386,7 @@ export function buildCharacter(avatar, opts = {}) {
     face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
   }
   const hatIt = ITEM[avatar.hat];
-  if (hatIt && hatIt.ugc && hatIt.model) { const hg = buildUgcModel(hatIt.model); hg.position.y = H.h; hg.scale.setScalar(H.hs || 1); headPivot.add(hg); }
+  if (hatIt && hatIt.ugc && hatIt.model_url) { const hg = attachUgcGlb(headPivot, hatIt.model_url, 1.5, H.h); hg.scale.setScalar(H.hs || 1); }
   else { const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); } }
   const limb = (x, y, color, w = 1) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(w, 2, w, color); m.position.y = -1; p.add(m); root.add(p); return p; };
   let larm, rarm, lleg, rleg;
@@ -408,8 +432,15 @@ export function buildCharacter(avatar, opts = {}) {
     root.userData.pet = pet;
   }
   const gearIt = ITEM[avatar.gear];
-  const gearBoxes = opts.gear === false ? null : ((GEAR_MODELS[avatar.gear] && GEAR_MODELS[avatar.gear].boxes) || (gearIt && gearIt.ugc && gearIt.model && gearIt.model.boxes));
-  if (gearBoxes) {
+  const gearGlb = opts.gear === false ? null : (gearIt && gearIt.ugc && gearIt.model_url);
+  const gearBoxes = opts.gear === false ? null : (GEAR_MODELS[avatar.gear] && GEAR_MODELS[avatar.gear].boxes);
+  if (gearGlb) {
+    const gear = new THREE.Group();
+    gear.position.set(0, -2, 0.5);
+    (root.userData.limbs?.rarm || root).add(gear);
+    loadUgcGlb(gearGlb, 1.1).then(g => { if (gear.parent) gear.add(g); }).catch(() => {});
+    root.userData.gear = gear;
+  } else if (gearBoxes) {
     const gear = new THREE.Group();
     for (const b of gearBoxes) {
       const m = box(b[3], b[4], b[5], b[6]);
