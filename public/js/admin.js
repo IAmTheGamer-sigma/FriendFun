@@ -363,7 +363,7 @@ export async function ownerPage(D, q = '') {
         const A3 = await ensureAvatar3d().catch(() => null);
         if (!A3 || !nmAlive) return;
         const av = nmAnchorSel?.value === 'bot' ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' } : me.avatar;
-        const { THREE } = await import('./three-util.js?v=ac3e6f2b');
+        const THREE = await import('three');
         const r = new THREE.WebGLRenderer({ canvas: nmCanvas, alpha: true, antialias: true });
         const sc = new THREE.Scene();
         const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 4, 14); cam.lookAt(0, 3, 0);
@@ -395,7 +395,7 @@ export async function ownerPage(D, q = '') {
         if (r.broadcast) {
           nmStatus.innerHTML = `<p>📡 <b>Live:</b> ${esc(r.broadcast.title)} <button class="btn-secondary btn-sm nm-replay">👁 View</button></p>`;
           nmStatus.querySelector('.nm-replay').onclick = async () => {
-            const m = await import('./news-player.js?v=bc818be1');
+            const m = await import('./news-player.js?v=ba63e7b1');
             m.showNewsBroadcast({ esc, me, ensureAvatar3d }, r.broadcast);
           };
         } else nmStatus.innerHTML = '<p class="muted small">No broadcast live.</p>';
@@ -408,7 +408,7 @@ export async function ownerPage(D, q = '') {
       const script = app.querySelector('.nm-script')?.value.trim();
       if (!script) { toast('Write a script first', true); return; }
       try {
-        const m = await import('./news-player.js?v=bc818be1');
+        const m = await import('./news-player.js?v=ba63e7b1');
         m.showNewsBroadcast({ esc, me, ensureAvatar3d }, { type: 'live', title, script, voice: nmVoice?.value, anchor: nmAnchorSel?.value, avatar: me.avatar });
       } catch (e) { toast('Preview failed', true); }
     };
