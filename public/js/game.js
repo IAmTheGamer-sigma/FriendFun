@@ -502,6 +502,22 @@ export class Game {
             <button class="news-close">✕</button>
           </div>`;
         ov.querySelector('.news-close').onclick = close;
+        const stage = ov.querySelector('.news-live-stage');
+        const doSpeak = () => {
+          try {
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(b.script);
+            const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
+            if (v) u.voice = v;
+            speechSynthesis.speak(u); return true;
+          } catch { return false; }
+        };
+        const listenBtn = document.createElement('button');
+        listenBtn.className = 'news-listen';
+        listenBtn.textContent = '🔊 Tap to hear the anchor';
+        listenBtn.onclick = () => { if (doSpeak()) listenBtn.remove(); };
+        stage.appendChild(listenBtn);
+        setTimeout(() => { if (ov.isConnected) doSpeak(); }, 500);
         try {
           const canvas = ov.querySelector('.news-anchor-canvas');
           const av = b.anchor === 'bot' ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' } : (b.avatar || this.me.avatar);
@@ -513,11 +529,7 @@ export class Game {
           let talking = true;
           const tick = () => { if (!ov.isConnected) return; requestAnimationFrame(tick); const t = Date.now(); ch.rotation.y = Math.sin(t / 2500) * 0.15; if (talking) ch.position.y = Math.abs(Math.sin(t / 180)) * 0.12; r.render(sc, cam); };
           tick();
-          const u = new SpeechSynthesisUtterance(b.script);
-          const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
-          if (v) u.voice = v;
-          u.onend = () => { talking = false; };
-          speechSynthesis.cancel(); speechSynthesis.speak(u);
+
         } catch {}
       } else if (b.video) {
         ov.innerHTML = `
