@@ -329,6 +329,17 @@ async function showNewsBroadcast(b) {
   const m = await import('./news-player.js?v=227ee6a3');
   return m.showNewsBroadcast({ esc, me, ensureAvatar3d }, b);
 }
+async function checkNews() {
+  if (!token || !me || document.querySelector('.news-overlay')) return;
+  try {
+    const r = await api('GET', '/api/news');
+    const b = r.broadcast;
+    if (!b) return;
+    const seen = +(localStorage.newsSeenAt || 0);
+    if (b.at > seen) { localStorage.newsSeenAt = b.at; showNewsBroadcast(b); }
+  } catch {}
+}
+setInterval(checkNews, 5000);
 
 
 function initEasterEggs() {
