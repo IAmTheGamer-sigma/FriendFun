@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=d76f1cb9';
+import { ITEM, BADGES, PET_MODELS, GEAR_MODELS } from './catalog.js?v=f2c5c929';
 import { renderToDataURL } from './three-util.js?v=ac3e6f2b';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -374,7 +374,7 @@ export function buildCharacter(avatar, opts = {}) {
   const torsoW = isBugs ? 1.8 : 2;
   const torso = box(torsoW, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
   const shirtIt = ITEM[avatar.shirt];
-  if (shirtIt && shirtIt.ugc && shirtIt.model_url) { attachUgcGlb(torso, shirtIt.model_url, 2.2, 0, shirtIt.model_transform); }
+  if (shirtIt && shirtIt.model_url) { attachUgcGlb(torso, shirtIt.model_url, 2.2, 0, shirtIt.model_transform); }
   else if (avatar.shirt && avatar.shirt !== 'shirt_none') {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(torsoW, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
     d.position.z = 0.501; torso.add(d);
@@ -391,7 +391,7 @@ export function buildCharacter(avatar, opts = {}) {
     face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
   }
   const hatIt = ITEM[avatar.hat];
-  if (hatIt && hatIt.ugc && hatIt.model_url) { const hg = attachUgcGlb(headPivot, hatIt.model_url, 1.5, H.h, hatIt.model_transform); hg.scale.setScalar(H.hs || 1); }
+  if (hatIt && hatIt.model_url) { const hg = attachUgcGlb(headPivot, hatIt.model_url, 1.5, H.h, hatIt.model_transform); hg.scale.setScalar(H.hs || 1); }
   else { const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); } }
   const limb = (x, y, color, w = 1) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(w, 2, w, color); m.position.y = -1; p.add(m); root.add(p); return p; };
   let larm, rarm, lleg, rleg;
@@ -437,7 +437,7 @@ export function buildCharacter(avatar, opts = {}) {
     root.userData.pet = pet;
   }
   const gearIt = ITEM[avatar.gear];
-  const gearGlb = opts.gear === false ? null : (gearIt && gearIt.ugc && gearIt.model_url);
+  const gearGlb = opts.gear === false ? null : (gearIt && gearIt.model_url);
   const gearBoxes = opts.gear === false ? null : (GEAR_MODELS[avatar.gear] && GEAR_MODELS[avatar.gear].boxes);
   if (gearGlb) {
     const gear = new THREE.Group();
