@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createTourney } from './tourney.js';
 import { createNews } from './news.js';
 import { createUgc, ugcState } from './ugc.js';
+import { createHacker } from './hacker.js';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
@@ -1584,6 +1585,7 @@ function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (cons
 const T = createTourney({ app, auth, supabase, privateServers, rooms, notify, key, list, broadcast, send });
 createNews({ app, auth, rooms, broadcast, isOwner });
 createUgc({ app, auth, modOnly, supabase, supabaseAdmin, SUPABASE_URL, ITEM, UGC_TEMPLATES, UGC_MAX_PRICE, UGC_CREATOR_CUT, UGC_BUCKET, UGC_GLB_MAX, filter, key, list, ugcDef, validUgcTransform, ensureUgcBucket });
+createHacker({ app, auth, rooms, broadcast, isOwner });
 
 wss.on('connection', (ws) => {
   let player = null, room = null;
