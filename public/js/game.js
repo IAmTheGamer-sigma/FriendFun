@@ -510,7 +510,11 @@ export class Game {
             const vs = speechSynthesis.getVoices();
             const v = vs.find(v => v.name === b.voice) || vs.find(v => v.lang.startsWith('en'));
             if (v) u.voice = v;
-            u.onend = () => { talking = false; setTimeout(() => { if (ov.isConnected) close(); }, 1500); };
+            let closed = false;
+            const finish = () => { if (closed) return; closed = true; talking = false; setTimeout(() => { if (ov.isConnected) close(); }, 1500); };
+            u.onend = finish; u.onerror = finish;
+            const estMs = Math.max(8000, (b.script.length / 14) * 1000 + 4000);
+            setTimeout(() => { if (ov.isConnected) finish(); }, estMs);
             speechSynthesis.speak(u);
           } catch {}
         };
@@ -547,7 +551,7 @@ export class Game {
           <div class="news-frame">
             <div class="news-banner">📡 FUNTOPIA NEWS</div>
             <div class="news-video-wrap">
-              <video class="news-video-el" src="${esc(b.video)}" playsinline loop></video>
+              <video class="news-video-el" src="${esc(b.video)}" playsinline></video>
               <button class="news-unmute">🔊 Tap for sound</button>
             </div>
             <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
