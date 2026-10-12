@@ -923,6 +923,7 @@ app.post('/api/ugc', auth, async (req, res) => {
     res.json({ ok: true, item: { ...ugcPublic(ugcDef(data)), status: 'pending' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.get('/api/ugc/status', auth, (req, res) => res.json({ table: ugcTableOk, bucket: ugcBucketOk }));
 app.get('/api/ugc/mine', auth, async (req, res) => {
   if (!ugcTableOk) return res.json([]);
   const { data } = await supabase.from('ugc_items').select('*').eq('creator', req.user.name).order('created_at', { ascending: false });
