@@ -53,17 +53,48 @@ export function showNewsBroadcast(D, b) {
         speechSynthesis.cancel(); speechSynthesis.speak(u);
       } catch {}
     } else {
+      // Video broadcast: anchor intro, then video with tap-for-audio (iOS needs a gesture)
       ov.innerHTML = `
         <div class="news-frame">
           <div class="news-banner">📡 FUNTOPIA NEWS</div>
-          <video class="news-video-el" src="${esc(b.video)}" controls autoplay playsinline></video>
-          <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
+          <div class="news-video-intro"><canvas class="news-anchor-canvas" width="400" height="400"></canvas>
+            <div class="news-intro-text"><b>${esc(b.title)}</b><div class="muted">A special report…</div></div></div>
           <button class="news-close">✕</button>
         </div>`;
       ov.querySelector('.news-close').onclick = close;
-      const v = ov.querySelector('video');
-      v.onended = close;
-      v.play().catch(() => {});
+      try {
+        const A3 = await ensureAvatar3d().catch(() => null);
+        if (A3 && ov.isConnected) {
+          const canvas = ov.querySelector('.news-anchor-canvas');
+          const av = { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' };
+          const { THREE } = await import('./three-util.js?v=ac3e6f2b');
+          const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+          const sc = new THREE.Scene();
+          const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100); cam.position.set(0, 4.2, 15); cam.lookAt(0, 3, 0);
+          sc.add(new THREE.AmbientLight(0xffffff, 1.3));
+          const ch = A3.buildCharacter(av); sc.add(ch);
+          const tick = () => { if (!ov.isConnected || !ov.querySelector('.news-video-intro')) return; requestAnimationFrame(tick); ch.rotation.y = Math.sin(Date.now() / 2500) * 0.15; r.render(sc, cam); };
+          tick();
+        }
+      } catch {}
+      setTimeout(() => {
+        if (!ov.isConnected) return;
+        const frame = ov.querySelector('.news-frame');
+        frame.innerHTML = `
+          <div class="news-banner">📡 FUNTOPIA NEWS</div>
+          <div class="news-video-wrap">
+            <video class="news-video-el" src="${esc(b.video)}" playsinline loop></video>
+            <button class="news-unmute">🔊 Tap for sound</button>
+          </div>
+          <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
+          <button class="news-close">✕</button>`;
+        frame.querySelector('.news-close').onclick = close;
+        const v = frame.querySelector('video');
+        const unmute = frame.querySelector('.news-unmute');
+        unmute.onclick = () => { v.muted = false; v.play().catch(() => {}); unmute.remove(); };
+        v.muted = true; v.play().catch(() => {});
+        v.onended = close;
+      }, 4000);
     }
   }, 2600);
 }
