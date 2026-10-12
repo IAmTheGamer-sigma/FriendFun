@@ -506,7 +506,7 @@ app.get('/api/search/users', auth, async (req, res) => {
 });
 
 function adminOnly(req, res, next) {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admins only' });
+  if (!isAdmin(req.user) && !isOwner(req.user)) return res.status(403).json({ error: 'Admins only' });
   next();
 }
 
