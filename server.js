@@ -303,11 +303,11 @@ async function dailyTix(u) {
   return { amount: amt, user: updated };
 }
 
-app.get('/api/online', auth, (req, res) => {
-  const now = Date.now();
-  let count = 0;
-  for (const p of presence.values()) if (now - p.lastSeen < 90000) count++;
-  res.json({ count });
+app.get('/api/player-count', auth, async (req, res) => {
+  try {
+    const { count } = await supabase.from('users').select('name', { count: 'exact', head: true });
+    res.json({ count: count || 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.get('/api/me', auth, async (req, res) => {
   const u = req.user;
