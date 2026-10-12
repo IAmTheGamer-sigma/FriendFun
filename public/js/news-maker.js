@@ -6,6 +6,7 @@ export async function newsMakerPage(D) {
   const A3 = await ensureAvatar3d().catch(() => null);
   mount('owner', `<h1>📡 News Maker</h1>
     <p class="muted">Write a script, pick a voice and an anchor. Preview it, then broadcast it live — everyone's screen glitches, then your anchor announces it with an AI voice.</p>
+    <div class="nm-status"></div>
     <div class="news-maker">
       <div class="nm-preview"><canvas class="nm-canvas"></canvas><div class="muted small">Anchor preview</div></div>
       <div class="nm-panel">
@@ -59,6 +60,23 @@ export async function newsMakerPage(D) {
       if (!t) { toast('Write a script first', true); return; }
       speak(t); toast('🔊 Previewing...');
     };
+    const statusEl = app.querySelector('.nm-status');
+    const refreshStatus = async () => {
+      try {
+        const r = await api('GET', '/api/news');
+        if (r.broadcast) {
+          statusEl.innerHTML = `<p>📡 <b>Live now:</b> ${esc(r.broadcast.title)} <button class="btn-secondary btn-sm nm-replay">👁 View</button> <button class="btn-secondary btn-sm nm-unbroadcast">Stop</button></p>`;
+          statusEl.querySelector('.nm-replay').onclick = async () => {
+            const m = await import('./news-player.js?v=227ee6a3');
+            m.showNewsBroadcast({ esc, me, ensureAvatar3d }, r.broadcast);
+          };
+          statusEl.querySelector('.nm-unbroadcast').onclick = async () => {
+            await api('POST', '/api/owner/news/clear'); refreshStatus(); toast('Broadcast stopped');
+          };
+        } else statusEl.innerHTML = '<p class="muted small">No broadcast live right now.</p>';
+      } catch {}
+    };
+    refreshStatus(); setInterval(() => { if (document.body.contains(statusEl)) refreshStatus(); }, 10000);
     app.querySelector('.nm-broadcast').onclick = async () => {
       const title = app.querySelector('.nm-title').value.trim() || 'Breaking News';
       const script = app.querySelector('.nm-script').value.trim();
@@ -66,7 +84,7 @@ export async function newsMakerPage(D) {
       if (!confirm('Broadcast this to EVERYONE online?')) return;
       try {
         await api('POST', '/api/owner/news', { type: 'live', title, script, voice: voiceSel.value, anchor: anchorSel.value });
-        toast('📡 News broadcast sent!');
+        toast('📡 News broadcast sent!'); refreshStatus();
       } catch (e) { toast(e.message, true); }
     };
   });
