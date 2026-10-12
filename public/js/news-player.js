@@ -32,7 +32,12 @@ export function showNewsBroadcast(D, b) {
           const v = vs.find(v => v.name === b.voice) || vs.find(v => v.lang.startsWith('en'));
           if (v) u.voice = v;
           u.rate = 1; u.pitch = 1;
-          u.onend = () => { talking = false; setTimeout(() => { if (ov.isConnected) close(); }, 1500); };
+          let closed = false;
+          const finish = () => { if (closed) return; closed = true; talking = false; setTimeout(() => { if (ov.isConnected) close(); }, 1500); };
+          u.onend = finish; u.onerror = finish;
+          // Fallback: estimate duration (~14 chars/sec) + buffer, in case onend never fires
+          const estMs = Math.max(8000, (b.script.length / 14) * 1000 + 4000);
+          setTimeout(() => { if (ov.isConnected) finish(); }, estMs);
           speechSynthesis.speak(u);
         } catch {}
       };
@@ -109,7 +114,7 @@ export function showNewsBroadcast(D, b) {
         frame.innerHTML = `
           <div class="news-banner">📡 FUNTOPIA NEWS</div>
           <div class="news-video-wrap">
-            <video class="news-video-el" src="${esc(b.video)}" playsinline loop></video>
+            <video class="news-video-el" src="${esc(b.video)}" playsinline></video>
             <button class="news-unmute">🔊 Tap for sound</button>
           </div>
           <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
