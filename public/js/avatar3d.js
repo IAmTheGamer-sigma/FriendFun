@@ -134,7 +134,7 @@ function getGlbScene(url) {
   }
   return glbCache.get(url);
 }
-export function loadUgcGlb(url, targetSize = 2) {
+export function loadUgcGlb(url, targetSize = 2, t = null) {
   return getGlbScene(url).then(raw => {
     const obj = raw.clone(true);
     const bbox = new THREE.Box3().setFromObject(obj);
@@ -143,17 +143,22 @@ export function loadUgcGlb(url, targetSize = 2) {
     const center = bbox.getCenter(new THREE.Vector3()).multiplyScalar(s);
     obj.scale.setScalar(s);
     obj.position.sub(center);
+    if (t) {
+      obj.scale.multiplyScalar(Math.min(3, Math.max(0.2, Number(t.s) || 1)));
+      obj.rotation.y = ((Number(t.ry) || 0) * Math.PI) / 180;
+      obj.position.x += Number(t.dx) || 0; obj.position.y += Number(t.dy) || 0; obj.position.z += Number(t.dz) || 0;
+    }
     obj.traverse(o => { if (o.isMesh) o.castShadow = true; });
     return obj;
   });
 }
 // Attach a GLB to a parent; adds the model when it finishes loading (no-op if
 // the anchor was removed meanwhile).
-function attachUgcGlb(parent, url, targetSize, y = 0) {
+function attachUgcGlb(parent, url, targetSize, y = 0, t = null) {
   const anchor = new THREE.Group();
   anchor.position.y = y;
   parent.add(anchor);
-  loadUgcGlb(url, targetSize).then(g => { if (anchor.parent) anchor.add(g); }).catch(() => {});
+  loadUgcGlb(url, targetSize, t).then(g => { if (anchor.parent) anchor.add(g); }).catch(() => {});
   return anchor;
 }
 
@@ -369,7 +374,7 @@ export function buildCharacter(avatar, opts = {}) {
   const torsoW = isBugs ? 1.8 : 2;
   const torso = box(torsoW, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
   const shirtIt = ITEM[avatar.shirt];
-  if (shirtIt && shirtIt.ugc && shirtIt.model_url) { attachUgcGlb(torso, shirtIt.model_url, 2.2); }
+  if (shirtIt && shirtIt.ugc && shirtIt.model_url) { attachUgcGlb(torso, shirtIt.model_url, 2.2, 0, shirtIt.model_transform); }
   else if (avatar.shirt && avatar.shirt !== 'shirt_none') {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(torsoW, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
     d.position.z = 0.501; torso.add(d);
@@ -386,7 +391,7 @@ export function buildCharacter(avatar, opts = {}) {
     face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
   }
   const hatIt = ITEM[avatar.hat];
-  if (hatIt && hatIt.ugc && hatIt.model_url) { const hg = attachUgcGlb(headPivot, hatIt.model_url, 1.5, H.h); hg.scale.setScalar(H.hs || 1); }
+  if (hatIt && hatIt.ugc && hatIt.model_url) { const hg = attachUgcGlb(headPivot, hatIt.model_url, 1.5, H.h, hatIt.model_transform); hg.scale.setScalar(H.hs || 1); }
   else { const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); } }
   const limb = (x, y, color, w = 1) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(w, 2, w, color); m.position.y = -1; p.add(m); root.add(p); return p; };
   let larm, rarm, lleg, rleg;
@@ -438,7 +443,7 @@ export function buildCharacter(avatar, opts = {}) {
     const gear = new THREE.Group();
     gear.position.set(0, -2, 0.5);
     (root.userData.limbs?.rarm || root).add(gear);
-    loadUgcGlb(gearGlb, 1.1).then(g => { if (gear.parent) gear.add(g); }).catch(() => {});
+    loadUgcGlb(gearGlb, 1.1, gearIt.model_transform).then(g => { if (gear.parent) gear.add(g); }).catch(() => {});
     root.userData.gear = gear;
   } else if (gearBoxes) {
     const gear = new THREE.Group();
