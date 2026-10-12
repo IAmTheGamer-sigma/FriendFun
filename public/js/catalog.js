@@ -44,7 +44,7 @@ export const CATALOG = [
   { id: 'pet_robo', type: 'pet', name: 'Robo Pup', price: 600, emoji: '🤖', color: '#90a4ae' },
   { id: 'pet_dragon', type: 'pet', name: 'Dragon', price: 800, emoji: '🐲', color: '#26c6da' },
   { id: 'hat_witch', type: 'hat', name: 'Witch Hat', price: 250, color: '#7b1fa2' },
-  { id: 'hat_pumpkin_champ', type: 'hat', name: 'Champion Pumpkin Head', price: 0, limited: true, model_url: null },
+  { id: 'hat_pumpkin_champ', type: 'hat', name: 'Champion Pumpkin Head', price: 0, limited: true, model_url: 'https://vjylxvdvctnmgvnkhgng.supabase.co/storage/v1/object/public/ugc-models/jack_o_lantern.glb' },
   { id: 'face_fangs', type: 'face', name: 'Vampire Fangs', price: 0, free: true },
   { id: 'face_stitches', type: 'face', name: 'Stitched Grin', price: 150 },
   { id: 'head_pumpkin', type: 'head', name: 'Pumpkin Head', price: 500 },
