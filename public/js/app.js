@@ -326,7 +326,7 @@ function eggConfetti(n = 120) {
 }
 // ============ NEWS BROADCAST ============
 async function showNewsBroadcast(b) {
-  const m = await import('./news-player.js?v=bc818be1');
+  const m = await import('./news-player.js?v=ba63e7b1');
   return m.showNewsBroadcast({ esc, me, ensureAvatar3d }, b);
 }
 async function checkNews() {
