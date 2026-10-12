@@ -34,23 +34,18 @@ async function loadCustomBadges() {
 let UGC_ITEMS = {}; // 'ugc_<id>' -> { id, type, name, price, color, template, creator, sales, ugc: true }
 let ugcTableOk = true;
 function ugcDef(row) {
-  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, model: row.model || null, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
+  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, model_url: row.model_url || null, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
 }
-// UGC custom 3D models: { boxes: [[x,y,z,w,h,d,"#rrggbb"], ...] }
-function validUgcModel(m) {
-  if (!m || !Array.isArray(m.boxes)) return 'Model must be { "boxes": [...] }';
-  if (m.boxes.length < 1 || m.boxes.length > 60) return 'Model must have 1–60 boxes';
-  const hex = /^#[0-9a-fA-F]{6}$/;
-  for (const b of m.boxes) {
-    if (!Array.isArray(b) || b.length < 7) return 'Each box must be [x, y, z, w, h, d, "#color"]';
-    const [x, y, z, w, h, d, c] = b;
-    if (![x, y, z, w, h, d].every(n => typeof n === 'number' && Number.isFinite(n))) return 'Box coordinates and sizes must be numbers';
-    if (Math.abs(x) > 4 || Math.abs(y) > 4 || Math.abs(z) > 4) return 'Box position out of range (±4)';
-    if (w < 0.05 || h < 0.05 || d < 0.05 || w > 4 || h > 4 || d > 4) return 'Box size out of range (0.05–4)';
-    if (!hex.test(String(c))) return 'Box color must be hex like "#e53935"';
-    if (b.length > 7 && typeof b[7] !== 'number') return 'Box rotation must be a number';
-  }
-  return null;
+// UGC custom 3D models (.glb) live in a public Supabase Storage bucket.
+const UGC_BUCKET = 'ugc-models';
+const UGC_GLB_MAX = 4 * 1024 * 1024;
+let ugcBucketOk = false;
+async function ensureUgcBucket() {
+  try {
+    const { error } = await supabase.storage.createBucket(UGC_BUCKET, { public: true });
+    if (error && !/exists|duplicate/i.test(error.message)) throw error;
+    ugcBucketOk = true;
+  } catch (e) { console.error('UGC bucket setup failed:', e.message); }
 }
 async function loadUgcItems() {
   try {
@@ -848,7 +843,24 @@ function muteState(u) {
 }
 
 // ---------- UGC (player-created avatar items) ----------
-const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, sales: u.sales });
+const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, sales: u.sales });
+// Upload a .glb model file (base64). Returns a public URL; the item is created separately.
+app.post('/api/ugc/model', auth, async (req, res) => {
+  try {
+    const data = String(req.body?.data || '');
+    if (!data) return res.status(400).json({ error: 'No file data' });
+    const buf = Buffer.from(data, 'base64');
+    if (buf.length > UGC_GLB_MAX) return res.status(400).json({ error: 'Model must be under 4MB' });
+    if (buf.length < 12 || buf.readUInt32LE(0) !== 0x46546C67) return res.status(400).json({ error: 'Not a valid .glb file' });
+    if (!ugcBucketOk) await ensureUgcBucket();
+    if (!ugcBucketOk) return res.status(500).json({ error: 'Model storage is not ready yet' });
+    const key = `ugc/${crypto.randomUUID()}.glb`;
+    const { error } = await supabase.storage.from(UGC_BUCKET).upload(key, buf, { contentType: 'model/gltf-binary', upsert: false });
+    if (error) throw error;
+    const { data: pub } = supabase.storage.from(UGC_BUCKET).getPublicUrl(key);
+    res.json({ url: pub.publicUrl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.get('/api/ugc', async (req, res) => {
   res.json(Object.values(UGC_ITEMS).map(ugcPublic));
 });
@@ -857,12 +869,12 @@ app.post('/api/ugc', auth, async (req, res) => {
   const b = req.body || {};
   const type = String(b.type || '');
   if (!['hat', 'shirt', 'gear'].includes(type)) return res.status(400).json({ error: 'Type must be hat, shirt, or gear' });
-  let template = null, color = null, model = null;
-  if (b.model) {
-    // Custom 3D model path
-    const err = validUgcModel(b.model);
-    if (err) return res.status(400).json({ error: err });
-    model = { boxes: b.model.boxes.map(bx => [bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], String(bx[6]).toLowerCase()].concat(bx.length > 7 ? [bx[7]] : [])) };
+  let template = null, color = null, model_url = null;
+  if (b.model_url) {
+    // Custom 3D model (.glb) path — must be a URL from our own upload endpoint
+    model_url = String(b.model_url);
+    const okPrefix = SUPABASE_URL.replace(/\/$/, '') + '/storage/v1/object/public/' + UGC_BUCKET + '/';
+    if (!model_url.startsWith(okPrefix)) return res.status(400).json({ error: 'Invalid model URL' });
   } else {
     // Remix path (hats and shirts only)
     if (!['hat', 'shirt'].includes(type)) return res.status(400).json({ error: 'Remix only supports hats and shirts — use a 3D model for gears' });
@@ -881,11 +893,10 @@ app.post('/api/ugc', auth, async (req, res) => {
     if ((mine || []).filter(r => r.status === 'pending').length >= 5) return res.status(400).json({ error: 'You have 5 items awaiting review already' });
     if ((mine || []).length >= 50) return res.status(400).json({ error: 'Item limit reached (50)' });
     const id = crypto.randomBytes(4).toString('hex');
-    const row = { id, creator: req.user.name, type, template, color, name, price, status: 'pending', sales: 0 };
-    if (model) row.model = model;
+    const row = { id, creator: req.user.name, type, template, color, model_url, name, price, status: 'pending', sales: 0 };
     const { data, error } = await supabase.from('ugc_items').insert(row).select().single();
     if (error) {
-      if (model && /model/i.test(error.message)) return res.status(500).json({ error: '3D models need the updated SQL — run supabase_ugc.sql' });
+      if (/model_url/i.test(error.message)) return res.status(500).json({ error: '3D models need the updated SQL — run supabase_ugc.sql' });
       throw error;
     }
     res.json({ ok: true, item: { ...ugcPublic(ugcDef(data)), status: 'pending' } });
@@ -2297,6 +2308,7 @@ async function seedShooterGames() {
 
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
 loadUgcItems().then(() => console.log('UGC items loaded:', Object.keys(UGC_ITEMS).length));
+ensureUgcBucket().then(() => console.log('UGC bucket ready:', ugcBucketOk));
 // Looney event deleted Oct 6, 2026: remove its games from the DB (prize kept via LOONEY_PRIZE grant)
 supabase.from('games').delete().eq('event', 'looney').then(() => console.log('looney games removed'));
 seedHalloweenGames().then(r => console.log('hw:', r.created));
