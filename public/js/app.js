@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=83ff43aa').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=b9dc4b76').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -508,7 +508,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=31ea15bd');
+  const { Game } = await import('./game.js?v=8effeef6');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -583,7 +583,7 @@ async function loadUgc() {
   try {
     const items = await api('GET', '/api/ugc');
     UGC_LIST = Array.isArray(items) ? items : [];
-    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, ugc: true };
+    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, ugc: true };
   } catch { UGC_LIST = []; }
 }
 
@@ -596,7 +596,7 @@ async function catalogPage(filter = 'all') {
     <div class="cat-filters">${filters.map(f => `<a href="#/catalog/${f}" class="${f === filter ? 'active' : ''}">${labels[f]}</a>`).join('')}</div>
     ${filter === 'ugc' ? '<p class="muted small">Player-created items. Creators earn 70% of every sale. <a href="#/ugc">Make your own →</a></p>' : ''}
     <div class="cat-grid">${list.map(i => `
-      <div class="cat-item">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : i.type === 'gear' ? (GEAR_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="gear-voxel" width="120" height="120" data-gear="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : `<div class="cat-img"><img src="${itemImage(i)}"></div>`}<div class="cat-name">${esc(i.name)}</div>
+      <div class="cat-item">${i.type === 'pet' ? (PET_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="pet-voxel" width="120" height="120" data-pet="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : i.type === 'gear' ? (GEAR_MODELS[i.id] ? `<div class="cat-img pet-img"><canvas class="gear-voxel" width="120" height="120" data-gear="${i.id}"></canvas></div>` : `<div class="cat-img pet-img">${i.emoji}</div>`) : (i.ugc && i.model_url ? `<div class="cat-img">${glbCardImg()}</div>` : `<div class="cat-img"><img src="${itemImage(i)}"></div>`)}</div><div class="cat-name">${esc(i.name)}</div>
         ${i.ugc ? `<div class="muted small">by ${esc(i.creator)} · ${i.sales} sold</div>` : ''}
         <div class="cat-price">${priceHtml(i)}</div>
         ${me.inventory.includes(i.id) ? '<button class="btn-owned" disabled>Owned</button>' : i.club && !me.club ? '<a class="btn-club" href="#/club">Members Only</a>' : `<button class="btn-buy" data-id="${i.id}"${i.ugc ? ' data-ugc="1"' : ''}>Buy</button>`}</div>`).join('') || '<p class="muted">Nothing here yet.</p>'}</div>`, () => {
@@ -612,7 +612,7 @@ function ugcBuyModal(it, onDone) {
   const cut = Math.floor(it.price * UGC_CREATOR_CUT);
   const d = document.createElement('div'); d.className = 'modal-bg';
   d.innerHTML = `<div class="modal"><h2>Buy UGC Item</h2>
-    <div class="buy-row"><img src="${itemImage(it)}"><div><p>Buy <b>${esc(it.name)}</b> by <b>${esc(it.creator)}</b>?</p>
+    <div class="buy-row">${it.model_url ? glbCardImg() : `<img src="${itemImage(it)}">`}<div><p>Buy <b>${esc(it.name)}</b> by <b>${esc(it.creator)}</b>?</p>
     <p class="muted small">${tix} ${fmt(cut)} goes to the creator</p>
     <p class="muted small">You have ${tix} ${fmt(me.funtix ?? 0)}</p></div></div>
     <div class="modal-actions"><button class="btn-secondary">Cancel</button><button class="btn-primary" ${(me.funtix ?? 0) < it.price ? 'disabled title="Not enough"' : ''}>Buy for ${tix} ${it.price}</button></div></div>`;
@@ -629,33 +629,21 @@ function ugcBuyModal(it, onDone) {
 // ---------- UGC Studio (player item creator) ----------
 const UGC_PALETTE = ['#e53935', '#ff6d00', '#ffeb3b', '#43a047', '#26c6da', '#1e88e5', '#7b1fa2', '#f48fb1', '#ffffff', '#9e9e9e', '#212121', '#795548'];
 const UGC_MODEL_SLOTS = ['hat', 'shirt', 'gear'];
-const UGC_EXAMPLE_MODEL = { boxes: [[0, 0.35, 0, 1.1, 0.25, 1.1, '#ffd400'], [0, 0.75, 0, 0.85, 0.55, 0.85, '#ffd400'], [0, 1.15, 0, 0.18, 0.3, 0.18, '#e53935']] };
-function ugcValidateModel(m) {
-  if (!m || !Array.isArray(m.boxes)) return 'Model must look like {"boxes": [...]}';
-  if (m.boxes.length < 1 || m.boxes.length > 60) return 'Model must have 1–60 boxes';
-  const hex = /^#[0-9a-fA-F]{6}$/;
-  for (const b of m.boxes) {
-    if (!Array.isArray(b) || b.length < 7) return 'Each box must be [x, y, z, w, h, d, "#color"]';
-    const [x, y, z, w, h, d, c] = b;
-    if (![x, y, z, w, h, d].every(n => typeof n === 'number' && isFinite(n))) return 'Box positions and sizes must be numbers';
-    if (Math.abs(x) > 4 || Math.abs(y) > 4 || Math.abs(z) > 4) return 'Box position out of range (±4)';
-    if (w < 0.05 || h < 0.05 || d < 0.05 || w > 4 || h > 4 || d > 4) return 'Box size out of range (0.05–4)';
-    if (!hex.test(String(c))) return 'Box color must be hex like "#e53935"';
-    if (b.length > 7 && typeof b[7] !== 'number') return 'Box rotation must be a number';
-  }
-  return null;
-}
+const UGC_GLB_MAX = 4 * 1024 * 1024;
+// Card art for GLB items (their 3D loads async, so grids show a placeholder)
+const glbCardImg = () => '<div class="glb-ph">📦<span>3D</span></div>';
+const ugcCardImg = u => u.model_url ? glbCardImg() : `<img src="${itemImage(u)}">`;
 async function ugcPage() {
   const A3 = await ensureAvatar3d().catch(() => null);
   let mode = 'remix';
   let type = 'hat', template = UGC_TEMPLATES.hat[0], color = '#e53935';
-  let slot = 'hat', modelBoxes = null, modelErr = '';
+  let slot = 'hat', glbFile = null, glbObjUrl = null;
   let mine = [];
   try { mine = await api('GET', '/api/ugc/mine'); } catch {}
-  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, model: m.model || null, creator: m.creator, ugc: true };
+  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, model_url: m.model_url || null, creator: m.creator, ugc: true };
   mount('ugc', `
     <h1>🎨 UGC Studio</h1>
-    <p class="muted">Remix a template or upload your own 3D model, pick where it goes, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
+    <p class="muted">Remix a template or upload your own .glb 3D model, pick where it goes, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
     <div class="av-wrap">
       <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Live preview</div></div>
       <div class="av-panel">
@@ -669,16 +657,11 @@ async function ugcPage() {
           <p class="muted small" style="margin:8px 0 4px">Where should it go?</p>
           <div class="av-tabs">${UGC_MODEL_SLOTS.map(s => `<button data-ugcsSlot="${s}" class="${s === slot ? 'active' : ''}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
           <div class="ugc-drop">
-            <label class="btn-secondary btn-small">Upload .json<input type="file" class="ugc-file" accept=".json,application/json" hidden></label>
-            <button class="btn-secondary btn-small ugc-example">Load example</button>
+            <label class="btn-secondary btn-small">Choose .glb file<input type="file" class="ugc-glb" accept=".glb,model/gltf-binary" hidden></label>
+            <span class="muted small ugc-filename">No file chosen</span>
           </div>
-          <textarea class="ugc-json" rows="6" spellcheck="false" placeholder='{"boxes": [[x, y, z, w, h, d, "#color"], ...]}'></textarea>
+          <p class="muted small">GLB up to 4MB. Uncompressed exports work best.</p>
           <div class="ugc-model-err"></div>
-          <details class="ugc-format"><summary>Model format</summary><pre>Each box: [x, y, z, width, height, depth, "#color"]
-1–60 boxes · positions ±4 · sizes 0.05–4
-Hat: origin = top of the head
-Shirt: origin = center of the torso
-Gear: origin = hand (shown at half size)</pre></details>
         </div>
         <label>Item name<input class="ugc-name" maxlength="40" placeholder="My cool hat"></label>
         <label>Price (FunTix)<input class="ugc-price" type="number" min="0" max="10000" value="100"></label>
@@ -686,7 +669,7 @@ Gear: origin = hand (shown at half size)</pre></details>
       </div>
     </div>
     <section><div class="sec-h"><h2>My creations (${mine.length})</h2></div>
-      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img"><img src="${itemImage(m)}"></div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type}${m.model ? ' · 3D' : ''} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
+      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img">${ugcCardImg(m)}</div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type}${m.model_url ? ' · 3D' : ''} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
   () => {
     const tplBox = app.querySelector('.ugc-templates');
     let ch = null, alive = true, r = null, sc = null;
@@ -696,8 +679,8 @@ Gear: origin = hand (shown at half size)</pre></details>
       ch = null;
       const av = structuredClone(me.avatar);
       if (mode === 'model') {
-        if (!modelBoxes) return;
-        ITEM['ugc_preview'] = { id: 'ugc_preview', type: slot, model: { boxes: modelBoxes }, ugc: true };
+        if (!glbObjUrl) return;
+        ITEM['ugc_preview'] = { id: 'ugc_preview', type: slot, model_url: glbObjUrl, ugc: true };
         av[slot] = 'ugc_preview';
       } else {
         ITEM['ugc_preview'] = { id: 'ugc_preview', type, color, template };
@@ -744,37 +727,33 @@ Gear: origin = hand (shown at half size)</pre></details>
       rebuild();
     });
     const errBox = app.querySelector('.ugc-model-err');
-    const parseModel = () => {
-      const txt = app.querySelector('.ugc-json').value.trim();
-      modelErr = ''; modelBoxes = null;
-      if (txt) {
-        try {
-          const m = JSON.parse(txt);
-          const err = ugcValidateModel(m);
-          if (err) modelErr = err;
-          else modelBoxes = m.boxes.map(bx => [bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], String(bx[6]).toLowerCase()].concat(bx.length > 7 ? [bx[7]] : []));
-        } catch { modelErr = 'Invalid JSON'; }
-      }
-      errBox.textContent = modelErr;
-      errBox.classList.toggle('show', !!modelErr);
+    const showErr = msg => { errBox.textContent = msg || ''; errBox.classList.toggle('show', !!msg); };
+    app.querySelector('.ugc-glb').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      if (!/\.glb$/i.test(f.name)) { showErr('File must be a .glb'); return; }
+      if (f.size > UGC_GLB_MAX) { showErr('Model must be under 4MB'); return; }
+      showErr('');
+      glbFile = f;
+      if (glbObjUrl) URL.revokeObjectURL(glbObjUrl);
+      glbObjUrl = URL.createObjectURL(f);
+      app.querySelector('.ugc-filename').textContent = f.name;
       rebuild();
     };
-    app.querySelector('.ugc-json').oninput = parseModel;
-    app.querySelector('.ugc-file').onchange = e => {
-      const f = e.target.files[0]; if (!f) return;
-      const rd = new FileReader();
-      rd.onload = () => { app.querySelector('.ugc-json').value = String(rd.result || ''); parseModel(); };
-      rd.readAsText(f);
-    };
-    app.querySelector('.ugc-example').onclick = () => { app.querySelector('.ugc-json').value = JSON.stringify(UGC_EXAMPLE_MODEL); parseModel(); };
     app.querySelector('.ugc-submit').onclick = async () => {
       const nm = app.querySelector('.ugc-name').value.trim();
       const pr = Math.floor(Number(app.querySelector('.ugc-price').value));
       try {
         if (mode === 'model') {
-          if (modelErr) throw new Error(modelErr);
-          if (!modelBoxes) throw new Error('Add a 3D model first — upload a .json file, paste JSON, or load the example');
-          await api('POST', '/api/ugc', { type: slot, model: { boxes: modelBoxes }, name: nm, price: pr });
+          if (!glbFile) throw new Error('Choose a .glb file first');
+          toast('Uploading model…');
+          const b64 = await new Promise((res, rej) => {
+            const rd = new FileReader();
+            rd.onload = () => res(String(rd.result).split(',')[1]);
+            rd.onerror = () => rej(new Error('Could not read file'));
+            rd.readAsDataURL(glbFile);
+          });
+          const up = await api('POST', '/api/ugc/model', { data: b64 });
+          await api('POST', '/api/ugc', { type: slot, model_url: up.url, name: nm, price: pr });
         } else {
           await api('POST', '/api/ugc', { type, template, color, name: nm, price: pr });
         }
@@ -1203,7 +1182,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=31ea15bd');
+      const { Game: GameClass } = await import('./game.js?v=8effeef6');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1265,7 +1244,7 @@ async function moderationPage() {
     pending = await api('GET', '/api/mod/ban/pending').catch(() => []);
     log = await api('GET', '/api/mod/log').catch(() => []);
     ugcPending = await api('GET', '/api/ugc/pending').catch(() => []);
-    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, ugc: true };
+    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model_url: u.model_url || null, creator: u.creator, ugc: true };
   }
   const badge = l => l === 'urgent' ? '<span class="mod-urgent">URGENT</span>' : l === 'review' ? '<span class="mod-review">REVIEW</span>' : '<span class="mod-clear">CLEAR</span>';
   const reload = () => moderationPage();
@@ -1293,10 +1272,11 @@ async function moderationPage() {
           ? '<span class="muted small">Waiting for someone else to confirm</span>'
           : `<button class="btn-danger btn-small" data-confirm-ban="${p.token}" data-name="${esc(p.name)}">Confirm ban (2/2)</button>`}</div></div>`).join('') || '<p class="muted">None pending.</p>'}</section>
     <section><div class="sec-h"><h2>UGC Review (${ugcPending.length})</h2></div>
-      ${ugcPending.map(u => `<div class="mod-report"><div class="cat-img"><img src="${itemImage(u)}"></div>
+      ${ugcPending.map(u => `<div class="mod-report"><div class="cat-img">${u.model_url ? glbCardImg() : `<img src="${itemImage(u)}">`}</div>
         <div class="mod-report-body"><b>${esc(u.name)}</b><div>${u.type} · ${tix} ${u.price}</div>
         <div class="muted small">by ${esc(u.creator)}</div></div>
         <div class="mod-report-actions">
+          ${u.model_url ? `<button class="btn-secondary btn-small" data-ugc-view="${u.id}">View 3D</button>` : ''}
           <button class="btn-primary btn-small" data-ugc-ok="${u.id}">Approve</button>
           <button class="btn-danger btn-small" data-ugc-no="${u.id}">Reject</button>
         </div></div>`).join('') || '<p class="muted">No UGC awaiting review.</p>'}</section>
@@ -1339,7 +1319,44 @@ async function moderationPage() {
       try { await api('POST', '/api/ugc/' + b.dataset.ugcNo + '/reject'); toast('UGC item rejected'); reload(); }
       catch (e) { toast(e.message, true); }
     });
+    app.querySelectorAll('[data-ugc-view]').forEach(b => b.onclick = () => {
+      const u = ugcPending.find(x => x.id === b.dataset.ugcView);
+      if (u) ugcGlbModal(u);
+    });
   });
+}
+
+// Moderator 3D preview for GLB UGC items
+async function ugcGlbModal(u) {
+  const A3 = await ensureAvatar3d().catch(() => null);
+  const d = document.createElement('div'); d.className = 'modal-bg';
+  d.innerHTML = `<div class="modal"><h2>${esc(u.name)}</h2>
+    <canvas class="glb-canvas" width="360" height="360"></canvas>
+    <p class="muted small">by ${esc(u.creator)} · ${u.type} · ${tix} ${u.price}</p>
+    <div class="modal-actions"><button class="btn-secondary">Close</button><button class="btn-primary" data-ok>Approve</button><button class="btn-danger" data-no>Reject</button></div></div>`;
+  document.body.appendChild(d);
+  let alive = true;
+  const close = () => { alive = false; d.remove(); };
+  const decide = async (kind) => {
+    try { await api('POST', '/api/ugc/' + u.id + '/' + kind); await loadUgc(); toast(kind === 'approve' ? 'Approved' : 'Rejected'); }
+    catch (e) { toast(e.message, true); }
+    close(); route();
+  };
+  d.querySelector('.btn-secondary').onclick = close;
+  d.onclick = e => { if (e.target === d) close(); };
+  d.querySelector('[data-ok]').onclick = () => decide('approve');
+  d.querySelector('[data-no]').onclick = () => decide('reject');
+  if (A3) {
+    const canvas = d.querySelector('.glb-canvas');
+    const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); r.outputColorSpace = THREE.SRGBColorSpace;
+    const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#fff', '#888', 1.5));
+    const dl = new THREE.DirectionalLight('#fff', 1.6); dl.position.set(3, 6, 8); sc.add(dl);
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 0.5, 7); cam.lookAt(0, 0, 0);
+    const holder = new THREE.Group(); sc.add(holder);
+    A3.loadUgcGlb(u.model_url, 2.4).then(g => { if (alive) holder.add(g); }).catch(() => toast('Could not load model', true));
+    const tick = () => { if (!alive) { r.dispose(); return; } requestAnimationFrame(tick); holder.rotation.y += 0.012; r.render(sc, cam); };
+    tick();
+  }
 }
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
