@@ -719,6 +719,14 @@ export const GEAR_MODELS = {
 export const ECON = { START_TIX: 100, DAILY_TIX: 25, PLAY_TIX: 2, PLAY_TIX_EVERY: 60000, COIN_TIX: 1, WIN_TIX: 25,
   CLUB_PRICE: 300, CLUB_DAYS: 30, CLUB_DAILY: 25, CLUB_PLAY_MULT: 2, CLUB_COIN_BONUS: 1 };
 export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
+// UGC (player-created items): remixable templates per slot. A UGC item stores
+// { template, color } and renders with the template's geometry/texture.
+export const UGC_TEMPLATES = {
+  hat: ['hat_cap', 'hat_tophat', 'hat_crown', 'hat_beanie', 'hat_witch', 'hat_cowboy', 'hat_horns', 'hat_halo', 'hat_cone', 'hat_catears', 'hat_bearears', 'hat_foxears', 'hat_helm_knight', 'hat_headphones'],
+  shirt: ['shirt_star', 'shirt_heart', 'shirt_stripes', 'shirt_suit', 'shirt_vampcape', 'shirt_mummy'],
+};
+export const UGC_MAX_PRICE = 10000;
+export const UGC_CREATOR_CUT = 0.7;
 export const DEFAULT_AVATAR = {
   colors: { head: '#f5cd30', torso: '#0d69ac', larm: '#f5cd30', rarm: '#f5cd30', lleg: '#a4bd47', rleg: '#a4bd47' },
   hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none', gear: 'gear_none',
