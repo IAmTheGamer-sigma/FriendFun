@@ -23,12 +23,14 @@ export async function ugcPage(D) {
   let type = 'hat', template = UGC_TEMPLATES.hat[0], color = '#e53935';
   let slot = 'hat', glbFile = null, glbObjUrl = null;
   let xf = { dx: 0, dy: 0, dz: 0, ry: 0, s: 1 };
-  let mine = [];
+  let mine = [], ugcStatus = { table: true, bucket: true };
   try { mine = await D.api('GET', '/api/ugc/mine'); } catch {}
+  try { ugcStatus = await D.api('GET', '/api/ugc/status'); } catch {}
   for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, model_url: m.model_url || null, model_transform: m.model_transform || null, creator: m.creator, ugc: true };
   D.mount('create', `
     <h1>Create</h1>
     <div class="av-tabs"><button data-goto="#/create">🎮 Experiences</button><button class="active">🎨 UGC Studio</button></div>
+    ${!ugcStatus.table ? '<p class="ugc-warn">⚠️ UGC database not set up — run supabase_ugc.sql in Supabase, then refresh.</p>' : !ugcStatus.bucket ? '<p class="ugc-warn">⚠️ Model storage not ready — add SUPABASE_SERVICE_KEY on Render, then refresh.</p>' : ''}
     <p class="muted">Remix a template or upload your own .glb 3D model, pick where it goes, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
     <div class="av-wrap">
       <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Live preview</div></div>
