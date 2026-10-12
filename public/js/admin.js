@@ -395,7 +395,7 @@ export async function ownerPage(D, q = '') {
         if (r.broadcast) {
           nmStatus.innerHTML = `<p>📡 <b>Live:</b> ${esc(r.broadcast.title)} <button class="btn-secondary btn-sm nm-replay">👁 View</button></p>`;
           nmStatus.querySelector('.nm-replay').onclick = async () => {
-            const m = await import('./news-player.js?v=d57ea797');
+            const m = await import('./news-player.js?v=00b6573e');
             m.showNewsBroadcast({ esc, me, ensureAvatar3d }, r.broadcast);
           };
         } else nmStatus.innerHTML = '<p class="muted small">No broadcast live.</p>';
@@ -408,7 +408,7 @@ export async function ownerPage(D, q = '') {
       const script = app.querySelector('.nm-script')?.value.trim();
       if (!script) { toast('Write a script first', true); return; }
       try {
-        const m = await import('./news-player.js?v=d57ea797');
+        const m = await import('./news-player.js?v=00b6573e');
         m.showNewsBroadcast({ esc, me, ensureAvatar3d }, { type: 'live', title, script, voice: nmVoice?.value, anchor: nmAnchorSel?.value, avatar: me.avatar });
       } catch (e) { toast('Preview failed', true); }
     };
