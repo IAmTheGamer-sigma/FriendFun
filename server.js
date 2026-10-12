@@ -1691,7 +1691,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (const p of room.players.values()) if (p.ws !== except && p.ws.readyState === 1) p.ws.send(s); }
-const T = createTourney({ app, auth, supabase, privateServers, notify, key, list, broadcast, send });
+const T = createTourney({ app, auth, supabase, privateServers, rooms, notify, key, list, broadcast, send });
 
 wss.on('connection', (ws) => {
   let player = null, room = null;
@@ -1789,9 +1789,9 @@ wss.on('connection', (ws) => {
       if (now - (player.lastGearHit || 0) < 500) return;
       player.lastGearHit = now;
       const target = room.players.get(m.id);
-      if (target && target.ws && target.id !== player.id) send(target.ws, { t: 'gearHit', from: player.name });
+      if (target && target.ws && target.id !== player.id) send(target.ws, { t: 'gearHit', from: player.name, dmg: Math.max(1, Math.min(150, m.dmg | 0 || 100)) });
     }
-    else if (m.t === 'tourneyKill' && typeof m.victim === 'string') T.tourneyKill(player, room, m.victim);
+    else if (m.t === 'rivalsDeath' && typeof m.by === 'string') T.rivalsDeath(player, room, m.by);
   });
   ws.on('close', () => {
     if (!player || !room) return;
