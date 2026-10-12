@@ -176,6 +176,12 @@ export async function ownerPage(D, q = '') {
       </div>
       <div class="site-state muted small"></div>
     </section>
+    <section class="admin-section owner-tools"><h3>📡 News Broadcast <span class="muted small">glitch + video on everyone's screen</span></h3>
+      <div class="owner-grid">
+        <span class="admin-inline"><input class="news-title" placeholder="Headline..." maxlength="80" style="min-width:160px"><input class="news-video" placeholder="Video URL (.mp4)..." style="min-width:220px"><button class="btn-primary news-send">📡 Broadcast News</button><button class="btn-secondary news-clear">Clear</button></span>
+      </div>
+      <p class="muted small">Upload your video to Supabase Storage (like the pumpkin), paste the public .mp4 URL. Everyone's screen glitches, then plays it fullscreen.</p>
+    </section>
     <section class="admin-section"><h3>🎮 Games <span class="muted small">danger zone</span></h3>
       ${gamesError ? `<p style="color:#ff6b6b">⚠️ Games list unavailable: ${esc(gamesError)}</p>` : ''}
       <div class="lbp">${games.map(g => `
@@ -330,6 +336,16 @@ export async function ownerPage(D, q = '') {
     };
     const announceClear = app.querySelector('.announce-clear');
     if (announceClear) announceClear.onclick = () => siteCmd('clear_announce');
+    const newsSend = app.querySelector('.news-send');
+    if (newsSend) newsSend.onclick = async () => {
+      const title = app.querySelector('.news-title')?.value.trim();
+      const video = app.querySelector('.news-video')?.value.trim();
+      if (!video) { toast('Paste a video URL first', true); return; }
+      try { await api('POST', '/api/owner/news', { title, video }); toast('📡 News broadcast sent!'); }
+      catch (e) { toast(e.message, true); }
+    };
+    const newsClear = app.querySelector('.news-clear');
+    if (newsClear) newsClear.onclick = async () => { try { await api('POST', '/api/owner/news/clear'); toast('News cleared'); } catch (e) { toast(e.message, true); } };
     const maintBtn = app.querySelector('.maint-toggle');
     if (maintBtn) maintBtn.onclick = async () => {
       try {
