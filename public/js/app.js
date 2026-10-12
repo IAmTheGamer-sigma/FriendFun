@@ -269,7 +269,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield], ['newsmaker', '📡 News Maker', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin && !me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -1345,14 +1345,14 @@ async function ugcGlbModal(u) {
   }
 }
 
-const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
+const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, ensureAvatar3d, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=51a3b745');
+  const m = await import('./admin.js?v=a848d97f');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=51a3b745');
+  const m = await import('./admin.js?v=a848d97f');
   return m.ownerPage(adminDeps, q);
 }
 
@@ -1488,10 +1488,10 @@ async function route() {
       case 'studio': return await studioPage(seg[1], seg[2]);
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
-      case 'admin': return await adminPage();
+      case 'admin': if (me && me.owner) { location.hash = '#/owner'; return; } return await adminPage();
       case 'settings': return settingsPage();
       case 'owner': return await ownerPage();
-      case 'newsmaker': { const m = await import('./news-maker.js?v=df0eb9aa'); return m.newsMakerPage({ mount, api, toast, esc, me, ensureAvatar3d, app: document.getElementById('app') }); }
+
       case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
       case 'horror': return horrorPage();
