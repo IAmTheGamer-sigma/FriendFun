@@ -19,14 +19,34 @@ export function showNewsBroadcast(D, b) {
           <button class="news-close">✕</button>
         </div>`;
       ov.querySelector('.news-close').onclick = close;
-      // 3D anchor
+      // 3D anchor + voice (with tap fallback for iOS)
+      const stage = ov.querySelector('.news-live-stage');
+      let talking = true;
+      const doSpeak = () => {
+        try {
+          speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(b.script);
+          const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
+          if (v) u.voice = v;
+          u.onend = () => { talking = false; };
+          speechSynthesis.speak(u);
+          return true;
+        } catch { return false; }
+      };
+      // Tap-to-listen button (iOS requires a gesture for audio)
+      const listenBtn = document.createElement('button');
+      listenBtn.className = 'news-listen';
+      listenBtn.textContent = '🔊 Tap to hear the anchor';
+      listenBtn.onclick = () => { if (doSpeak()) listenBtn.remove(); };
+      stage.appendChild(listenBtn);
       try {
         const A3 = await ensureAvatar3d().catch(() => null);
-        if (A3 && !ov.isConnected) return;
+        if (!A3 || !ov.isConnected) throw new Error('3D unavailable');
         const canvas = ov.querySelector('.news-anchor-canvas');
         const av = b.anchor === 'bot'
           ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' }
-          : (b.avatar || me.avatar);
+          : (b.avatar || (me && me.avatar));
+        if (!av) throw new Error('no avatar');
         const { THREE } = await import('./three-util.js?v=ac3e6f2b');
         const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
         r.setSize(400, 400);
@@ -35,7 +55,6 @@ export function showNewsBroadcast(D, b) {
         sc.add(new THREE.AmbientLight(0xffffff, 1.3));
         const key = new THREE.DirectionalLight(0xffffff, 0.8); key.position.set(5, 10, 7); sc.add(key);
         const ch = A3.buildCharacter(av); sc.add(ch);
-        let talking = true;
         const tick = () => {
           if (!ov.isConnected) return;
           requestAnimationFrame(tick);
@@ -45,13 +64,13 @@ export function showNewsBroadcast(D, b) {
           r.render(sc, cam);
         };
         tick();
-        // AI voice
-        const u = new SpeechSynthesisUtterance(b.script);
-        const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
-        if (v) u.voice = v;
-        u.onend = () => { talking = false; };
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-      } catch {}
+      } catch (e) {
+        // Fallback: show emoji anchor if 3D fails
+        stage.innerHTML = '<div class="news-fallback-anchor">🧑‍💼</div>';
+        stage.appendChild(listenBtn);
+      }
+      // Try autoplay voice (works on desktop; iOS needs the tap button)
+      setTimeout(() => { if (ov.isConnected) doSpeak(); }, 500);
     } else {
       // Video broadcast: anchor intro, then video with tap-for-audio (iOS needs a gesture)
       ov.innerHTML = `
