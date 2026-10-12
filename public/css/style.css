@@ -565,3 +565,14 @@ body.halloween .sidebar .logo { filter: drop-shadow(0 0 8px #ff6d0066); }
 .set-row input[type=checkbox] { width: 22px; height: 22px; accent-color: #335fff; }
 .set-curpw, .set-newpw { display: block; width: 100%; max-width: 320px; margin: 6px 0; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.15); background: rgba(0,0,0,.25); color: inherit; font: inherit; }
 .set-pw-btn { margin-top: 8px; }
+/* UGC Studio */
+.ugc-templates { margin: 10px 0; }
+.ugc-templates .item-grid { max-height: 220px; overflow-y: auto; }
+.av-panel > label { display: block; margin: 10px 0; font-size: 14px; }
+.av-panel > label input { display: block; width: 100%; max-width: 280px; margin-top: 4px; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.15); background: rgba(0,0,0,.25); color: inherit; font: inherit; }
+.ugc-submit { margin-top: 6px; }
+.ugc-status { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.ugc-status.pending { background: rgba(255,193,7,.2); color: #ffc107; }
+.ugc-status.approved { background: rgba(76,175,80,.2); color: #66bb6a; }
+.ugc-status.rejected { background: rgba(244,67,54,.2); color: #ef5350; }
+.mod-report .cat-img img { width: 72px; height: 72px; border-radius: 8px; }
