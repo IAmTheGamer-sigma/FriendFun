@@ -193,6 +193,61 @@ export function shooterRooftop() {
   return w;
 }
 
+
+// ============ SPOOKY RIVALS ARENA (1v1 tournament, Oct 2026) ============
+export function spookyRivals() {
+  const w = startWorld('#160a2e');
+  w.shooter = true;
+  w.tourney = true;
+  // floor + walls
+  w.parts.push(part([0, -0.5, 0], [54, 1, 54], '#23232e', { name: 'ArenaFloor' }));
+  const wh = 8;
+  w.parts.push(part([0, wh / 2, -27], [54, wh, 2], '#3a2a5a', { name: 'WallN' }));
+  w.parts.push(part([0, wh / 2, 27], [54, wh, 2], '#3a2a5a', { name: 'WallS' }));
+  w.parts.push(part([-27, wh / 2, 0], [2, wh, 54], '#3a2a5a', { name: 'WallW' }));
+  w.parts.push(part([27, wh / 2, 0], [2, wh, 54], '#3a2a5a', { name: 'WallE' }));
+  // purple neon trim on walls
+  for (const [x, z, sx, sz] of [[0, -26, 54, 0.4], [0, 26, 54, 0.4], [-26, 0, 0.4, 54], [26, 0, 0.4, 54]])
+    w.parts.push(part([x, wh + 0.2, z], [sx, 0.4, sz], '#b388ff', { name: 'NeonTrim', m: 'neon', cc: false }));
+  // giant moon (decor)
+  w.parts.push(part([0, 38, -60], [16, 16, 2], '#fff8e1', { name: 'Moon', m: 'neon', cc: false }));
+  // center: giant glowing jack-o-lantern on a platform
+  w.parts.push(part([0, 1, 0], [10, 2, 10], '#4a4a5a', { name: 'CenterPlatform' }));
+  w.parts.push(part([0, 4.5, 0], [5, 5, 5], '#e67e22', { name: 'BigPumpkin', m: 'plastic' }));
+  w.parts.push(part([0, 7.4, 0], [1, 1.2, 1], '#2e7d32', { name: 'Stem', m: 'plastic' }));
+  w.parts.push(part([-1.2, 5.2, 2.6], [1, 1, 0.3], '#ffca28', { name: 'EyeL', m: 'neon', cc: false }));
+  w.parts.push(part([1.2, 5.2, 2.6], [1, 1, 0.3], '#ffca28', { name: 'EyeR', m: 'neon', cc: false }));
+  w.parts.push(part([0, 3.6, 2.6], [2.4, 0.8, 0.3], '#ffca28', { name: 'Mouth', m: 'neon', cc: false }));
+  // cover crates
+  for (const [x, z] of [[-10, -10], [10, -10], [-10, 10], [10, 10], [-16, 0], [16, 0]])
+    w.parts.push(part([x, 2, z], [4, 4, 4], '#6d4c41', { name: 'Crate', m: 'wood' }));
+  // gravestones
+  for (const [x, z, ry] of [[-6, -16, 0.3], [6, -16, -0.2], [-6, 16, -0.3], [6, 16, 0.2]]) {
+    w.parts.push(part([x, 1.5, z], [2.4, 3, 0.8], '#9e9e9e', { name: 'Gravestone', m: 'plastic' }));
+    void ry;
+  }
+  // dead trees
+  for (const [tx, tz] of [[-20, -20], [20, 20], [-20, 20], [20, -20]]) {
+    w.parts.push(part([tx, 3, tz], [1.2, 6, 1.2], '#4e342e', { name: 'DeadTree', m: 'wood' }));
+    w.parts.push(part([tx + 1.2, 5.5, tz], [2.8, 0.8, 0.8], '#4e342e', { name: 'Branch', m: 'wood' }));
+    w.parts.push(part([tx - 1.2, 6.5, tz], [2.4, 0.8, 0.8], '#4e342e', { name: 'Branch', m: 'wood' }));
+  }
+  // small pumpkins with glow
+  for (const [px, pz] of [[-14, 6], [14, -6], [-8, 20], [8, -20]]) {
+    w.parts.push(part([px, 1, pz], [2, 2, 2], '#e67e22', { name: 'Pumpkin', m: 'plastic' }));
+    w.parts.push(part([px, 2.4, pz], [0.5, 0.6, 0.5], '#2e7d32', { name: 'Stem', m: 'plastic' }));
+  }
+  // ghost lights on posts
+  for (const [lx, lz] of [[-22, 0], [22, 0], [0, -22], [0, 22]]) {
+    w.parts.push(part([lx, 3, lz], [0.8, 6, 0.8], '#222', { name: 'LampPost', m: 'plastic' }));
+    w.parts.push(part([lx, 6.5, lz], [1.6, 1.6, 1.6], '#b388ff', { name: 'GhostLight', m: 'neon', cc: false }));
+  }
+  // spawns: opposite ends
+  w.parts.push(part([0, 0.25, -22], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  w.parts.push(part([0, 0.25, 22], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  return w;
+}
+
 // ============ ORIGINAL HALLOWEEN WORLDS (hand-designed, Oct 2026) ============
 // Helper: floating candy coin
 function candy(w, x, y, z) {
