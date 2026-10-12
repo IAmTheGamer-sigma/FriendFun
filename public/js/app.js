@@ -311,6 +311,82 @@ async function refreshSiteBanner() {
     }
   } catch {}
 }
+// ============ EASTER EGGS ============
+function eggConfetti(n = 120) {
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'egg-confetti';
+    d.textContent = ['🎉', '🥚', '🎃', '⭐', '🍬'][Math.floor(Math.random() * 5)];
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.animationDelay = (Math.random() * 0.8) + 's';
+    d.style.fontSize = (16 + Math.random() * 24) + 'px';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3200);
+  }
+}
+// ============ NEWS BROADCAST ============
+function showNewsBroadcast(video, title) {
+  if (document.querySelector('.news-overlay')) return;
+  const ov = document.createElement('div');
+  ov.className = 'news-overlay news-glitch';
+  ov.innerHTML = `<div class="news-static"></div><div class="news-glitch-text">📡 SIGNAL INTERRUPTED</div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => {
+    ov.classList.remove('news-glitch');
+    ov.innerHTML = `
+      <div class="news-frame">
+        <div class="news-banner">📡 FUNTOPIA NEWS</div>
+        <video class="news-video-el" src="${esc(video)}" controls autoplay playsinline></video>
+        <div class="news-lower3rd"><b>${esc(title)}</b></div>
+        <button class="news-close">✕</button>
+      </div>`;
+    const close = () => ov.remove();
+    ov.querySelector('.news-close').onclick = close;
+    const v = ov.querySelector('video');
+    v.onended = close;
+    v.play().catch(() => {});
+  }, 2600);
+}
+async function checkNews() {
+  if (!token || !me || document.querySelector('.news-overlay')) return;
+  try {
+    const r = await api('GET', '/api/news');
+    const b = r.broadcast;
+    if (!b) return;
+    const seen = +(localStorage.newsSeenAt || 0);
+    if (b.at > seen) { localStorage.newsSeenAt = b.at; showNewsBroadcast(b.video, b.title); }
+  } catch {}
+}
+setInterval(checkNews, 5000);
+
+function initEasterEggs() {
+  // 1. Konami code
+  const seq = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+  let ki = 0;
+  addEventListener('keydown', e => {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    ki = (k === seq[ki]) ? ki + 1 : (k === seq[0] ? 1 : 0);
+    if (ki === seq.length) { ki = 0; eggConfetti(); toast('🥚 KONAMI! You found an Easter egg!'); }
+  });
+  // 2. Logo 5 clicks
+  let clicks = 0, ct = null;
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.logo')) return;
+    clicks++; clearTimeout(ct); ct = setTimeout(() => clicks = 0, 1500);
+    if (clicks === 5) { clicks = 0; document.querySelector('.logo')?.classList.add('egg-spin'); eggConfetti(60); toast('👀 The logo approves.'); setTimeout(() => document.querySelector('.logo')?.classList.remove('egg-spin'), 1200); }
+  });
+  // 3. Secret chat word
+  const origSend = null; // hooked via chat observer below
+  new MutationObserver(muts => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType === 1 && n.textContent && /\bxyzzy\b/i.test(n.textContent) && n.classList?.contains('chat-msg')) {
+        eggConfetti(40); toast('✨ XYZZY! A hollow voice says "plugh".');
+      }
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+}
+setTimeout(initEasterEggs, 1000);
+
 function mount(active, html, after) {
   document.body.classList.toggle('halloween', halloweenActive());
   app.className = ''; app.innerHTML = shell(active, html);
@@ -578,7 +654,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=058257bf');
+  const { Game } = await import('./game.js?v=a76fb7b3');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -1120,7 +1196,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=058257bf');
+      const { Game: GameClass } = await import('./game.js?v=a76fb7b3');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1300,11 +1376,11 @@ async function ugcGlbModal(u) {
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=3fc342a5');
+  const m = await import('./admin.js?v=51a3b745');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=3fc342a5');
+  const m = await import('./admin.js?v=51a3b745');
   return m.ownerPage(adminDeps, q);
 }
 
@@ -1421,7 +1497,7 @@ async function route() {
       case 'play': return await playPage(seg[1], qp.get('server'));
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
-      case 'ugc': { const m = await import('./ugc-studio.js?v=46230619'); return m.ugcPage(ugcDeps); }
+      case 'ugc': { const m = await import('./ugc-studio.js?v=07967ed1'); return m.ugcPage(ugcDeps); }
       case 'tourney': return await tourneyPage();
       case 'friends': return await friendsPage();
       case 'halloween': return await halloweenPage();
