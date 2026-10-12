@@ -472,10 +472,13 @@ async function tourneyPage() {
       <div class="tourney-prize"><span class="tp-emoji">🎃</span><b>Champion Pumpkin Head</b><em>Exclusive prize — only the tournament winner gets it</em></div>
       <div class="tourney-countdown"><span>${t.finalized ? 'Tournament over' : 'Ends in'}</span><b class="tourney-timer">–</b>${t.finalized && t.winner ? `<div>👑 Winner: <b>${esc(t.winner)}</b></div>` : ''}</div>
     </div>
+    ${t.finalized ? '' : `<div class="tourney-loadout"><span class="muted">Loadout:</span><div class="loadout-picks">
+      ${[['rifle', '🔫 Rifle'], ['smg', '🔫 SMG'], ['shotgun', '🔫 Shotgun'], ['sniper', '🔫 Sniper']].map(([id, label]) => `<button class="loadout-pick" data-w="${id}">${label}</button>`).join('')}
+      </div><span class="muted small">+ 🔫 Pistol secondary</span></div>`}
     <div class="tourney-actions">${t.finalized ? '<span class="muted">The tournament has ended.</span>' : '<button class="btn-primary tourney-join">Join the Tournament</button><button class="btn-secondary tourney-leave" hidden>Leave Queue</button><span class="muted tourney-status"></span>'}</div>
     <section><div class="sec-h"><h2>🏆 Leaderboard <span class="muted small">most match wins</span></h2></div>
       <div class="tourney-board">${board.map((r, i) => `<div class="tourney-row${r.name === me.name ? ' me' : ''}"><span class="tourney-rank">${i + 1}</span><span class="tourney-name">${i === 0 ? '👑 ' : ''}${esc(r.name)}</span><span class="tourney-wins">${r.wins} win${r.wins === 1 ? '' : 's'}</span></div>`).join('') || '<p class="muted">No wins yet — be the first!</p>'}</div></section>`}`,
-  () => {
+  async () => {
     if (!t || t.error || t.finalized) return;
     let alive = true;
     const timer = setInterval(() => {
@@ -499,6 +502,10 @@ async function tourneyPage() {
         if (s.finalized) { alive = false; tourneyPage(); }
       } catch {}
     };
+    const picks = app.querySelectorAll('.loadout-pick');
+    const markPick = id => picks.forEach(b => b.classList.toggle('active', b.dataset.w === id));
+    try { const lo = await api('GET', '/api/tourney/loadout'); markPick(lo.primary); } catch {}
+    picks.forEach(b => b.onclick = async () => { try { const r = await api('POST', '/api/tourney/loadout', { primary: b.dataset.w }); markPick(r.primary); toast('Loadout: ' + r.primary); } catch (e) { toast(e.message, true); } });
     joinBtn.onclick = async () => { try { const r = await api('POST', '/api/tourney/join'); if (r.matched) { alive = false; location.hash = '#/play/g_spookyrivals?server=' + r.code; } else sync(); } catch (e) { toast(e.message, true); } };
     leaveBtn.onclick = async () => { try { await api('POST', '/api/tourney/leave'); sync(); } catch (e) { toast(e.message, true); } };
     const poll = setInterval(sync, 5000);
@@ -571,7 +578,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=7b2000dc');
+  const { Game } = await import('./game.js?v=058257bf');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -1113,7 +1120,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=7b2000dc');
+      const { Game: GameClass } = await import('./game.js?v=058257bf');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
