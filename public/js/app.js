@@ -1491,7 +1491,7 @@ async function route() {
       case 'admin': return await adminPage();
       case 'settings': return settingsPage();
       case 'owner': return await ownerPage();
-      case 'newsmaker': { const m = await import('./news-maker.js?v=4695664c'); return m.newsMakerPage({ mount, api, toast, esc, me, ensureAvatar3d, app: document.getElementById('app') }); }
+      case 'newsmaker': { const m = await import('./news-maker.js?v=df0eb9aa'); return m.newsMakerPage({ mount, api, toast, esc, me, ensureAvatar3d, app: document.getElementById('app') }); }
       case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
       case 'horror': return horrorPage();
