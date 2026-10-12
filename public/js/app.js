@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=c2a605a5').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=10814c87').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -269,7 +269,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin || me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -459,6 +459,54 @@ async function discoverPage(q) {
     <section><div class="sec-h"><h2>Recently Updated</h2></div><div class="game-row">${fresh.map(gameCard).join('')}</div></section>`);
 }
 
+async function tourneyPage() {
+  let t = null;
+  try { t = await api('GET', '/api/tourney'); } catch (e) { t = { error: e.message }; }
+  const ends = t && t.endsAt ? t.endsAt : 0;
+  const board = (t && t.board) || [];
+  mount('tourney', `
+    <h1>🎃 Spooky Rivals Tournament</h1>
+    <p class="muted">1v1 shooter in the haunted arena. Most match wins by <b>Wednesday night</b> takes the exclusive <b>Champion Pumpkin Head</b> 👑</p>
+    ${t && t.error ? `<p class="err">${esc(t.error)}</p>` : `
+    <div class="tourney-hero">
+      <div class="tourney-prize"><span class="tp-emoji">🎃</span><b>Champion Pumpkin Head</b><em>Exclusive prize — only the tournament winner gets it</em></div>
+      <div class="tourney-countdown"><span>${t.finalized ? 'Tournament over' : 'Ends in'}</span><b class="tourney-timer">–</b>${t.finalized && t.winner ? `<div>👑 Winner: <b>${esc(t.winner)}</b></div>` : ''}</div>
+    </div>
+    <div class="tourney-actions">${t.finalized ? '<span class="muted">The tournament has ended.</span>' : '<button class="btn-primary tourney-join">Join the Tournament</button><button class="btn-secondary tourney-leave" hidden>Leave Queue</button><span class="muted tourney-status"></span>'}</div>
+    <section><div class="sec-h"><h2>🏆 Leaderboard <span class="muted small">most match wins</span></h2></div>
+      <div class="tourney-board">${board.map((r, i) => `<div class="tourney-row${r.name === me.name ? ' me' : ''}"><span class="tourney-rank">${i + 1}</span><span class="tourney-name">${i === 0 ? '👑 ' : ''}${esc(r.name)}</span><span class="tourney-wins">${r.wins} win${r.wins === 1 ? '' : 's'}</span></div>`).join('') || '<p class="muted">No wins yet — be the first!</p>'}</div></section>`}`,
+  () => {
+    if (!t || t.error || t.finalized) return;
+    let alive = true;
+    const timer = setInterval(() => {
+      if (!alive) return;
+      const ms = ends - Date.now();
+      const el = app.querySelector('.tourney-timer');
+      if (!el) return;
+      if (ms <= 0) { el.textContent = 'Over!'; return; }
+      const d = Math.floor(ms / 86400000), h = Math.floor(ms % 86400000 / 3600000), m = Math.floor(ms % 3600000 / 60000), s = Math.floor(ms % 60000 / 1000);
+      el.textContent = (d ? d + 'd ' : '') + h + 'h ' + m + 'm ' + s + 's';
+    }, 1000);
+    const joinBtn = app.querySelector('.tourney-join'), leaveBtn = app.querySelector('.tourney-leave'), status = app.querySelector('.tourney-status');
+    const sync = async () => {
+      if (!alive) return;
+      try {
+        const s = await api('GET', '/api/tourney');
+        if (s.myMatch) { alive = false; location.hash = '#/play/g_spookyrivals?server=' + s.myMatch.code; return; }
+        const inQ = !!s.inQueue;
+        joinBtn.hidden = inQ; leaveBtn.hidden = !inQ;
+        status.textContent = inQ ? 'In queue — waiting for an opponent…' : '';
+        if (s.finalized) { alive = false; tourneyPage(); }
+      } catch {}
+    };
+    joinBtn.onclick = async () => { try { const r = await api('POST', '/api/tourney/join'); if (r.matched) { alive = false; location.hash = '#/play/g_spookyrivals?server=' + r.code; } else sync(); } catch (e) { toast(e.message, true); } };
+    leaveBtn.onclick = async () => { try { await api('POST', '/api/tourney/leave'); sync(); } catch (e) { toast(e.message, true); } };
+    const poll = setInterval(sync, 5000);
+    sync();
+    cleanup = () => { alive = false; clearInterval(timer); clearInterval(poll); };
+  });
+}
+
 async function gamePage(id) {
   const g = await api('GET', '/api/games/' + id);
   const mine = g.creator.toLowerCase() === me.name.toLowerCase();
@@ -523,7 +571,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=5d121a2a');
+  const { Game } = await import('./game.js?v=2c6e277d');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -1065,7 +1113,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=5d121a2a');
+      const { Game: GameClass } = await import('./game.js?v=2c6e277d');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1367,6 +1415,7 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'ugc': { const m = await import('./ugc-studio.js?v=46230619'); return m.ugcPage(ugcDeps); }
+      case 'tourney': return await tourneyPage();
       case 'friends': return await friendsPage();
       case 'halloween': return await halloweenPage();
       case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
