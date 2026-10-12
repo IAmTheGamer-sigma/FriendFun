@@ -1,7 +1,7 @@
 export async function adminPage(D, q = '', gq = '') {
   const { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN } = D;
   const me = D.me, BADGE_DEFS = D.BADGE_DEFS;
-  if (!me.admin) { location.hash = '#/home'; return; }
+  if (!me.admin && !me.owner) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
   let games = [], gamesError = '';
   try { games = await api('GET', '/api/admin/games?q=' + encodeURIComponent(gq)); }
@@ -9,7 +9,7 @@ export async function adminPage(D, q = '', gq = '') {
   const badgeOpts = Object.values(BADGE_DEFS).map(b => `<option value="${esc(b.id)}">${esc(b.icon || '')} ${esc(b.name)}${b.custom ? ' (custom)' : ''}</option>`).join('');
   const status = u => u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('admin', `<h1>Admin Panel</h1>
-    <p class="muted">Manage players: FriendClub, FunTix, badges and quick actions.</p>
+    <p class="muted">Manage players: FriendClub, FunTix, badges and quick actions.${me.owner ? ' <a href="#/owner">👑 Owner Panel</a> has the owner-only tools.' : ''}</p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <section class="admin-section"><h3>Create Badge</h3>
       <div class="badge-creator">
@@ -26,15 +26,6 @@ export async function adminPage(D, q = '', gq = '') {
         <button class="btn-danger btn-small badge-delete" data-id="${esc(b.id)}" title="Delete badge">×</button></span>`).join('') || '<span class="muted small">No custom badges yet</span>'}
       </div>
     </section>
-    ${me.owner ? `<section class="admin-section owner-tools"><h3>👑 Owner Tools <span class="muted small">site-wide</span></h3>
-      <div class="owner-grid">
-        <span class="admin-inline"><input class="announce-text" placeholder="Broadcast announcement..." maxlength="200" style="min-width:220px"><button class="btn-primary announce-send">📢 Broadcast</button><button class="btn-secondary announce-clear">Clear</button></span>
-        <span class="admin-inline"><button class="btn-secondary maint-toggle">🔧 Maintenance: OFF</button></span>
-        <span class="admin-inline"><button class="btn-danger kick-all">Kick all players</button></span>
-        <span class="admin-inline"><input type="number" class="rain-amt" value="50" min="1" max="1000" title="FunTix per online player"><button class="btn-primary funtix-rain">🌧️ FunTix Rain</button></span>
-      </div>
-      <div class="site-state muted small"></div>
-    </section>` : ''}
     <section class="admin-section"><h3>🎮 Games <span class="muted small">publish, feature & manage</span></h3>
       ${gamesError ? `<p style="color:#ff6b6b">⚠️ Games list unavailable: ${esc(gamesError)} — the rest of the panel still works.</p>` : ''}
       <form class="game-search admin-search"><input name="gq" placeholder="Search games" value="${esc(gq)}"><button class="btn-primary">Search</button></form>
@@ -47,8 +38,6 @@ export async function adminPage(D, q = '', gq = '') {
           <button class="btn-secondary g-pub" data-id="${esc(g.id)}" title="Toggle Discover visibility">${g.unpublished ? 'Publish' : 'Unpublish'}</button>
           <button class="btn-secondary g-feat" data-id="${esc(g.id)}" title="Pin to top of Discover">${g.featured ? 'Unfeature' : '⭐ Feature'}</button>
           <button class="btn-secondary g-rename" data-id="${esc(g.id)}" title="Rename game">Rename</button>
-          ${me.owner ? `<button class="btn-secondary g-resetv" data-id="${esc(g.id)}" title="Reset visit count">Reset visits</button>
-          <button class="btn-danger g-del" data-id="${esc(g.id)}" title="Permanently delete">Delete</button>` : ''}
         </div>
       </div>`).join('') || '<p class="muted">No games found.</p>'}</div>
     </section>
@@ -84,30 +73,7 @@ export async function adminPage(D, q = '', gq = '') {
               ? `<button class="btn-primary ban-revoke" data-name="${esc(u.name)}" title="Unban this user">Unban</button><span class="banned-tag" title="${esc(u.banReason || 'Banned')}">🚫 BANNED${u.bannedUntil ? ' until ' + new Date(u.bannedUntil).toLocaleDateString() : ''}</span>`
               : `<button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban this user">Ban</button>`}
           </span>
-          ${me.owner ? `<span class="admin-inline">
-            ${u.owner ? '<span class="muted small">Owner</span>' : u.admin
-              ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
-              : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
-            ${!u.owner && u.name.toLowerCase() !== 'fun' ? `<button class="btn-primary owner-grant" data-name="${esc(u.name)}" title="Make them an owner (with AI access)">Make Owner</button>` : ''}
-            ${u.owner && u.name.toLowerCase() !== 'fun' && !u.envAdmin ? `<button class="btn-secondary owner-revoke" data-name="${esc(u.name)}" title="Remove owner">Remove Owner</button>` : ''}
-          </span>` : (u.admin ? '<span class="muted small">Admin</span>' : '')}
         </div>
-        ${me.owner ? `<div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
-          <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Take FunTix">Take FunTix</button></span>
-          <button class="btn-secondary mod-toggle" data-name="${esc(u.name)}" data-on="${u.role === 'moderator' ? '0' : '1'}" title="Toggle moderator">${u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}</button>
-          ${u.funpanel ? `<button class="btn-secondary funpanel-toggle" data-name="${esc(u.name)}" data-on="0" title="Take back their FunPanel">Revoke FunPanel</button>` : (u.admin || u.owner || u.role === 'moderator' ? '' : `<button class="btn-primary funpanel-toggle" data-name="${esc(u.name)}" data-on="1" title="Give them the in-game FunPanel">🎁 Gift FunPanel</button>`)}
-          <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove item">Remove Item</button></span>
-          <button class="btn-secondary inv-view" data-name="${esc(u.name)}" title="See everything they own">View Items</button>
-          <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle Club">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
-          <button class="btn-secondary pw-reset" data-name="${esc(u.name)}" title="Temp password">Reset Password</button>
-          <button class="btn-secondary rename-btn" data-name="${esc(u.name)}" title="Rename user">Rename</button>
-          <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar">Reset Avatar</button>
-          <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Unmute">Unmute</button>
-          <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="System DM">System DM</button>
-          <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete games">Wipe Games</button>
-          <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Clear friends">Clear Friends</button>
-          <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Clear badges">Clear Badges</button>
-        </div>` : ''}
       </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
     app.querySelector('form.admin-search:not(.game-search)').onsubmit = e => { e.preventDefault(); adminPage(D, e.target.q.value.trim(), gq); };
     app.querySelector('form.game-search').onsubmit = e => { e.preventDefault(); adminPage(D, q, e.target.gq.value.trim()); };
@@ -123,8 +89,6 @@ export async function adminPage(D, q = '', gq = '') {
       const v = prompt('Rename game to:');
       if (v && v.trim()) gcmd(b.dataset.id, 'rename', { name: v.trim() });
     });
-    app.querySelectorAll('.g-resetv').forEach(b => b.onclick = () => { if (confirm('Reset visit count to 0?')) gcmd(b.dataset.id, 'reset_visits'); });
-    app.querySelectorAll('.g-del').forEach(b => b.onclick = () => { if (confirm('PERMANENTLY delete this game? This cannot be undone.')) gcmd(b.dataset.id, 'delete'); });
     const cmd = async (name, command, extra = {}) => {
       try {
         const r = await api('POST', '/api/admin/users/' + encodeURIComponent(name) + '/command', { command, ...extra });
@@ -133,55 +97,33 @@ export async function adminPage(D, q = '', gq = '') {
     };
     app.querySelectorAll('.club-toggle').forEach(b => b.onclick = async () => {
       const on = b.dataset.on === '1';
-      try {
-        await api('POST', '/api/admin/club/' + encodeURIComponent(b.dataset.name), { on });
-        toast(on ? `Gave FriendClub to ${b.dataset.name}` : `Removed FriendClub from ${b.dataset.name}`); adminPage(D, q, gq);
-      } catch (e) { toast(e.message, true); }
+      try { const r = await api('POST', '/api/admin/club/' + encodeURIComponent(b.dataset.name), { on }); toast(on ? `Gave FriendClub to ${b.dataset.name}` : `Removed FriendClub from ${b.dataset.name}`); adminPage(D, q, gq); }
+      catch (e) { toast(e.message, true); }
     });
     app.querySelectorAll('.tix-give').forEach(b => b.onclick = () => {
       const inp = app.querySelector(`.tix-amt[data-name="${CSS.escape(b.dataset.name)}"]`);
-      const amount = Math.max(1, Math.min(10000, Math.floor(Number(inp?.value) || 100)));
-      cmd(b.dataset.name, 'grant_tix', { amount });
+      cmd(b.dataset.name, 'grant_tix', { amount: Math.max(1, Math.floor(Number(inp?.value) || 100)) });
     });
     app.querySelectorAll('.items-give').forEach(b => b.onclick = () => cmd(b.dataset.name, 'give_all_items'));
     app.querySelectorAll('.daily-reset').forEach(b => b.onclick = () => cmd(b.dataset.name, 'reset_daily'));
-    let badgeImageData = '';
-    const bcFile = app.querySelector('.badge-file');
-    const bcPreview = app.querySelector('.badge-preview');
-    if (bcFile) bcFile.onchange = () => {
-      const f = bcFile.files[0];
-      if (!f) return;
-      const img = new Image();
-      img.onload = () => {
-        const max = 128;
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const c = document.createElement('canvas');
-        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        badgeImageData = c.toDataURL('image/png');
-        bcPreview.src = badgeImageData; bcPreview.style.display = '';
-        URL.revokeObjectURL(img.src);
-      };
-      img.src = URL.createObjectURL(f);
-    };
-    const bcBtn = app.querySelector('.badge-create');
-    if (bcBtn) bcBtn.onclick = async () => {
-      const name = app.querySelector('.badge-name').value.trim();
-      const icon = app.querySelector('.badge-icon').value.trim() || '🏅';
-      const color = app.querySelector('.badge-color').value;
-      const desc = app.querySelector('.badge-desc').value.trim();
-      if (!name) { toast('Enter a badge name', true); return; }
+    app.querySelectorAll('.badge-create').forEach(b => b.onclick = async () => {
+      const name = app.querySelector('.badge-name')?.value.trim();
+      const icon = app.querySelector('.badge-icon')?.value.trim();
+      const color = app.querySelector('.badge-color')?.value;
+      const desc = app.querySelector('.badge-desc')?.value.trim();
+      const file = app.querySelector('.badge-file')?.files?.[0];
+      if (!name) { toast('Badge needs a name', true); return; }
       try {
-        await api('POST', '/api/admin/badges', { name, icon, color, desc, image: badgeImageData });
+        let image = '';
+        if (file) image = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+        await api('POST', '/api/admin/badges', { name, icon, color, desc, image });
         toast('Badge created'); await loadBadgeDefs(); adminPage(D, q, gq);
       } catch (e) { toast(e.message, true); }
-    };
+    });
     app.querySelectorAll('.badge-delete').forEach(b => b.onclick = async () => {
-      if (!confirm('Delete this badge? It will be removed from all players.')) return;
-      try {
-        await api('DELETE', '/api/admin/badges/' + encodeURIComponent(b.dataset.id));
-        toast('Badge deleted'); await loadBadgeDefs(); adminPage(D, q, gq);
-      } catch (e) { toast(e.message, true); }
+      if (!confirm('Delete this badge?')) return;
+      try { await api('DELETE', '/api/admin/badges/' + encodeURIComponent(b.dataset.id)); toast('Badge deleted'); await loadBadgeDefs(); adminPage(D, q, gq); }
+      catch (e) { toast(e.message, true); }
     });
     app.querySelectorAll('.badge-grant').forEach(b => b.onclick = () => {
       const sel = app.querySelector(`.badge-sel[data-name="${CSS.escape(b.dataset.name)}"]`);
@@ -209,6 +151,89 @@ export async function adminPage(D, q = '', gq = '') {
       if (!confirm(`Unban ${b.dataset.name}?`)) return;
       cmd(b.dataset.name, 'unban', {});
     });
+  });
+}
+
+export async function ownerPage(D, q = '') {
+  const { api, mount, esc, avatarImgTag, toast, tix, CLUB, ADMIN } = D;
+  const me = D.me;
+  if (!me.owner) { location.hash = '#/home'; return; }
+  const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
+  let games = [], gamesError = '';
+  try { games = await api('GET', '/api/admin/games'); }
+  catch (e) { gamesError = e.message || 'Could not load games'; }
+  const status = u => u.owner ? 'Owner' : u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
+  mount('owner', `<h1>👑 Owner Panel</h1>
+    <p class="muted">Owner-only tools. For everyday admin work (badges, FunTix, bans) use the <a href="#/admin">Admin Panel</a>.</p>
+    <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
+    <section class="admin-section owner-tools"><h3>📢 Site Tools <span class="muted small">site-wide</span></h3>
+      <div class="owner-grid">
+        <span class="admin-inline"><input class="announce-text" placeholder="Broadcast announcement..." maxlength="200" style="min-width:220px"><button class="btn-primary announce-send">📢 Broadcast</button><button class="btn-secondary announce-clear">Clear</button></span>
+        <span class="admin-inline"><button class="btn-secondary maint-toggle">🔧 Maintenance: OFF</button></span>
+        <span class="admin-inline"><button class="btn-danger kick-all">Kick all players</button></span>
+        <span class="admin-inline"><input type="number" class="rain-amt" value="50" min="1" max="1000" title="FunTix per online player"><button class="btn-primary funtix-rain">🌧️ FunTix Rain</button></span>
+      </div>
+      <div class="site-state muted small"></div>
+    </section>
+    <section class="admin-section"><h3>🎮 Games <span class="muted small">danger zone</span></h3>
+      ${gamesError ? `<p style="color:#ff6b6b">⚠️ Games list unavailable: ${esc(gamesError)}</p>` : ''}
+      <div class="lbp">${games.map(g => `
+      <div class="lbp-row admin-row-wrap">
+        <a class="lbp-name" href="#/play/${encodeURIComponent(g.id)}">${esc(g.name)}</a>
+        ${g.featured ? '<span class="feat-tag">⭐ FEATURED</span>' : ''}${g.unpublished ? '<span class="unpub-tag">HIDDEN</span>' : ''}
+        <span class="admin-status">by ${esc(g.creator)} &middot; 👁 ${(g.visits ?? 0).toLocaleString()}</span>
+        <div class="admin-controls">
+          <button class="btn-secondary g-resetv" data-id="${esc(g.id)}" title="Reset visit count">Reset visits</button>
+          <button class="btn-danger g-del" data-id="${esc(g.id)}" title="Permanently delete">Delete</button>
+        </div>
+      </div>`).join('') || '<p class="muted">No games found.</p>'}</div>
+    </section>
+    <div class="lbp">${users.map(u => `
+      <div class="lbp-row admin-row-wrap">
+        ${avatarImgTag(u.avatar)}<a class="lbp-name" href="#/users/${encodeURIComponent(u.name)}">${u.club ? CLUB : ''}${esc(u.name)}${u.admin ? ADMIN : ''}</a>
+        <span class="role-tag role-${u.role || 'player'}">${esc((u.role || 'player').toUpperCase())}</span>
+        <span class="admin-status">${status(u)} &middot; ${tix} ${(u.funtix ?? 0).toLocaleString()}</span>
+        <div class="admin-controls">
+          <span class="admin-inline">
+            ${u.owner ? '<span class="muted small">Owner</span>' : u.admin
+              ? `<button class="btn-secondary admin-revoke" data-name="${esc(u.name)}" title="Remove admin">Remove Admin</button>`
+              : `<button class="btn-danger admin-grant" data-name="${esc(u.name)}" title="Grant full admin powers">Make Admin</button>`}
+            ${!u.owner && u.name.toLowerCase() !== 'fun' ? `<button class="btn-primary owner-grant" data-name="${esc(u.name)}" title="Make them an owner (with AI access)">Make Owner</button>` : ''}
+            ${u.owner && u.name.toLowerCase() !== 'fun' && !u.envAdmin ? `<button class="btn-secondary owner-revoke" data-name="${esc(u.name)}" title="Remove owner">Remove Owner</button>` : ''}
+          </span>
+        </div>
+        <div class="admin-controls owner-controls"><span class="owner-label">👑 Owner</span>
+          <span class="admin-inline"><input type="number" class="tix-take-amt" data-name="${esc(u.name)}" value="100" min="1" title="FunTix amount"><button class="btn-secondary tix-take" data-name="${esc(u.name)}" title="Take FunTix">Take FunTix</button></span>
+          <button class="btn-secondary mod-toggle" data-name="${esc(u.name)}" data-on="${u.role === 'moderator' ? '0' : '1'}" title="Toggle moderator">${u.role === 'moderator' ? 'Remove Mod' : 'Make Mod'}</button>
+          ${u.funpanel ? `<button class="btn-secondary funpanel-toggle" data-name="${esc(u.name)}" data-on="0" title="Take back their FunPanel">Revoke FunPanel</button>` : (u.admin || u.owner || u.role === 'moderator' ? '' : `<button class="btn-primary funpanel-toggle" data-name="${esc(u.name)}" data-on="1" title="Give them the in-game FunPanel">🎁 Gift FunPanel</button>`)}
+          <span class="admin-inline"><input class="item-id" data-name="${esc(u.name)}" placeholder="item id" title="Catalog item id"><button class="btn-secondary item-grant" data-name="${esc(u.name)}" title="Give item">Grant Item</button><button class="btn-secondary item-revoke" data-name="${esc(u.name)}" title="Remove item">Remove Item</button></span>
+          <button class="btn-secondary inv-view" data-name="${esc(u.name)}" title="See everything they own">View Items</button>
+          <button class="btn-secondary club2-toggle" data-name="${esc(u.name)}" data-on="${u.clubForever ? '0' : '1'}" title="Toggle Club">${u.clubForever ? 'Revoke Club' : 'Give Club'}</button>
+          <button class="btn-secondary pw-reset" data-name="${esc(u.name)}" title="Temp password">Reset Password</button>
+          <button class="btn-secondary rename-btn" data-name="${esc(u.name)}" title="Rename user">Rename</button>
+          <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar">Reset Avatar</button>
+          <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Unmute">Unmute</button>
+          <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="System DM">System DM</button>
+          <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete games">Wipe Games</button>
+          <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Clear friends">Clear Friends</button>
+          <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Clear badges">Clear Badges</button>
+        </div>
+      </div>`).join('') || '<p class="muted">No players found.</p>'}</div>`, () => {
+    app.querySelector('form.admin-search').onsubmit = e => { e.preventDefault(); ownerPage(D, e.target.q.value.trim()); };
+    const gcmd = async (id, command, extra = {}) => {
+      try {
+        const r = await api('POST', '/api/admin/games/' + encodeURIComponent(id) + '/command', { command, ...extra });
+        toast(r.message || 'Done'); ownerPage(D, q);
+      } catch (e) { toast(e.message, true); }
+    };
+    app.querySelectorAll('.g-resetv').forEach(b => b.onclick = () => { if (confirm('Reset visit count to 0?')) gcmd(b.dataset.id, 'reset_visits'); });
+    app.querySelectorAll('.g-del').forEach(b => b.onclick = () => { if (confirm('PERMANENTLY delete this game? This cannot be undone.')) gcmd(b.dataset.id, 'delete'); });
+    const cmd = async (name, command, extra = {}) => {
+      try {
+        const r = await api('POST', '/api/admin/users/' + encodeURIComponent(name) + '/command', { command, ...extra });
+        toast(r.message || 'Done'); ownerPage(D, q);
+      } catch (e) { toast(e.message, true); }
+    };
     app.querySelectorAll('.admin-grant').forEach(b => b.onclick = () => {
       if (!confirm(`Grant FULL ADMIN to ${b.dataset.name}? They will have complete control.`)) return;
       if (!confirm(`Are you REALLY sure? ${b.dataset.name} will be able to ban, grant admin, and more.`)) return;
