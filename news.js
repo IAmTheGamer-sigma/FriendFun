@@ -5,11 +5,21 @@ export function createNews(D) {
 
   app.post('/api/owner/news', auth, (req, res) => {
     if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
-    const video = String(req.body?.video || '').trim().slice(0, 500);
-    if (!/^https?:\/\/.+\.(mp4|webm|mov)(\?.*)?$/i.test(video)) return res.status(400).json({ error: 'Video URL must end in .mp4, .webm or .mov' });
+    const type = req.body?.type === 'live' ? 'live' : 'video';
     const title = String(req.body?.title || 'Breaking News').trim().slice(0, 80) || 'Breaking News';
-    newsBC = { video, title, at: Date.now(), by: req.user.name };
-    for (const room of rooms.values()) broadcast(room, { t: 'news', video, title });
+    if (type === 'live') {
+      const script = String(req.body?.script || '').trim().slice(0, 500);
+      if (script.length < 5) return res.status(400).json({ error: 'Script too short' });
+      const voice = String(req.body?.voice || '').slice(0, 100);
+      const anchor = req.body?.anchor === 'bot' ? 'bot' : 'me';
+      const avatar = anchor === 'me' ? (req.user.avatar || null) : null;
+      newsBC = { type, title, script, voice, anchor, avatar, at: Date.now(), by: req.user.name };
+    } else {
+      const video = String(req.body?.video || '').trim().slice(0, 500);
+      if (!/^https?:\/\/.+\.(mp4|webm|mov)(\?.*)?$/i.test(video)) return res.status(400).json({ error: 'Video URL must end in .mp4, .webm or .mov' });
+      newsBC = { type, title, video, at: Date.now(), by: req.user.name };
+    }
+    for (const room of rooms.values()) broadcast(room, { t: 'news', ...newsBC });
     res.json({ ok: true });
   });
   app.get('/api/news', auth, (req, res) => res.json({ broadcast: newsBC }));
