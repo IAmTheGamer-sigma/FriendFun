@@ -52,6 +52,14 @@ export const CATALOG = [
   { id: 'shirt_vampcape', type: 'shirt', name: 'Vampire Cape', price: 350, color: '#7b1e1e' },
   { id: 'shirt_mummy', type: 'shirt', name: 'Mummy Wraps', price: 300, color: '#e8e0c8' },
   { id: 'pet_bat', type: 'pet', name: 'Bat Buddy', price: 300, emoji: '🦇', color: '#5d4037' },
+  { id: 'hat_scarecrow', type: 'hat', name: 'Scarecrow Hat', price: 275, color: '#a67c00' },
+  { id: 'hat_devilhorns', type: 'hat', name: 'Devil Horns', price: 325, color: '#c62828' },
+  { id: 'face_zombie', type: 'face', name: 'Zombie Face', price: 200 },
+  { id: 'shirt_skeleton', type: 'shirt', name: 'Skeleton Suit', price: 450, color: '#212121' },
+  { id: 'shirt_pumpkin', type: 'shirt', name: 'Pumpkin Tee', price: 250, color: '#ef6c00' },
+  { id: 'pet_ghost', type: 'pet', name: 'Ghost Pal', price: 350, emoji: '👻', color: '#f5f5f5' },
+  { id: 'pet_spider', type: 'pet', name: 'Spider Friend', price: 350, emoji: '🕷️', color: '#212121' },
+  { id: 'gear_candybucket', type: 'gear', name: 'Candy Bucket', price: 400, emoji: '🪣', color: '#ff9800' },
   { id: 'gear_none', type: 'gear', name: 'No Gear', price: 0, free: true, emoji: '🚫' },
   { id: 'gear_sword', type: 'gear', name: 'Sword', price: 300, emoji: '🗡️', color: '#cfd8dc' },
   { id: 'gear_slingshot', type: 'gear', name: 'Slingshot', price: 400, emoji: '🎯', color: '#8d6e63' },
@@ -723,7 +731,7 @@ export const ITEM = Object.fromEntries(CATALOG.map(i => [i.id, i]));
 // UGC (player-created items): remixable templates per slot. A UGC item stores
 // { template, color } and renders with the template's geometry/texture.
 export const UGC_TEMPLATES = {
-  hat: ['hat_cap', 'hat_tophat', 'hat_crown', 'hat_beanie', 'hat_witch', 'hat_cowboy', 'hat_horns', 'hat_halo', 'hat_cone', 'hat_catears', 'hat_bearears', 'hat_foxears', 'hat_helm_knight', 'hat_headphones'],
+  hat: ['hat_cap', 'hat_tophat', 'hat_crown', 'hat_beanie', 'hat_witch', 'hat_cowboy', 'hat_horns', 'hat_halo', 'hat_cone', 'hat_catears', 'hat_bearears', 'hat_foxears', 'hat_helm_knight', 'hat_headphones', 'hat_scarecrow', 'hat_devilhorns'],
   shirt: ['shirt_star', 'shirt_heart', 'shirt_stripes', 'shirt_suit', 'shirt_vampcape', 'shirt_mummy'],
 };
 export const UGC_MAX_PRICE = 10000;
