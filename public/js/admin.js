@@ -155,7 +155,7 @@ export async function adminPage(D, q = '', gq = '') {
 }
 
 export async function ownerPage(D, q = '') {
-  const { api, mount, esc, avatarImgTag, toast, tix, CLUB, ADMIN } = D;
+  const { api, mount, esc, avatarImgTag, toast, tix, CLUB, ADMIN, ensureAvatar3d } = D;
   const me = D.me;
   if (!me.owner) { location.hash = '#/home'; return; }
   const users = await api('GET', '/api/admin/users?q=' + encodeURIComponent(q));
@@ -164,7 +164,7 @@ export async function ownerPage(D, q = '') {
   catch (e) { gamesError = e.message || 'Could not load games'; }
   const status = u => u.owner ? 'Owner' : u.admin ? 'Admin' : u.clubForever ? 'FriendClub (free)' : u.club ? `FriendClub (${Math.ceil((u.clubUntil - Date.now()) / 86400000)} days left)` : 'Not a member';
   mount('owner', `<h1>👑 Owner Panel</h1>
-    <p class="muted">Owner-only tools. For everyday admin work (badges, FunTix, bans) use the <a href="#/admin">Admin Panel</a>.</p>
+    <p class="muted">Owner-only tools.</p>
     <p><a class="btn-secondary" href="https://muse.ai" target="_blank" rel="noopener">🤖 Muse AI</a></p>
     <form class="admin-search"><input name="q" placeholder="Search players" value="${esc(q)}"><button class="btn-primary">Search</button></form>
     <section class="admin-section owner-tools"><h3>📢 Site Tools <span class="muted small">site-wide</span></h3>
@@ -176,11 +176,19 @@ export async function ownerPage(D, q = '') {
       </div>
       <div class="site-state muted small"></div>
     </section>
-    <section class="admin-section owner-tools"><h3>📡 News Broadcast <span class="muted small">glitch + video on everyone's screen</span></h3>
-      <div class="owner-grid">
-        <span class="admin-inline"><input class="news-title" placeholder="Headline..." maxlength="80" style="min-width:160px"><input class="news-video" placeholder="Video URL (.mp4)..." style="min-width:220px"><button class="btn-primary news-send">📡 Broadcast News</button><button class="btn-secondary news-clear">Clear</button></span>
+    <section class="admin-section owner-tools"><h3>📡 News Maker <span class="muted small">AI anchor broadcast</span></h3>
+      <div class="news-maker">
+        <div class="nm-preview"><canvas class="nm-canvas" width="300" height="300"></canvas><div class="muted small">Anchor preview</div></div>
+        <div class="nm-panel">
+          <label>Headline<input class="nm-title" maxlength="80" placeholder="Breaking News..."></label>
+          <label>Script<textarea class="nm-script" rows="4" maxlength="500" placeholder="Hello Funtopia! This is your news anchor..."></textarea></label>
+          <label>AI Voice<select class="nm-voice"></select></label>
+          <label>Anchor<select class="nm-anchor"><option value="me">My avatar</option><option value="bot">Newsbot</option></select></label>
+          <div class="nm-actions"><button class="btn-secondary nm-preview-btn">▶ Preview</button><button class="btn-primary nm-broadcast">📡 Broadcast Live</button></div>
+          <div class="nm-status"></div>
+        </div>
       </div>
-      <p class="muted small">Upload your video to Supabase Storage (like the pumpkin), paste the public .mp4 URL. Everyone's screen glitches, then plays it fullscreen.</p>
+      <p class="muted small">Or broadcast a video file: <span class="admin-inline"><input class="news-video" placeholder="Video URL (.mp4)..." style="min-width:200px"><button class="btn-secondary news-send">📡 Video</button><button class="btn-secondary news-clear">Clear</button></span></p>
     </section>
     <section class="admin-section"><h3>🎮 Games <span class="muted small">danger zone</span></h3>
       ${gamesError ? `<p style="color:#ff6b6b">⚠️ Games list unavailable: ${esc(gamesError)}</p>` : ''}
@@ -336,16 +344,84 @@ export async function ownerPage(D, q = '') {
     };
     const announceClear = app.querySelector('.announce-clear');
     if (announceClear) announceClear.onclick = () => siteCmd('clear_announce');
+    // 📡 News Maker wiring
+    const nmVoice = app.querySelector('.nm-voice');
+    const loadNmVoices = () => {
+      try {
+        const vs = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+        nmVoice.innerHTML = vs.map(v => `<option value="${esc(v.name)}">${esc(v.name)} (${v.lang})</option>`).join('') || '<option>Default</option>';
+      } catch {}
+    };
+    if (nmVoice) { loadNmVoices(); try { speechSynthesis.onvoiceschanged = loadNmVoices; } catch {} }
+    // 3D anchor preview
+    const nmCanvas = app.querySelector('.nm-canvas');
+    const nmAnchorSel = app.querySelector('.nm-anchor');
+    let nmAlive = true;
+    const buildNmPreview = async () => {
+      if (!nmCanvas || !nmAlive) return;
+      try {
+        const A3 = await ensureAvatar3d().catch(() => null);
+        if (!A3 || !nmAlive) return;
+        const av = nmAnchorSel?.value === 'bot' ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' } : me.avatar;
+        const { THREE } = await import('./three-util.js?v=ac3e6f2b');
+        const r = new THREE.WebGLRenderer({ canvas: nmCanvas, alpha: true, antialias: true });
+        const sc = new THREE.Scene();
+        const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100); cam.position.set(0, 4, 14); cam.lookAt(0, 3, 0);
+        sc.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const ch = A3.buildCharacter(av); sc.add(ch);
+        const tick = () => { if (!nmAlive) return; requestAnimationFrame(tick); ch.rotation.y = Math.sin(Date.now() / 2000) * 0.2; r.render(sc, cam); };
+        tick();
+      } catch {}
+    };
+    buildNmPreview();
+    if (nmAnchorSel) nmAnchorSel.onchange = () => { nmAlive = false; setTimeout(() => { nmAlive = true; buildNmPreview(); }, 50); };
+    const nmPreviewBtn = app.querySelector('.nm-preview-btn');
+    if (nmPreviewBtn) nmPreviewBtn.onclick = () => {
+      const t = app.querySelector('.nm-script')?.value.trim();
+      if (!t) { toast('Write a script first', true); return; }
+      try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        const v = speechSynthesis.getVoices().find(v => v.name === nmVoice.value);
+        if (v) u.voice = v;
+        speechSynthesis.speak(u); toast('🔊 Previewing...');
+      } catch { toast('Voice not available', true); }
+    };
+    const nmStatus = app.querySelector('.nm-status');
+    const refreshNmStatus = async () => {
+      if (!nmStatus || !document.body.contains(nmStatus)) return;
+      try {
+        const r = await api('GET', '/api/news');
+        if (r.broadcast) {
+          nmStatus.innerHTML = `<p>📡 <b>Live:</b> ${esc(r.broadcast.title)} <button class="btn-secondary btn-sm nm-replay">👁 View</button></p>`;
+          nmStatus.querySelector('.nm-replay').onclick = async () => {
+            const m = await import('./news-player.js?v=227ee6a3');
+            m.showNewsBroadcast({ esc, me, ensureAvatar3d }, r.broadcast);
+          };
+        } else nmStatus.innerHTML = '<p class="muted small">No broadcast live.</p>';
+      } catch {}
+    };
+    refreshNmStatus();
+    const nmBroadcast = app.querySelector('.nm-broadcast');
+    if (nmBroadcast) nmBroadcast.onclick = async () => {
+      const title = app.querySelector('.nm-title')?.value.trim() || 'Breaking News';
+      const script = app.querySelector('.nm-script')?.value.trim();
+      if (!script) { toast('Write a script first', true); return; }
+      if (!confirm('Broadcast this to EVERYONE online?')) return;
+      try {
+        await api('POST', '/api/owner/news', { type: 'live', title, script, voice: nmVoice?.value, anchor: nmAnchorSel?.value });
+        toast('📡 News broadcast sent!'); refreshNmStatus();
+      } catch (e) { toast(e.message, true); }
+    };
     const newsSend = app.querySelector('.news-send');
     if (newsSend) newsSend.onclick = async () => {
-      const title = app.querySelector('.news-title')?.value.trim();
       const video = app.querySelector('.news-video')?.value.trim();
       if (!video) { toast('Paste a video URL first', true); return; }
-      try { await api('POST', '/api/owner/news', { title, video }); toast('📡 News broadcast sent!'); }
+      try { await api('POST', '/api/owner/news', { video }); toast('📡 Video broadcast sent!'); refreshNmStatus(); }
       catch (e) { toast(e.message, true); }
     };
     const newsClear = app.querySelector('.news-clear');
-    if (newsClear) newsClear.onclick = async () => { try { await api('POST', '/api/owner/news/clear'); toast('News cleared'); } catch (e) { toast(e.message, true); } };
+    if (newsClear) newsClear.onclick = async () => { try { await api('POST', '/api/owner/news/clear'); toast('News cleared'); refreshNmStatus(); } catch (e) { toast(e.message, true); } };
     const maintBtn = app.querySelector('.maint-toggle');
     if (maintBtn) maintBtn.onclick = async () => {
       try {
