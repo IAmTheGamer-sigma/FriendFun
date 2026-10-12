@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=1046eb00';
+import { NEWSBOY_AVATAR, buildNewsStudio } from './news-studio.js?v=9285cfef';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=d76f1cb9';
 
@@ -499,38 +500,48 @@ export class Game {
             <div class="news-banner">📡 FUNTOPIA NEWS LIVE</div>
             <div class="news-live-stage"><canvas class="news-anchor-canvas" width="400" height="400"></canvas></div>
             <div class="news-lower3rd"><b>${esc(b.title)}</b><div class="news-script">${esc(b.script)}</div></div>
-            <button class="news-close">✕</button>
           </div>`;
-        ov.querySelector('.news-close').onclick = close;
-        const stage = ov.querySelector('.news-live-stage');
+        let talking = true, spoken = false;
         const doSpeak = () => {
+          if (spoken) return; spoken = true;
           try {
             speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(b.script);
-            const v = speechSynthesis.getVoices().find(v => v.name === b.voice);
+            const vs = speechSynthesis.getVoices();
+            const v = vs.find(v => v.name === b.voice) || vs.find(v => v.lang.startsWith('en'));
             if (v) u.voice = v;
-            speechSynthesis.speak(u); return true;
-          } catch { return false; }
+            u.onend = () => { talking = false; setTimeout(() => { if (ov.isConnected) close(); }, 1500); };
+            speechSynthesis.speak(u);
+          } catch {}
         };
-        const listenBtn = document.createElement('button');
-        listenBtn.className = 'news-listen';
-        listenBtn.textContent = '🔊 Tap to hear the anchor';
-        listenBtn.onclick = () => { if (doSpeak()) listenBtn.remove(); };
-        stage.appendChild(listenBtn);
-        setTimeout(() => { if (ov.isConnected) doSpeak(); }, 500);
+        const unlockFn = () => doSpeak();
+        document.addEventListener('pointerdown', unlockFn, { once: true });
+        const origClose = close;
+        close = () => { document.removeEventListener('pointerdown', unlockFn); origClose(); };
         try {
           const canvas = ov.querySelector('.news-anchor-canvas');
-          const av = b.anchor === 'bot' ? { skin: '#c0c0c0', shirt: '#1a1a2e', pants: '#0f0f1a', hat: 'hat_tophat' } : (b.avatar || this.me.avatar);
+          const av = b.anchor === 'bot' ? NEWSBOY_AVATAR : (b.avatar || this.me.avatar || NEWSBOY_AVATAR);
           const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+          r.setSize(420, 420);
           const sc = new THREE.Scene();
-          const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100); cam.position.set(0, 4.2, 15); cam.lookAt(0, 3, 0);
-          sc.add(new THREE.AmbientLight(0xffffff, 1.3));
-          const ch = buildCharacter(av); sc.add(ch);
-          let talking = true;
-          const tick = () => { if (!ov.isConnected) return; requestAnimationFrame(tick); const t = Date.now(); ch.rotation.y = Math.sin(t / 2500) * 0.15; if (talking) ch.position.y = Math.abs(Math.sin(t / 180)) * 0.12; r.render(sc, cam); };
-          tick();
-
+          const studio = buildNewsStudio(THREE); sc.add(studio.group);
+          const ch = buildCharacter(av); ch.position.set(0, 0, 0); sc.add(ch);
+          const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+          cam.position.set(0, 5.2, 13); cam.lookAt(0, 3.5, 0);
+          sc.add(new THREE.AmbientLight(0xffffff, 0.9));
+          const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(5, 10, 8); sc.add(key);
+          let last = performance.now();
+          const tick = (now) => {
+            if (!ov.isConnected) return; requestAnimationFrame(tick);
+            const dt = Math.min(0.05, (now - last) / 1000); last = now;
+            const t = now / 1000; studio.update(dt);
+            ch.rotation.y = Math.sin(t * 0.6) * 0.12;
+            if (talking) ch.position.y = Math.abs(Math.sin(t * 9)) * 0.1;
+            r.render(sc, cam);
+          };
+          requestAnimationFrame(tick);
         } catch {}
+        doSpeak();
       } else if (b.video) {
         ov.innerHTML = `
           <div class="news-frame">
@@ -540,9 +551,7 @@ export class Game {
               <button class="news-unmute">🔊 Tap for sound</button>
             </div>
             <div class="news-lower3rd"><b>${esc(b.title)}</b></div>
-            <button class="news-close">✕</button>
           </div>`;
-        ov.querySelector('.news-close').onclick = close;
         const v = ov.querySelector('video');
         const unmute = ov.querySelector('.news-unmute');
         unmute.onclick = () => { v.muted = false; v.play().catch(() => {}); unmute.remove(); };
