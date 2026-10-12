@@ -120,6 +120,18 @@ function shirtTexture(id) {
 
 function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.75 }); }
 function box(w, h, d, color) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color)); m.castShadow = true; m.receiveShadow = true; return m; }
+// UGC custom 3D models: { boxes: [[x,y,z,w,h,d,color,rotZ?], ...] }
+function buildUgcModel(model) {
+  const g = new THREE.Group();
+  for (const b of (model && model.boxes) || []) {
+    if (!Array.isArray(b) || b.length < 7) continue;
+    const m = box(b[3], b[4], b[5], b[6]);
+    m.position.set(b[0], b[1], b[2]);
+    if (typeof b[7] === 'number') m.rotation.z = b[7];
+    g.add(m);
+  }
+  return g;
+}
 
 function hatStyle(id) {
   if (id.startsWith('ugc_')) { const u = ITEM[id]; return u && u.template ? hatStyle(u.template) : 'cap'; }
@@ -332,7 +344,9 @@ export function buildCharacter(avatar, opts = {}) {
   const root = new THREE.Group();
   const torsoW = isBugs ? 1.8 : 2;
   const torso = box(torsoW, 2, 1, suit ? '#263238' : C.torso); torso.position.y = 3; root.add(torso);
-  if (avatar.shirt && avatar.shirt !== 'shirt_none') {
+  const shirtIt = ITEM[avatar.shirt];
+  if (shirtIt && shirtIt.ugc && shirtIt.model) { torso.add(buildUgcModel(shirtIt.model)); }
+  else if (avatar.shirt && avatar.shirt !== 'shirt_none') {
     const d = new THREE.Mesh(new THREE.PlaneGeometry(torsoW, 2), new THREE.MeshStandardMaterial({ map: shirtTexture(avatar.shirt), transparent: true, roughness: 0.8 }));
     d.position.z = 0.501; torso.add(d);
   }
@@ -347,7 +361,9 @@ export function buildCharacter(avatar, opts = {}) {
       : new THREE.Mesh(new THREE.PlaneGeometry(H.fw, H.fw), faceMat);
     face.position.set(0, H.h / 2, H.round ? 0 : H.fz); headPivot.add(face);
   }
-  const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); }
+  const hatIt = ITEM[avatar.hat];
+  if (hatIt && hatIt.ugc && hatIt.model) { const hg = buildUgcModel(hatIt.model); hg.position.y = H.h; hg.scale.setScalar(H.hs || 1); headPivot.add(hg); }
+  else { const hat = buildHat(avatar.hat); if (hat) { hat.position.y = H.h; hat.scale.setScalar(H.hs || 1); headPivot.add(hat); } }
   const limb = (x, y, color, w = 1) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = box(w, 2, w, color); m.position.y = -1; p.add(m); root.add(p); return p; };
   let larm, rarm, lleg, rleg;
   if (isBugs) {
@@ -391,10 +407,11 @@ export function buildCharacter(avatar, opts = {}) {
     root.add(pet);
     root.userData.pet = pet;
   }
-  const gearSpec = opts.gear === false ? null : GEAR_MODELS[avatar.gear];
-  if (gearSpec) {
+  const gearIt = ITEM[avatar.gear];
+  const gearBoxes = opts.gear === false ? null : ((GEAR_MODELS[avatar.gear] && GEAR_MODELS[avatar.gear].boxes) || (gearIt && gearIt.ugc && gearIt.model && gearIt.model.boxes));
+  if (gearBoxes) {
     const gear = new THREE.Group();
-    for (const b of gearSpec.boxes) {
+    for (const b of gearBoxes) {
       const m = box(b[3], b[4], b[5], b[6]);
       m.position.set(b[0], b[1], b[2]);
       if (b[7]) m.rotation.z = b[7];
