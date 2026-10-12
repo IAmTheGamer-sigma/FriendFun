@@ -656,3 +656,8 @@ a.set-row.set-link:last-child { border-bottom: 0; }
 .news-live-stage { background: radial-gradient(circle at 50% 25%, #3a2a6e, #0a0a18); border-radius: 12px; display: grid; place-items: center; padding: 10px; }
 .news-anchor-canvas { width: min(400px, 80vw); height: min(400px, 80vw); }
 .news-script { font-weight: 400; font-size: 14px; color: var(--muted); margin-top: 6px; max-height: 80px; overflow-y: auto; }
+.news-video-intro { display: flex; align-items: center; gap: 18px; background: radial-gradient(circle at 30% 30%, #2a2a5e, #0a0a18); border-radius: 12px; padding: 16px; }
+.news-video-intro .news-anchor-canvas { width: 180px; height: 180px; flex: none; }
+.news-intro-text { font-size: 20px; }
+.news-video-wrap { position: relative; background: #000; border-radius: 12px; overflow: hidden; }
+.news-unmute { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--grad); border: 0; color: #fff; font-size: 20px; font-weight: 900; padding: 16px 28px; border-radius: 30px; box-shadow: var(--glow); }
