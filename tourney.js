@@ -1,12 +1,13 @@
 // Spooky Rivals tournament (server side). Wired into server.js via tourneyDeps.
 export const TOURNEY_GAME = 'g_spookyrivals';
 export const TOURNEY_ENDS = Date.UTC(2026, 9, 15, 3, 59, 0); // Wed Oct 14 2026, 11:59pm ET
-export const TOURNEY_KILLS = 5;
+export const RIVALS_ROUNDS = 5; // first to 5 rounds (real Rivals rules)
 export const TOURNEY_PRIZE = 'hat_pumpkin_champ';
 
 export function createTourney(D) {
-  const { app, auth, supabase, privateServers, notify, key, list, broadcast, send } = D;
-  const tourney = { queue: [], matches: new Map(), wins: new Map(), finalized: false, winner: null, tableOk: true };
+  const { app, auth, supabase, privateServers, rooms, notify, key, list, broadcast, send } = D;
+  const tourney = { queue: [], matches: new Map(), wins: new Map(), loadouts: new Map(), finalized: false, winner: null, tableOk: true };
+  const RIVALS_WEAPONS = ['rifle', 'smg', 'shotgun', 'sniper']; // primary pool (pistol is always secondary)
   function tourneyCode() {
     const ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
     let code; do { code = Array.from({ length: 6 }, () => ABC[Math.floor(Math.random() * ABC.length)]).join(''); } while (privateServers.has(code));
@@ -50,32 +51,52 @@ export function createTourney(D) {
     const tm = tcode && tourney.matches.get(tcode);
     return (tm && tm.state !== 'done') ? { tm, tcode } : null;
   }
-  // called on WS join — sends tourney info if this is a tournament match room
+  function roomFor(tm) {
+    return rooms.get(tm.code ? TOURNEY_GAME + ':' + tm.code : TOURNEY_GAME);
+  }
+  function startRound(tm) {
+    tm.state = 'round'; tm.round++;
+    const room = roomFor(tm);
+    if (room) broadcast(room, { t: 'rivalsRound', round: tm.round, rounds: tm.rounds, p1: tm.p1, p2: tm.p2 });
+  }
+  // called on WS join — sends rivals match info; starts round 1 when both are in
   function tourneyJoin(player, room, ws) {
     const found = matchOfRoom(room);
     if (!found) return;
     const { tm } = found;
     if (tm.p1 !== player.name && tm.p2 !== player.name) return;
     const opp = tm.p1 === player.name ? tm.p2 : tm.p1;
-    send(ws, { t: 'tourney', killsToWin: TOURNEY_KILLS, opponent: opp, scores: tm.scores });
+    const myLoadout = tourney.loadouts.get(key(player.name)) || { primary: 'rifle', secondary: 'pistol' };
+    send(ws, { t: 'rivals', opponent: opp, loadout: myLoadout, rounds: tm.rounds, round: tm.round, p1: tm.p1, p2: tm.p2, roundsToWin: RIVALS_ROUNDS });
+    // both in? start round 1
+    if (tm.state === 'waiting') {
+      const names = new Set([...room.players.values()].map(p => p.name));
+      if (names.has(tm.p1) && names.has(tm.p2)) startRound(tm);
+    }
   }
-  // called on { t: 'tourneyKill' }
-  function tourneyKill(player, room, victim) {
+  // called on { t: 'rivalsDeath', by } — victim reports elimination (Rivals rules)
+  function rivalsDeath(player, room, killer) {
     const found = matchOfRoom(room);
-    if (!found || typeof victim !== 'string') return;
+    if (!found || typeof killer !== 'string') return;
     const { tm, tcode } = found;
+    if (tm.state !== 'round') return;
     const opp = tm.p1 === player.name ? tm.p2 : tm.p2 === player.name ? tm.p1 : null;
-    if (!opp || victim !== opp) return;
+    if (!opp || killer !== opp) return;
     const now = Date.now();
-    if (now - (player.lastTourneyKill || 0) < 2000) return;
-    player.lastTourneyKill = now;
-    tm.state = 'live'; tm.scores[player.name]++;
-    broadcast(room, { t: 'tourneyScore', scores: tm.scores, killsToWin: TOURNEY_KILLS });
-    if (tm.scores[player.name] >= TOURNEY_KILLS) {
+    if (now - (tm.lastDeath || 0) < 2000) return;
+    tm.lastDeath = now;
+    tm.state = 'intermission'; tm.rounds[killer]++;
+    broadcast(room, { t: 'rivalsRoundEnd', winner: killer, rounds: tm.rounds, p1: tm.p1, p2: tm.p2, roundsToWin: RIVALS_ROUNDS });
+    if (tm.rounds[killer] >= RIVALS_ROUNDS) {
       tm.state = 'done';
-      broadcast(room, { t: 'tourneyEnd', winner: player.name, scores: tm.scores });
-      tourneyAddWin(player.name).catch(() => {});
-      setTimeout(() => tourney.matches.delete(tcode), 60000);
+      setTimeout(() => {
+        const r2 = roomFor(tm);
+        if (r2) broadcast(r2, { t: 'tourneyEnd', winner: killer, rounds: tm.rounds });
+        tourneyAddWin(killer).catch(() => {});
+        if (tcode) setTimeout(() => tourney.matches.delete(tcode), 60000);
+      }, 3500);
+    } else {
+      setTimeout(() => { if (tm.state === 'intermission') startRound(tm); }, 3500);
     }
   }
   // called on WS close — handles forfeit / cancel
@@ -86,9 +107,9 @@ export function createTourney(D) {
     if (tm.p1 !== player.name && tm.p2 !== player.name) return;
     const opp = tm.p1 === player.name ? tm.p2 : tm.p1;
     const oppIn = [...room.players.values()].some(p => p.name === opp && p.id !== player.id);
-    if (tm.state === 'live' && oppIn) {
-      tm.state = 'done'; tm.scores[opp] = Math.max(tm.scores[opp] || 0, TOURNEY_KILLS);
-      broadcast(room, { t: 'tourneyEnd', winner: opp, forfeit: true, scores: tm.scores });
+    if ((tm.state === 'round' || tm.state === 'intermission') && oppIn) {
+      tm.state = 'done'; tm.rounds[opp] = RIVALS_ROUNDS;
+      broadcast(room, { t: 'tourneyEnd', winner: opp, forfeit: true, rounds: tm.rounds });
       tourneyAddWin(opp).catch(() => {});
       setTimeout(() => tourney.matches.delete(tcode), 60000);
     } else if (tm.state === 'waiting') {
@@ -112,7 +133,7 @@ export function createTourney(D) {
     for (const m of tourney.matches.values())
       if (m.state !== 'done' && (m.p1 === req.user.name || m.p2 === req.user.name)) myMatch = { code: m.code };
     res.json({ endsAt: TOURNEY_ENDS, finalized: tourney.finalized, winner: tourney.winner,
-      board, killsToWin: TOURNEY_KILLS, prize: TOURNEY_PRIZE,
+      board, roundsToWin: RIVALS_ROUNDS, prize: TOURNEY_PRIZE,
       inQueue: tourney.queue.includes(req.user.name), myMatch });
   });
   app.post('/api/tourney/join', auth, async (req, res) => {
@@ -126,7 +147,7 @@ export function createTourney(D) {
       const p1 = tourney.queue.shift(), p2 = tourney.queue.shift();
       const code = tourneyCode();
       privateServers.set(code, { gameId: TOURNEY_GAME, owner: p1, created: Date.now() });
-      const match = { p1, p2, code, scores: { [p1]: 0, [p2]: 0 }, state: 'waiting', started: Date.now() };
+      const match = { p1, p2, code, rounds: { [p1]: 0, [p2]: 0 }, round: 0, state: 'waiting', started: Date.now() };
       tourney.matches.set(code, match);
       const link = `#/play/${TOURNEY_GAME}?server=${code}`;
       notify(p1, 'tourney', `🎃 Tournament match vs ${p2} — join now!`, link);
@@ -135,10 +156,18 @@ export function createTourney(D) {
     }
     return res.json({ queued: true });
   });
+  app.post('/api/tourney/loadout', auth, (req, res) => {
+    const primary = RIVALS_WEAPONS.includes(req.body?.primary) ? req.body.primary : 'rifle';
+    tourney.loadouts.set(key(req.user.name), { primary, secondary: 'pistol' });
+    res.json({ ok: true, primary, secondary: 'pistol' });
+  });
+  app.get('/api/tourney/loadout', auth, (req, res) => {
+    res.json(tourney.loadouts.get(key(req.user.name)) || { primary: 'rifle', secondary: 'pistol' });
+  });
   app.post('/api/tourney/leave', auth, (req, res) => {
     tourney.queue = tourney.queue.filter(n => n !== req.user.name);
     res.json({ ok: true });
   });
   tourneyLoad().then(() => console.log('Tourney wins loaded:', tourney.wins.size));
-  return { tourney, tourneyJoin, tourneyKill, tourneyLeave, tourneyFinalizeIfDue };
+  return { tourney, tourneyJoin, rivalsDeath, tourneyLeave, tourneyFinalizeIfDue };
 }
