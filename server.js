@@ -6,7 +6,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { templates, hwMansion, hwPumpkin, hwWitch, hwGhost, hwBase, shooterArena, shooterFort, shooterRooftop } from './public/js/worlds.js';
-import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES } from './public/js/catalog.js';
+import { ITEM, CATALOG, DEFAULT_AVATAR, ECON, BADGES, UGC_TEMPLATES, UGC_MAX_PRICE, UGC_CREATOR_CUT } from './public/js/catalog.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ADMINS = (process.env.FF_ADMINS || 'fun').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -30,6 +30,22 @@ async function loadCustomBadges() {
     (data || []).forEach(b => { CUSTOM_BADGES[b.id] = b; });
   } catch (e) { console.error('Failed to load custom badges:', e.message); }
 }
+// ---- UGC (player-created avatar items) ----
+let UGC_ITEMS = {}; // 'ugc_<id>' -> { id, type, name, price, color, template, creator, sales, ugc: true }
+let ugcTableOk = true;
+function ugcDef(row) {
+  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
+}
+async function loadUgcItems() {
+  try {
+    const { data, error } = await supabase.from('ugc_items').select('*').eq('status', 'approved');
+    if (error) throw error;
+    UGC_ITEMS = {};
+    (data || []).forEach(r => { UGC_ITEMS['ugc_' + r.id] = ugcDef(r); });
+    ugcTableOk = true;
+  } catch (e) { ugcTableOk = false; UGC_ITEMS = {}; console.error('UGC table missing or unreadable:', e.message); }
+}
+const itemDef = id => ITEM[id] || UGC_ITEMS[id];
 function badgeDefs() {
   const defs = {};
   for (const [id, b] of Object.entries(BADGES)) defs[id] = { id, name: b.name, desc: b.desc, color: b.color, path: b.path, custom: false };
@@ -335,7 +351,7 @@ app.put('/api/me/avatar', auth, async (req, res) => {
   const hex = /^#[0-9a-fA-F]{6}$/;
   const colors = {};
   for (const k of Object.keys(DEFAULT_AVATAR.colors)) colors[k] = hex.test(a.colors?.[k]) ? a.colors[k] : req.user.avatar.colors[k];
-  const pick = (slot) => (a[slot] && (a[slot] === slot + '_none' || req.user.inventory.includes(a[slot])) && ITEM[a[slot]]?.type === slot) ? a[slot] : req.user.avatar[slot];
+  const pick = (slot) => (a[slot] && (a[slot] === slot + '_none' || req.user.inventory.includes(a[slot])) && itemDef(a[slot])?.type === slot) ? a[slot] : req.user.avatar[slot];
   const avatar = { colors, hat: pick('hat'), face: pick('face'), shirt: pick('shirt'), head: pick('head') || DEFAULT_AVATAR.head, pet: pick('pet') || DEFAULT_AVATAR.pet, gear: pick('gear') || DEFAULT_AVATAR.gear, vehicle: pick('vehicle') || 'vehicle_none' };
   await supabase.from('users').update({ avatar }).eq('name', req.user.name);
   res.json(avatar);
@@ -814,6 +830,84 @@ function muteState(u) {
   if (until <= Date.now()) return null;
   return { until, reason: dbUntil >= memUntil ? (u.muteReason || '') : (mem?.reason || '') };
 }
+
+// ---------- UGC (player-created avatar items) ----------
+const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, sales: u.sales });
+app.get('/api/ugc', async (req, res) => {
+  res.json(Object.values(UGC_ITEMS).map(ugcPublic));
+});
+app.post('/api/ugc', auth, async (req, res) => {
+  if (!ugcTableOk) return res.status(500).json({ error: 'UGC is not set up yet — the database table is missing' });
+  const b = req.body || {};
+  const type = String(b.type || '');
+  if (!['hat', 'shirt'].includes(type)) return res.status(400).json({ error: 'Type must be hat or shirt' });
+  const template = String(b.template || '');
+  const t = ITEM[template];
+  if (!t || t.type !== type || t.limited || !(UGC_TEMPLATES[type] || []).includes(template)) return res.status(400).json({ error: 'Invalid template' });
+  const color = String(b.color || '');
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Invalid color' });
+  const name = filter(String(b.name || '').trim()).slice(0, 40);
+  if (name.length < 3) return res.status(400).json({ error: 'Name must be at least 3 characters' });
+  const price = Math.floor(Number(b.price));
+  if (!Number.isFinite(price) || price < 0 || price > UGC_MAX_PRICE) return res.status(400).json({ error: 'Price must be 0–' + UGC_MAX_PRICE });
+  try {
+    const { data: mine } = await supabase.from('ugc_items').select('id,status').eq('creator', req.user.name);
+    if ((mine || []).filter(r => r.status === 'pending').length >= 5) return res.status(400).json({ error: 'You have 5 items awaiting review already' });
+    if ((mine || []).length >= 50) return res.status(400).json({ error: 'Item limit reached (50)' });
+    const id = crypto.randomBytes(4).toString('hex');
+    const { data, error } = await supabase.from('ugc_items').insert({ id, creator: req.user.name, type, template, color, name, price, status: 'pending', sales: 0 }).select().single();
+    if (error) throw error;
+    res.json({ ok: true, item: { ...ugcPublic(ugcDef(data)), status: 'pending' } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get('/api/ugc/mine', auth, async (req, res) => {
+  if (!ugcTableOk) return res.json([]);
+  const { data } = await supabase.from('ugc_items').select('*').eq('creator', req.user.name).order('created_at', { ascending: false });
+  res.json((data || []).map(r => ({ ...ugcPublic(ugcDef(r)), status: r.status })));
+});
+app.get('/api/ugc/pending', modOnly, async (req, res) => {
+  if (!ugcTableOk) return res.json([]);
+  const { data } = await supabase.from('ugc_items').select('*').eq('status', 'pending').order('created_at', { ascending: true });
+  res.json((data || []).map(r => ({ ...ugcPublic(ugcDef(r)), status: r.status })));
+});
+app.post('/api/ugc/:id/approve', modOnly, async (req, res) => {
+  const raw = String(req.params.id).replace(/^ugc_/, '');
+  const { data, error } = await supabase.from('ugc_items').update({ status: 'approved' }).eq('id', raw).eq('status', 'pending').select().single();
+  if (error || !data) return res.status(404).json({ error: 'Not found or already reviewed' });
+  try {
+    const { data: cu } = await supabase.from('users').select('inventory').eq('name', data.creator).single();
+    const inv = Array.isArray(cu?.inventory) ? cu.inventory : [];
+    if (!inv.includes('ugc_' + data.id)) await supabase.from('users').update({ inventory: [...inv, 'ugc_' + data.id] }).eq('name', data.creator);
+  } catch {}
+  await loadUgcItems();
+  logMod(req.user.name, 'ugc_approve', data.name, data.creator);
+  res.json({ ok: true });
+});
+app.post('/api/ugc/:id/reject', modOnly, async (req, res) => {
+  const raw = String(req.params.id).replace(/^ugc_/, '');
+  const { data, error } = await supabase.from('ugc_items').update({ status: 'rejected' }).eq('id', raw).eq('status', 'pending').select().single();
+  if (error || !data) return res.status(404).json({ error: 'Not found or already reviewed' });
+  logMod(req.user.name, 'ugc_reject', data.name, data.creator);
+  res.json({ ok: true });
+});
+app.post('/api/ugc/:id/buy', auth, async (req, res) => {
+  const id = 'ugc_' + String(req.params.id).replace(/^ugc_/, '');
+  const it = UGC_ITEMS[id];
+  if (!it) return res.status(404).json({ error: 'No such item' });
+  if (list(req.user, 'inventory').includes(id)) return res.status(400).json({ error: 'You already own this' });
+  if ((Number(req.user.funtix) || 0) < it.price) return res.status(400).json({ error: 'Not enough FunTix' });
+  const cut = Math.floor(it.price * UGC_CREATOR_CUT);
+  const buyerInv = [...list(req.user, 'inventory'), id];
+  const { error: e1 } = await supabase.from('users').update({ funtix: (Number(req.user.funtix) || 0) - it.price, inventory: buyerInv }).eq('name', req.user.name);
+  if (e1) return res.status(500).json({ error: e1.message });
+  try {
+    const { data: crow } = await supabase.from('users').select('funtix').eq('name', it.creator).single();
+    if (crow) await supabase.from('users').update({ funtix: (Number(crow.funtix) || 0) + cut }).eq('name', it.creator);
+    await supabase.from('ugc_items').update({ sales: it.sales + 1 }).eq('id', id.replace(/^ugc_/, ''));
+  } catch {}
+  UGC_ITEMS[id] = { ...it, sales: it.sales + 1 };
+  res.json({ funtix: (Number(req.user.funtix) || 0) - it.price, inventory: buyerInv });
+});
 
 // Flagged-content reports + automated first-pass triage.
 // The triage labels every report (clear / review / urgent) so humans know what
@@ -2171,6 +2265,7 @@ async function seedShooterGames() {
 }
 
 loadCustomBadges().then(() => console.log('Custom badges loaded:', Object.keys(CUSTOM_BADGES).length));
+loadUgcItems().then(() => console.log('UGC items loaded:', Object.keys(UGC_ITEMS).length));
 // Looney event deleted Oct 6, 2026: remove its games from the DB (prize kept via LOONEY_PRIZE grant)
 supabase.from('games').delete().eq('event', 'looney').then(() => console.log('looney games removed'));
 seedHalloweenGames().then(r => console.log('hw:', r.created));
