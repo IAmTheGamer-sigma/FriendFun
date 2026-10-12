@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=d2e275e1').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=83ff43aa').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -508,7 +508,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=0d8bac19');
+  const { Game } = await import('./game.js?v=31ea15bd');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -583,7 +583,7 @@ async function loadUgc() {
   try {
     const items = await api('GET', '/api/ugc');
     UGC_LIST = Array.isArray(items) ? items : [];
-    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, ugc: true };
+    for (const u of UGC_LIST) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, ugc: true };
   } catch { UGC_LIST = []; }
 }
 
@@ -628,36 +628,81 @@ function ugcBuyModal(it, onDone) {
 
 // ---------- UGC Studio (player item creator) ----------
 const UGC_PALETTE = ['#e53935', '#ff6d00', '#ffeb3b', '#43a047', '#26c6da', '#1e88e5', '#7b1fa2', '#f48fb1', '#ffffff', '#9e9e9e', '#212121', '#795548'];
+const UGC_MODEL_SLOTS = ['hat', 'shirt', 'gear'];
+const UGC_EXAMPLE_MODEL = { boxes: [[0, 0.35, 0, 1.1, 0.25, 1.1, '#ffd400'], [0, 0.75, 0, 0.85, 0.55, 0.85, '#ffd400'], [0, 1.15, 0, 0.18, 0.3, 0.18, '#e53935']] };
+function ugcValidateModel(m) {
+  if (!m || !Array.isArray(m.boxes)) return 'Model must look like {"boxes": [...]}';
+  if (m.boxes.length < 1 || m.boxes.length > 60) return 'Model must have 1–60 boxes';
+  const hex = /^#[0-9a-fA-F]{6}$/;
+  for (const b of m.boxes) {
+    if (!Array.isArray(b) || b.length < 7) return 'Each box must be [x, y, z, w, h, d, "#color"]';
+    const [x, y, z, w, h, d, c] = b;
+    if (![x, y, z, w, h, d].every(n => typeof n === 'number' && isFinite(n))) return 'Box positions and sizes must be numbers';
+    if (Math.abs(x) > 4 || Math.abs(y) > 4 || Math.abs(z) > 4) return 'Box position out of range (±4)';
+    if (w < 0.05 || h < 0.05 || d < 0.05 || w > 4 || h > 4 || d > 4) return 'Box size out of range (0.05–4)';
+    if (!hex.test(String(c))) return 'Box color must be hex like "#e53935"';
+    if (b.length > 7 && typeof b[7] !== 'number') return 'Box rotation must be a number';
+  }
+  return null;
+}
 async function ugcPage() {
   const A3 = await ensureAvatar3d().catch(() => null);
+  let mode = 'remix';
   let type = 'hat', template = UGC_TEMPLATES.hat[0], color = '#e53935';
+  let slot = 'hat', modelBoxes = null, modelErr = '';
   let mine = [];
   try { mine = await api('GET', '/api/ugc/mine'); } catch {}
-  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, creator: m.creator, ugc: true };
+  for (const m of mine) if (!ITEM[m.id]) ITEM[m.id] = { id: m.id, type: m.type, name: m.name, price: m.price, color: m.color, template: m.template, model: m.model || null, creator: m.creator, ugc: true };
   mount('ugc', `
     <h1>🎨 UGC Studio</h1>
-    <p class="muted">Remix a template, make it yours, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
+    <p class="muted">Remix a template or upload your own 3D model, pick where it goes, set a price. A moderator reviews every item before it goes on sale — you earn <b>${Math.round(UGC_CREATOR_CUT * 100)}%</b> of every sale.</p>
     <div class="av-wrap">
       <div class="av-preview"><canvas class="av-canvas"></canvas><div class="muted small">Live preview</div></div>
       <div class="av-panel">
-        <div class="av-tabs">${['hat', 'shirt'].map(t => `<button data-ugctype="${t}" class="${t === type ? 'active' : ''}">${t === 'hat' ? 'Hats' : 'Shirts'}</button>`).join('')}</div>
-        <div class="ugc-templates"></div>
-        <div class="swatches">${UGC_PALETTE.map(c => `<button class="swatch" data-c="${c}" style="background:${c}"></button>`).join('')}<label class="swatch custom" title="Custom color"><input type="color" value="${color}"></label></div>
+        <div class="av-tabs">${[['remix', 'Remix'], ['model', '3D Model']].map(([k, l]) => `<button data-ugcmode="${k}" class="${k === mode ? 'active' : ''}">${l}</button>`).join('')}</div>
+        <div class="ugc-remix">
+          <div class="av-tabs">${['hat', 'shirt'].map(t => `<button data-ugctype="${t}" class="${t === type ? 'active' : ''}">${t === 'hat' ? 'Hats' : 'Shirts'}</button>`).join('')}</div>
+          <div class="ugc-templates"></div>
+          <div class="swatches">${UGC_PALETTE.map(c => `<button class="swatch" data-c="${c}" style="background:${c}"></button>`).join('')}<label class="swatch custom" title="Custom color"><input type="color" value="${color}"></label></div>
+        </div>
+        <div class="ugc-model" hidden>
+          <p class="muted small" style="margin:8px 0 4px">Where should it go?</p>
+          <div class="av-tabs">${UGC_MODEL_SLOTS.map(s => `<button data-ugcsSlot="${s}" class="${s === slot ? 'active' : ''}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
+          <div class="ugc-drop">
+            <label class="btn-secondary btn-small">Upload .json<input type="file" class="ugc-file" accept=".json,application/json" hidden></label>
+            <button class="btn-secondary btn-small ugc-example">Load example</button>
+          </div>
+          <textarea class="ugc-json" rows="6" spellcheck="false" placeholder='{"boxes": [[x, y, z, w, h, d, "#color"], ...]}'></textarea>
+          <div class="ugc-model-err"></div>
+          <details class="ugc-format"><summary>Model format</summary><pre>Each box: [x, y, z, width, height, depth, "#color"]
+1–60 boxes · positions ±4 · sizes 0.05–4
+Hat: origin = top of the head
+Shirt: origin = center of the torso
+Gear: origin = hand (shown at half size)</pre></details>
+        </div>
         <label>Item name<input class="ugc-name" maxlength="40" placeholder="My cool hat"></label>
         <label>Price (FunTix)<input class="ugc-price" type="number" min="0" max="10000" value="100"></label>
         <button class="btn-primary ugc-submit">Submit for review</button>
       </div>
     </div>
     <section><div class="sec-h"><h2>My creations (${mine.length})</h2></div>
-      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img"><img src="${itemImage(m)}"></div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
+      <div class="cat-grid">${mine.map(m => `<div class="cat-item"><div class="cat-img"><img src="${itemImage(m)}"></div><div class="cat-name">${esc(m.name)}</div><div class="muted small">${m.type}${m.model ? ' · 3D' : ''} · ${tix} ${m.price} · ${m.sales || 0} sold</div><span class="ugc-status ${m.status}">${m.status}</span></div>`).join('') || '<p class="muted">Nothing yet — create your first item above!</p>'}</div></section>`,
   () => {
     const tplBox = app.querySelector('.ugc-templates');
     let ch = null, alive = true, r = null, sc = null;
     const rebuild = () => {
       if (!A3 || !sc) return;
-      ITEM['ugc_preview'] = { id: 'ugc_preview', type, color, template };
       if (ch) sc.remove(ch);
-      const av = structuredClone(me.avatar); av[type] = 'ugc_preview';
+      ch = null;
+      const av = structuredClone(me.avatar);
+      if (mode === 'model') {
+        if (!modelBoxes) return;
+        ITEM['ugc_preview'] = { id: 'ugc_preview', type: slot, model: { boxes: modelBoxes }, ugc: true };
+        av[slot] = 'ugc_preview';
+      } else {
+        ITEM['ugc_preview'] = { id: 'ugc_preview', type, color, template };
+        av[type] = 'ugc_preview';
+      }
       ch = A3.buildCharacter(av); sc.add(ch);
     };
     if (A3) {
@@ -671,6 +716,7 @@ async function ugcPage() {
       const tick = () => { if (!alive) return; requestAnimationFrame(tick); r.render(sc, cam); }; tick();
       cleanup = () => { alive = false; r.dispose(); delete ITEM['ugc_preview']; };
     }
+    // Remix tab
     const renderTpls = () => {
       tplBox.innerHTML = `<div class="item-grid">${UGC_TEMPLATES[type].map(tid => { const t = ITEM[tid]; return `<button class="item ${tid === template ? 'worn' : ''}" data-tpl="${tid}"><img src="${itemImage(t)}"><span>${esc(t.name)}</span></button>`; }).join('')}</div>`;
       tplBox.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => { template = b.dataset.tpl; renderTpls(); rebuild(); });
@@ -683,11 +729,55 @@ async function ugcPage() {
     });
     app.querySelectorAll('.swatch[data-c]').forEach(b => b.onclick = () => { color = b.dataset.c; rebuild(); });
     app.querySelector('.swatch.custom input[type=color]').onchange = e => { color = e.target.value; rebuild(); };
+    // Mode tabs
+    app.querySelectorAll('[data-ugcmode]').forEach(b => b.onclick = () => {
+      mode = b.dataset.ugcmode;
+      app.querySelectorAll('[data-ugcmode]').forEach(x => x.classList.toggle('active', x === b));
+      app.querySelector('.ugc-remix').hidden = mode !== 'remix';
+      app.querySelector('.ugc-model').hidden = mode !== 'model';
+      rebuild();
+    });
+    // 3D model tab
+    app.querySelectorAll('[data-ugcsSlot]').forEach(b => b.onclick = () => {
+      slot = b.dataset.ugcsSlot;
+      app.querySelectorAll('[data-ugcsSlot]').forEach(x => x.classList.toggle('active', x === b));
+      rebuild();
+    });
+    const errBox = app.querySelector('.ugc-model-err');
+    const parseModel = () => {
+      const txt = app.querySelector('.ugc-json').value.trim();
+      modelErr = ''; modelBoxes = null;
+      if (txt) {
+        try {
+          const m = JSON.parse(txt);
+          const err = ugcValidateModel(m);
+          if (err) modelErr = err;
+          else modelBoxes = m.boxes.map(bx => [bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], String(bx[6]).toLowerCase()].concat(bx.length > 7 ? [bx[7]] : []));
+        } catch { modelErr = 'Invalid JSON'; }
+      }
+      errBox.textContent = modelErr;
+      errBox.classList.toggle('show', !!modelErr);
+      rebuild();
+    };
+    app.querySelector('.ugc-json').oninput = parseModel;
+    app.querySelector('.ugc-file').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => { app.querySelector('.ugc-json').value = String(rd.result || ''); parseModel(); };
+      rd.readAsText(f);
+    };
+    app.querySelector('.ugc-example').onclick = () => { app.querySelector('.ugc-json').value = JSON.stringify(UGC_EXAMPLE_MODEL); parseModel(); };
     app.querySelector('.ugc-submit').onclick = async () => {
       const nm = app.querySelector('.ugc-name').value.trim();
       const pr = Math.floor(Number(app.querySelector('.ugc-price').value));
       try {
-        await api('POST', '/api/ugc', { type, template, color, name: nm, price: pr });
+        if (mode === 'model') {
+          if (modelErr) throw new Error(modelErr);
+          if (!modelBoxes) throw new Error('Add a 3D model first — upload a .json file, paste JSON, or load the example');
+          await api('POST', '/api/ugc', { type: slot, model: { boxes: modelBoxes }, name: nm, price: pr });
+        } else {
+          await api('POST', '/api/ugc', { type, template, color, name: nm, price: pr });
+        }
         toast('Submitted for review! 🎨');
         await loadUgc();
         ugcPage();
@@ -1113,7 +1203,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=0d8bac19');
+      const { Game: GameClass } = await import('./game.js?v=31ea15bd');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1175,7 +1265,7 @@ async function moderationPage() {
     pending = await api('GET', '/api/mod/ban/pending').catch(() => []);
     log = await api('GET', '/api/mod/log').catch(() => []);
     ugcPending = await api('GET', '/api/ugc/pending').catch(() => []);
-    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, ugc: true };
+    for (const u of ugcPending) if (!ITEM[u.id]) ITEM[u.id] = { id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, ugc: true };
   }
   const badge = l => l === 'urgent' ? '<span class="mod-urgent">URGENT</span>' : l === 'review' ? '<span class="mod-review">REVIEW</span>' : '<span class="mod-clear">CLEAR</span>';
   const reload = () => moderationPage();
