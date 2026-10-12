@@ -264,7 +264,7 @@ function shell(active, content) {
           <button class="tb-menu-item tb-logout-all"><span class="sb-ico">&#10006;</span>Log out all</button>
         </div>
       </div>
-      <span class="tb-online" title="Players online"><i class="dot"></i><b class="online-count">–</b></span>
+      <span class="tb-online" title="Total players">👥<b class="player-count">–</b></span>
       <a class="tb-bux" href="#/funtix" title="FunTix">${tix}<span class="me-tix">${fmt(me.funtix ?? 0)}</span></a>
     </div>
   </header>
@@ -289,10 +289,10 @@ async function refreshPartyBar() {
   } catch {}
 }
 let onlineTimer = null;
-async function refreshOnline() {
+async function refreshPlayerCount() {
   try {
-    const r = await api('GET', '/api/online');
-    document.querySelectorAll('.online-count').forEach(el => el.textContent = fmt(r.count));
+    const r = await api('GET', '/api/player-count');
+    document.querySelectorAll('.player-count').forEach(el => el.textContent = fmt(r.count));
   } catch {}
 }
 let siteStateCache = null, siteStateAt = 0;
@@ -316,9 +316,9 @@ function mount(active, html, after) {
   app.className = ''; app.innerHTML = shell(active, html);
   refreshPartyBar();
   refreshSiteBanner();
-  refreshOnline();
+  refreshPlayerCount();
   clearInterval(onlineTimer);
-  onlineTimer = setInterval(refreshOnline, 30000);
+  onlineTimer = setInterval(refreshPlayerCount, 60000);
   const userBtn = app.querySelector('.tb-user');
   const menu = app.querySelector('.tb-menu');
   if (userBtn && menu) {
