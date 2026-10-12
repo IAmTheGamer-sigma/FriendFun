@@ -34,7 +34,23 @@ async function loadCustomBadges() {
 let UGC_ITEMS = {}; // 'ugc_<id>' -> { id, type, name, price, color, template, creator, sales, ugc: true }
 let ugcTableOk = true;
 function ugcDef(row) {
-  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
+  return { id: 'ugc_' + row.id, type: row.type, name: row.name, price: Number(row.price) || 0, color: row.color, template: row.template, model: row.model || null, creator: row.creator, sales: Number(row.sales) || 0, ugc: true };
+}
+// UGC custom 3D models: { boxes: [[x,y,z,w,h,d,"#rrggbb"], ...] }
+function validUgcModel(m) {
+  if (!m || !Array.isArray(m.boxes)) return 'Model must be { "boxes": [...] }';
+  if (m.boxes.length < 1 || m.boxes.length > 60) return 'Model must have 1–60 boxes';
+  const hex = /^#[0-9a-fA-F]{6}$/;
+  for (const b of m.boxes) {
+    if (!Array.isArray(b) || b.length < 7) return 'Each box must be [x, y, z, w, h, d, "#color"]';
+    const [x, y, z, w, h, d, c] = b;
+    if (![x, y, z, w, h, d].every(n => typeof n === 'number' && Number.isFinite(n))) return 'Box coordinates and sizes must be numbers';
+    if (Math.abs(x) > 4 || Math.abs(y) > 4 || Math.abs(z) > 4) return 'Box position out of range (±4)';
+    if (w < 0.05 || h < 0.05 || d < 0.05 || w > 4 || h > 4 || d > 4) return 'Box size out of range (0.05–4)';
+    if (!hex.test(String(c))) return 'Box color must be hex like "#e53935"';
+    if (b.length > 7 && typeof b[7] !== 'number') return 'Box rotation must be a number';
+  }
+  return null;
 }
 async function loadUgcItems() {
   try {
@@ -832,7 +848,7 @@ function muteState(u) {
 }
 
 // ---------- UGC (player-created avatar items) ----------
-const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, creator: u.creator, sales: u.sales });
+const ugcPublic = u => ({ id: u.id, type: u.type, name: u.name, price: u.price, color: u.color, template: u.template, model: u.model || null, creator: u.creator, sales: u.sales });
 app.get('/api/ugc', async (req, res) => {
   res.json(Object.values(UGC_ITEMS).map(ugcPublic));
 });
@@ -840,12 +856,22 @@ app.post('/api/ugc', auth, async (req, res) => {
   if (!ugcTableOk) return res.status(500).json({ error: 'UGC is not set up yet — the database table is missing' });
   const b = req.body || {};
   const type = String(b.type || '');
-  if (!['hat', 'shirt'].includes(type)) return res.status(400).json({ error: 'Type must be hat or shirt' });
-  const template = String(b.template || '');
-  const t = ITEM[template];
-  if (!t || t.type !== type || t.limited || !(UGC_TEMPLATES[type] || []).includes(template)) return res.status(400).json({ error: 'Invalid template' });
-  const color = String(b.color || '');
-  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Invalid color' });
+  if (!['hat', 'shirt', 'gear'].includes(type)) return res.status(400).json({ error: 'Type must be hat, shirt, or gear' });
+  let template = null, color = null, model = null;
+  if (b.model) {
+    // Custom 3D model path
+    const err = validUgcModel(b.model);
+    if (err) return res.status(400).json({ error: err });
+    model = { boxes: b.model.boxes.map(bx => [bx[0], bx[1], bx[2], bx[3], bx[4], bx[5], String(bx[6]).toLowerCase()].concat(bx.length > 7 ? [bx[7]] : [])) };
+  } else {
+    // Remix path (hats and shirts only)
+    if (!['hat', 'shirt'].includes(type)) return res.status(400).json({ error: 'Remix only supports hats and shirts — use a 3D model for gears' });
+    template = String(b.template || '');
+    const t = ITEM[template];
+    if (!t || t.type !== type || t.limited || !(UGC_TEMPLATES[type] || []).includes(template)) return res.status(400).json({ error: 'Invalid template' });
+    color = String(b.color || '');
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) return res.status(400).json({ error: 'Invalid color' });
+  }
   const name = filter(String(b.name || '').trim()).slice(0, 40);
   if (name.length < 3) return res.status(400).json({ error: 'Name must be at least 3 characters' });
   const price = Math.floor(Number(b.price));
@@ -855,8 +881,13 @@ app.post('/api/ugc', auth, async (req, res) => {
     if ((mine || []).filter(r => r.status === 'pending').length >= 5) return res.status(400).json({ error: 'You have 5 items awaiting review already' });
     if ((mine || []).length >= 50) return res.status(400).json({ error: 'Item limit reached (50)' });
     const id = crypto.randomBytes(4).toString('hex');
-    const { data, error } = await supabase.from('ugc_items').insert({ id, creator: req.user.name, type, template, color, name, price, status: 'pending', sales: 0 }).select().single();
-    if (error) throw error;
+    const row = { id, creator: req.user.name, type, template, color, name, price, status: 'pending', sales: 0 };
+    if (model) row.model = model;
+    const { data, error } = await supabase.from('ugc_items').insert(row).select().single();
+    if (error) {
+      if (model && /model/i.test(error.message)) return res.status(500).json({ error: '3D models need the updated SQL — run supabase_ugc.sql' });
+      throw error;
+    }
     res.json({ ok: true, item: { ...ugcPublic(ugcDef(data)), status: 'pending' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
