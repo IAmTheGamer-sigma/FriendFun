@@ -113,7 +113,6 @@ const icons = {
   chat: '<svg viewBox="0 0 24 24"><path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1z"/></svg>',
   news: '<svg viewBox="0 0 24 24"><path d="M4 4h13v12H6l-2 2zm15 1h3v13l-3-2M7 8h8M7 11h8M7 14h5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1L15 3h-6l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1L9 21h6l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4z"/></svg>',
-  terminal: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 9l3 3-3 3M12 15h5" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
 };
 
 const ADMIN = '<span class="admin-badge">ADMIN</span>';
@@ -270,7 +269,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin && !me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : []), ...(me.owner ? [['hacker', '💀 Hacker', icons.terminal]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin && !me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -346,11 +345,21 @@ let hackMod = null;
 async function checkHack() {
   if (!token || !me || document.querySelector('.news-overlay')) return;
   try {
-    if (!hackMod) hackMod = await import('./hacker.js?v=86752c67');
+    if (!hackMod) hackMod = await import('./hacker.js?v=48706346');
     await hackMod.pollHackEvent(api);
   } catch {}
 }
 setInterval(checkHack, 5000);
+// summon the hidden panel: type "hack" anywhere outside a text field (owners only)
+let hkSeq = '';
+addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) { hkSeq = ''; return; }
+  hkSeq = (hkSeq + (e.key.length === 1 ? e.key.toLowerCase() : '')).slice(-4);
+  if (hkSeq === 'hack' && me && me.owner) {
+    hkSeq = '';
+    (async () => { try { if (!hackMod) hackMod = await import('./hacker.js?v=48706346'); hackMod.openHackerPanel({ api, toast, me }); } catch {} })();
+  }
+});
 
 
 function initEasterEggs() {
@@ -1369,7 +1378,6 @@ async function ugcGlbModal(u) {
 
 const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CLUB, ADMIN, ensureAvatar3d, get me() { return me; }, get BADGE_DEFS() { return BADGE_DEFS; } };
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
-const hackerDeps = { api, mount, esc, toast, get me() { return me; } };
 async function adminPage(q = '') {
   const m = await import('./admin.js?v=295aa910');
   return m.adminPage(adminDeps, q);
@@ -1514,7 +1522,6 @@ async function route() {
       case 'admin': if (me && me.owner) { location.hash = '#/owner'; return; } return await adminPage();
       case 'settings': return settingsPage();
       case 'owner': return await ownerPage();
-      case 'hacker': { const m = await import('./hacker.js?v=86752c67'); return m.hackerPage(hackerDeps); }
 
       case 'moderation': return await moderationPage();
       case 'funtix': case 'funbux': return funtixPage();
