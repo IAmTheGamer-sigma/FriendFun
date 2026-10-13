@@ -694,3 +694,12 @@ body.hk-corrupt #app { animation: hkJitter .18s infinite; }
 .hk-jump { background: #000; display: flex; align-items: center; justify-content: center; animation: hkBlink .12s steps(2) infinite; }
 .hk-jump-face { font-size: min(42vw, 300px); }
 .hk-matrix { background: #000; }
+
+/* floating hacker panel window (summoned by typing "hack") */
+.hk-panel { position: fixed; right: 12px; bottom: 12px; width: min(620px, 94vw); z-index: 99999; background: #070b07; border: 1px solid #0f0; border-radius: 12px; box-shadow: 0 0 40px rgba(0,255,0,.25); overflow: hidden; }
+.hk-panel-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #0a120a; color: #0f0; font: 700 13px ui-monospace, monospace; border-bottom: 1px solid rgba(0,255,0,.25); }
+.hk-x { background: transparent; border: 1px solid #0f0; color: #0f0; border-radius: 6px; cursor: pointer; font-size: 12px; padding: 2px 9px; }
+.hk-x:hover { background: #0f0; color: #000; }
+.hk-panel .hk-quick { padding: 8px 10px 0; }
+.hk-panel .hk-term { border: 0; box-shadow: none; border-radius: 0; max-width: none; }
+.hk-panel .hk-out { min-height: 170px; max-height: 300px; }
