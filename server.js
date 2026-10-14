@@ -794,16 +794,13 @@ app.post('/api/admin/site/command', auth, async (req, res) => {
     return res.json({ ok: true, message: `Kicked ${n} players from all games` });
   } else if (command === 'funtix_rain') {
     const amount = Math.max(1, Math.min(1000, Math.floor(Number(req.body?.amount) || 50)));
-    const names = new Set();
-    for (const [, room] of rooms) for (const [, p] of room.players) names.add(key(p.name));
-    for (const n of names) {
-      try {
-        const { data: u } = await supabase.from('users').select('funtix').eq('name', n).maybeSingle();
-        if (u) await supabase.from('users').update({ funtix: (Number(u.funtix) || 0) + amount }).eq('name', n);
-      } catch {}
+    const duration = 30;
+    for (const [, room] of rooms) {
+      room.tixRain = { amount, until: Date.now() + duration * 1000 };
+      broadcast(room, { t: 'tix_rain', amount, duration });
+      broadcast(room, { t: 'sys', text: `🌧️ FunTix rain! Catch falling tickets for +${amount} each!` });
     }
-    for (const [, room] of rooms) broadcast(room, { t: 'sys', text: `🌧️ FunTix rain! +${amount} FunTix for everyone online!` });
-    return res.json({ ok: true, message: `Rained ${amount} FunTix on ${names.size} online players` });
+    return res.json({ ok: true, message: `FunTix rain started: ${amount} per ticket, ${duration}s` });
   }
   return res.status(400).json({ error: 'Unknown site command' });
 });
@@ -1659,6 +1656,18 @@ wss.on('connection', (ws) => {
       if (now - (player.lastTreat || 0) < 30000) return;
       player.lastTreat = now;
       const earned = 10;
+      const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + earned }).eq('name', player.user.name).select().single();
+      if (error || !updated) return;
+      player.user = updated;
+      send(ws, { t: 'money', ...money(updated), earned });
+    }
+    else if (m.t === 'tix_collect') {
+      const rain = room.tixRain;
+      if (!rain || Date.now() > rain.until) return;
+      const now = Date.now();
+      if (now - (player.lastTixCollect || 0) < 500) return;
+      player.lastTixCollect = now;
+      const earned = rain.amount;
       const { data: updated, error } = await supabase.from('users').update({ funtix: (Number(player.user.funtix) || 0) + earned }).eq('name', player.user.name).select().single();
       if (error || !updated) return;
       player.user = updated;
