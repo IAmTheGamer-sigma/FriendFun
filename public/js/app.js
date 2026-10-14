@@ -1380,11 +1380,11 @@ const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CL
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 const horrorDeps = { avatarImgTag, esc, route, get me() { return me; }, getCleanup: () => cleanup, setCleanup: fn => { cleanup = fn; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=295aa910');
+  const m = await import('./admin.js?v=e2c4b49f');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=295aa910');
+  const m = await import('./admin.js?v=e2c4b49f');
   return m.ownerPage(adminDeps, q);
 }
 
