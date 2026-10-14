@@ -1673,6 +1673,32 @@ wss.on('connection', (ws) => {
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned });
     }
+    else if (m.t === 'voice_join') {
+      player.voice = true;
+      // Tell existing voice users about the new peer
+      for (const [, p] of room.players) {
+        if (p !== player && p.voice && p.ws.readyState === 1) {
+          send(p.ws, { t: 'voice_peer', peer: player.user.name, action: 'join' });
+          send(ws, { t: 'voice_peer', peer: p.user.name, action: 'join' });
+        }
+      }
+    }
+    else if (m.t === 'voice_leave') {
+      player.voice = false;
+      for (const [, p] of room.players) {
+        if (p !== player && p.voice && p.ws.readyState === 1) {
+          send(p.ws, { t: 'voice_peer', peer: player.user.name, action: 'leave' });
+        }
+      }
+    }
+    else if (m.t === 'voice_signal' && typeof m.to === 'string' && m.data) {
+      for (const [, p] of room.players) {
+        if (p.user.name === m.to && p.voice && p.ws.readyState === 1) {
+          send(p.ws, { t: 'voice_signal', from: player.user.name, data: m.data });
+          break;
+        }
+      }
+    }
     else if (m.t === 'scriptTix') {
       const now = Date.now();
       const amt = Math.max(1, Math.min(100, Math.floor(Number(m.amount) || 0)));
