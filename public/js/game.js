@@ -531,6 +531,103 @@ export class Game {
     // Volume updates
     setInterval(() => this.voice.updateVolumes(), 500);
   }
+  updateSoccer(dt) {
+    // Ball physics: find ball, push when player touches
+    if (!this.ballMesh) {
+      for (const [id, m] of this.meshes) {
+        if (m.userData.part.k === 'ball') { this.ballMesh = m; this.ballVel = new THREE.Vector3(); break; }
+      }
+    }
+    if (this.ballMesh) {
+      const b = this.ballMesh;
+      // Player kick
+      const d = b.position.distanceTo(this.pos);
+      if (d < 3) {
+        const dir = b.position.clone().sub(this.pos).normalize();
+        this.ballVel.add(dir.multiplyScalar(20 * dt));
+        if (!this.lastKick || Date.now() - this.lastKick > 500) {
+          this.lastKick = Date.now(); sfx.coin();
+        }
+      }
+      // Friction + gravity
+      this.ballVel.multiplyScalar(1 - 2 * dt);
+      b.position.add(this.ballVel.clone().multiplyScalar(dt));
+      if (b.position.y > 1) b.position.y -= 10 * dt;
+      if (b.position.y < 0.75) { b.position.y = 0.75; this.ballVel.y = 0; }
+      // Goal detection (check triggers)
+      for (const [id, m] of this.meshes) {
+        const p = m.userData.part;
+        if (p.k === 'score' && b.position.distanceTo(m.position) < 3) {
+          if (!this.lastGoal || Date.now() - this.lastGoal > 3000) {
+            this.lastGoal = Date.now();
+            this.showBig(`⚽ GOAL for ${p.team}!`, 3000);
+            sfx.win(); confetti(this.c);
+            b.position.set(0, 1, 0); this.ballVel.set(0, 0, 0);
+            this.send({ t: 'goal', team: p.team });
+          }
+        }
+      }
+    }
+  }
+  updateMystery(dt) {
+    if (!this.cluesFound) this.cluesFound = new Set();
+    // Check clue pickups
+    for (const [id, m] of this.meshes) {
+      const p = m.userData.part;
+      if (p.k === 'clue' && !this.cluesFound.has(id)) {
+        if (m.position.distanceTo(this.pos) < 3) {
+          this.cluesFound.add(id); m.visible = false;
+          this.showBig(`🔍 Found clue! (${this.cluesFound.size}/5)`, 2000);
+          sfx.coin();
+          if (this.cluesFound.size >= 5) {
+            this.showBig('🎉 Mystery solved! You found all clues!', 4000);
+            sfx.win(); confetti(this.c);
+            this.send({ t: 'win' });
+          }
+        }
+      }
+    }
+  }
+  updateGarden(dt) {
+    if (!this.gardenPlots) this.gardenPlots = new Map();
+    // Click plot to plant/harvest (via trigger check)
+    for (const [id, m] of this.meshes) {
+      const p = m.userData.part;
+      if (p.k === 'plot') {
+        const state = this.gardenPlots.get(id) || { stage: 0, timer: 0 };
+        if (state.stage > 0 && state.stage < 3) {
+          state.timer += dt;
+          if (state.timer > 10) { state.stage++; state.timer = 0; this.gardenPlots.set(id, state); this.updatePlotVisual(m, state); }
+        }
+        // Proximity + jump to interact (simple)
+        if (m.position.distanceTo(this.pos) < 4 && this.keys['e'] && !state.cd) {
+          state.cd = true; setTimeout(() => state.cd = false, 1000);
+          if (state.stage === 0) {
+            state.stage = 1; state.timer = 0;
+            this.showBig('🌱 Planted!', 1500); sfx.coin();
+          } else if (state.stage === 3) {
+            state.stage = 0; state.timer = 0;
+            this.showBig('🌻 Harvested! +25 FunTix', 2000); sfx.win();
+            this.send({ t: 'scriptTix', amount: 25 });
+          }
+          this.gardenPlots.set(id, state); this.updatePlotVisual(m, state);
+        }
+      }
+    }
+  }
+  updatePlotVisual(mesh, state) {
+    // Clear old plant
+    if (mesh.userData.plant) { mesh.remove(mesh.userData.plant); mesh.userData.plant = null; }
+    if (state.stage === 0) return;
+    const colors = ['#7cb342', '#9ccc65', '#ffeb3b'];
+    const sizes = [0.5, 1, 1.5];
+    const plant = new THREE.Mesh(
+      new THREE.SphereGeometry(sizes[state.stage - 1], 10, 8),
+      new THREE.MeshStandardMaterial({ color: colors[state.stage - 1] })
+    );
+    plant.position.y = 1;
+    mesh.add(plant); mesh.userData.plant = plant;
+  }
   showNews(b) {
     if (typeof b === 'string') b = { type: 'video', video: b, title: 'Breaking News' };
     if (!b || document.querySelector('.news-overlay')) return;
@@ -1500,6 +1597,10 @@ export class Game {
         if (t.position.y < this.pos.y - 5) { this.scene.remove(t); rain.tickets.splice(i, 1); }
       }
     }
+    // Template game modes
+    if (this.world.soccer) this.updateSoccer(dt);
+    if (this.world.mystery) this.updateMystery(dt);
+    if (this.world.garden) this.updateGarden(dt);
     // halloween decor animation
     const hw = this.hwDecor;
     if (hw) {
