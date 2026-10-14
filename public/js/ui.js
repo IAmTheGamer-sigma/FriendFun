@@ -16,6 +16,6 @@ export const LOGO = '<svg class="ff-logo" viewBox="0 0 40 32" xmlns="http://www.
 
 export const CLUB = `<svg class="club-badge" viewBox="0 0 24 24" width="18" height="18"><title>FriendClub member</title><path fill="#ffd400" d="${CLUB_PATH}"/></svg>`;
 
-export const tix = '<svg class="tix" viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="11" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="#1b1d1f" stroke-width="1.4" opacity=".35"/><path fill="#1b1d1f" d="M7.5 7h9v2.6h-3.2V18h-2.6V9.6H7.5z"/></svg>';
+export const tix = '<svg class="tix" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v2.2a2.8 2.8 0 0 0 0 5.6V16a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2.2a2.8 2.8 0 0 0 0-5.6V6a1 1 0 0 1 1-1z"/><line x1="8" y1="5" x2="8" y2="17" stroke="#1b1d1f" stroke-width="1.4" stroke-dasharray="2 1.6" opacity=".55"/><circle cx="15" cy="11" r="2.2" fill="#1b1d1f" opacity=".65"/></svg>';
 
 export const badgeIcon = (id, size = 18) => { const b = BADGES[id]; return b ? `<svg class="club-badge" viewBox="0 0 24 24" width="${size}" height="${size}"><title>${b.name}</title><path fill="${b.color}" d="${b.path}"/></svg>` : ''; };
