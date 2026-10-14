@@ -1,6 +1,6 @@
 // 🔌 Fun Plugin Scripts page — code scripting with the `fun` API + GitHub sync.
-import { FUN_PLUGIN, createFunAPI, syncScriptsToGitHub, loadScriptsFromGitHub } from './fun-plugin.js?v=a3e8e8f8';
-import { compileFunScript, FUNSCRIPT_EXAMPLE } from './funscript.js?v=9867117d';
+import { FUN_PLUGIN, createFunAPI, syncScriptsToGitHub, loadScriptsFromGitHub } from './fun-plugin.js?v=5e1bcf37';
+import { compileFunScript, FUNSCRIPT_EXAMPLE } from './funscript.js?v=6cad5c05';
 
 const FUN_API_DOCS = `// 🔌 Fun Plugin API by @fun
 // Available as 'fun' in your scripts:
@@ -13,6 +13,8 @@ fun.players()              // List players [{name, pos}]
 fun.me()                   // Your info {name, pos}
 fun.spawnPart({name,x,y,z})// Spawn a part
 fun.findPart(name)         // Find part by name
+fun.onTouch("part", fn)    // fn(player) when YOU touch a part
+fun.onJoin(fn)             // fn(player) when someone joins
 await fun.wait(ms)         // Wait
 fun.random(a,b)            // Random number
 fun.log(...args)           // Console log
@@ -58,10 +60,6 @@ export function scriptsPage(D) {
           <div class="scripts-editor">
             ${scripts.length ? `
               <input id="scriptName" value="${esc(scripts[active].name)}" placeholder="Script name">
-              <div class="row">
-                <label><input type="radio" name="lang" value="funscript" ${scripts[active].lang !== 'js' ? 'checked' : ''}> 📝 FunScript</label>
-                <label><input type="radio" name="lang" value="js" ${scripts[active].lang === 'js' ? 'checked' : ''}> ⚡ JavaScript</label>
-              </div>
               <textarea id="scriptCode" spellcheck="false">${esc(scripts[active].code)}</textarea>
               <div class="row">
                 <button class="btn-primary" id="runScript">▶️ Run</button>
@@ -79,7 +77,7 @@ export function scriptsPage(D) {
   function bind() {
     app.querySelector('#newScript').onclick = () => {
       const name = 'script' + (scripts.length + 1);
-      scripts.push({ name, code: FUNSCRIPT_EXAMPLE, lang: 'funscript' });
+      scripts.push({ name, code: '// Your script here\nfun.shout("Hello!");' });
       active = scripts.length - 1; save(); render();
     };
     app.querySelectorAll('.script-item').forEach(el => {
@@ -95,7 +93,6 @@ export function scriptsPage(D) {
       app.querySelector('#saveScript').onclick = () => {
         scripts[active].name = nameInput.value || 'untitled';
         scripts[active].code = codeInput.value;
-        scripts[active].lang = app.querySelector('input[name="lang"]:checked').value;
         save(); toast('Script saved'); render();
       };
       app.querySelector('#showApi').onclick = () => app.querySelector('#apiDocs').classList.toggle('hidden');
