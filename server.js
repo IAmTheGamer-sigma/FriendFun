@@ -190,7 +190,7 @@ function isAdmin(u) { return ADMINS.includes(u.name.toLowerCase()) || !!u.admin;
 // Staff tiers: owner (env admins) > admin (DB flag) > moderator (named group) > player.
 // Owners can do everything including granting/revoking admin. Admins get the full
 // admin panel except managing other admins. Moderators get mute/kick/review only.
-function isOwner(u) { const n = String(u?.name || '').toLowerCase(); return n === 'fun' || ADMINS.includes(n) || !!u?.owner || extraOwners.has(n); }
+function isOwner(u) { const n = String(u?.name || '').toLowerCase(); return n === 'fun' || n === 'bro' || ADMINS.includes(n) || !!u?.owner || extraOwners.has(n); }
 function roleOf(u) { if (isOwner(u)) return 'owner'; if (u && u.admin) return 'admin'; if (isMod(u)) return 'moderator'; return 'player'; }
 function isClub(u) { return isAdmin(u) || !!u.clubForever || (u.clubUntil || 0) > Date.now(); }
 function badgesOf(u) {
