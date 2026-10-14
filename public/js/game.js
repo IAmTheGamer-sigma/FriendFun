@@ -483,6 +483,36 @@ export class Game {
     this.showBig(won ? '✅ ROUND WON' : '❌ ROUND LOST', 2200);
     won ? sfx.win() : sfx.oof();
   }
+  startTixRain(m) {
+    const amount = m.amount || 50, duration = (m.duration || 30) * 1000;
+    if (this.tixRain) { this.tixRain.until = Date.now() + duration; this.tixRain.amount = amount; return; }
+    const rain = this.tixRain = { amount, until: Date.now() + duration, tickets: [], lastSpawn: 0 };
+    this.sys(`🌧️ FunTix rain! Catch tickets for +${amount} each!`);
+    sfx.coin();
+    const ticketGeo = new THREE.PlaneGeometry(1.2, 0.7);
+    const ticketMat = new THREE.MeshBasicMaterial({ color: '#ffd400', side: THREE.DoubleSide });
+    rain.spawnTick = () => {
+      if (!this.tixRain || Date.now() > rain.until) { this.stopTixRain(); return; }
+      const now = Date.now();
+      if (now - rain.lastSpawn > 400 && rain.tickets.length < 40) {
+        rain.lastSpawn = now;
+        const t = new THREE.Mesh(ticketGeo, ticketMat);
+        const r = 25;
+        t.position.set(this.pos.x + (Math.random() - 0.5) * r * 2, this.pos.y + 20 + Math.random() * 10, this.pos.z + (Math.random() - 0.5) * r * 2);
+        t.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        t.userData.vy = 6 + Math.random() * 4;
+        t.userData.spin = (Math.random() - 0.5) * 6;
+        this.scene.add(t); rain.tickets.push(t);
+      }
+      requestAnimationFrame(rain.spawnTick);
+    };
+    rain.spawnTick();
+  }
+  stopTixRain() {
+    const rain = this.tixRain; if (!rain) return;
+    for (const t of rain.tickets) { this.scene.remove(t); t.geometry.dispose(); }
+    this.tixRain = null;
+  }
   showNews(b) {
     if (typeof b === 'string') b = { type: 'video', video: b, title: 'Breaking News' };
     if (!b || document.querySelector('.news-overlay')) return;
@@ -1185,6 +1215,7 @@ export class Game {
       else if (m.t === 'rivalsRoundEnd') { this.onRivalsRoundEnd(m); }
       else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
       else if (m.t === 'news') this.showNews(m);
+      else if (m.t === 'tix_rain') this.startTixRain(m);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
@@ -1426,6 +1457,27 @@ export class Game {
             bounce();
           }
         }
+      }
+    }
+    // FunTix rain tickets
+    if (this.tixRain) {
+      const rain = this.tixRain;
+      for (let i = rain.tickets.length - 1; i >= 0; i--) {
+        const t = rain.tickets[i];
+        t.position.y -= t.userData.vy * dt;
+        t.rotation.z += t.userData.spin * dt;
+        t.rotation.x += t.userData.spin * 0.5 * dt;
+        // collect if near player
+        const dx = t.position.x - this.pos.x, dz = t.position.z - this.pos.z, dy = t.position.y - (this.pos.y + 2);
+        if (dx * dx + dz * dz < 4 && Math.abs(dy) < 3) {
+          this.scene.remove(t); rain.tickets.splice(i, 1);
+          this.send({ t: 'tix_collect' });
+          this.showBig(`🎫 +${rain.amount} FunTix!`, 1200);
+          sfx.coin();
+          continue;
+        }
+        // remove if below ground
+        if (t.position.y < this.pos.y - 5) { this.scene.remove(t); rain.tickets.splice(i, 1); }
       }
     }
     // halloween decor animation
