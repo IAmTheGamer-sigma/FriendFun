@@ -176,6 +176,12 @@ export async function ownerPage(D, q = '') {
       </div>
       <div class="site-state muted small"></div>
     </section>
+    <section class="admin-section owner-tools"><h3>👑 FriendClub <span class="muted small">danger zone</span></h3>
+      <button class="btn-danger club-reset-all">Remove FriendClub from everyone except @fun</button>
+    </section>
+    <section class="admin-section owner-tools"><h3>🚨 Farm Scanner <span class="muted small">auto-scans every 5 min</span></h3>
+      <div class="farm-reports"><p class="muted">Scanning...</p></div>
+    </section>
     <section class="admin-section owner-tools"><h3>📡 News Maker <span class="muted small">AI anchor broadcast</span></h3>
       <div class="news-maker">
         <div class="nm-preview"><canvas class="nm-canvas" width="300" height="300"></canvas><div class="muted small">Anchor preview</div></div>
@@ -441,6 +447,43 @@ export async function ownerPage(D, q = '') {
     };
     const kickAll = app.querySelector('.kick-all');
     if (kickAll) kickAll.onclick = () => { if (confirm('Kick EVERYONE out of all games right now?')) siteCmd('kick_all'); };
+    // Farm reports
+    const farmDiv = app.querySelector('.farm-reports');
+    async function loadFarms() {
+      try {
+        const r = await api('GET', '/api/admin/farms');
+        if (!r.reports.length) { farmDiv.innerHTML = '<p class="muted">✅ No farms detected.</p>'; return; }
+        farmDiv.innerHTML = r.reports.map(f => `
+          <div class="farm-report">
+            <div><strong>${esc(f.gameName)}</strong> by ${esc(f.creator)}</div>
+            <div class="muted small">${f.reasons.map(esc).join(' • ')}</div>
+            <div class="row">
+              <button class="btn-danger farm-del" data-id="${f.gameId}" data-name="${esc(f.gameName)}">🗑️ Delete Game</button>
+              <button class="btn-secondary farm-ban" data-user="${esc(f.creator)}">🔨 Ban Creator</button>
+            </div>
+          </div>`).join('');
+        farmDiv.querySelectorAll('.farm-del').forEach(b => b.onclick = async () => {
+          if (!confirm(`Delete "${b.dataset.name}"?`)) return;
+          await api('POST', `/api/admin/farms/${b.dataset.id}/delete`);
+          toast('Game deleted'); loadFarms();
+        });
+        farmDiv.querySelectorAll('.farm-ban').forEach(b => b.onclick = async () => {
+          const user = b.dataset.user;
+          if (!confirm(`Ban ${user}? Reason: Making FunTix farms`)) return;
+          await api('POST', `/api/admin/users/${user}/command`, { command: 'ban', reason: 'Making FunTix farms' });
+          toast(`${user} banned`); loadFarms();
+        });
+      } catch { farmDiv.innerHTML = '<p class="muted">Failed to load.</p>'; }
+    }
+    loadFarms();
+    setInterval(loadFarms, 60000);
+    const clubResetBtn = app.querySelector('.club-reset-all');
+    if (clubResetBtn) clubResetBtn.onclick = async () => {
+      if (!confirm('Remove FriendClub from EVERYONE except @fun? This cannot be undone.')) return;
+      if (!confirm('Are you absolutely sure?')) return;
+      const r = await api('POST', '/api/admin/club/reset-all');
+      toast(`Cleared FriendClub from ${r.cleared} users`);
+    };
     const rainBtn = app.querySelector('.funtix-rain');
     if (rainBtn) rainBtn.onclick = () => {
       const amount = Math.max(1, Math.min(1000, Math.floor(Number(app.querySelector('.rain-amt')?.value) || 50)));
