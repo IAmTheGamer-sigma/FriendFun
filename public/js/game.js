@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
 import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=4b390e65';
 import { NEWSBOY_AVATAR, buildNewsStudio } from './news-studio.js?v=9285cfef';
+import { VoiceChat } from './voice.js?v=9d41bd66';
 import { sfx } from './sound.js?v=89850e26';
 import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=94017c68';
 
@@ -75,7 +76,7 @@ export class Game {
     this.collected = new Set(); this.won = false;
     this.buildDom(); this.build3D(); this.bind();
     this.spawn(true);
-    if (!opts.test) this.connect(); else this.sys('Test mode - press Stop to return to Studio.');
+    if (!opts.test) { this.connect(); this.initVoice(); } else this.sys('Test mode - press Stop to return to Studio.');
     this.last = performance.now();
     this.loop = this.loop.bind(this); this.raf = requestAnimationFrame(this.loop);
   }
@@ -512,6 +513,23 @@ export class Game {
     const rain = this.tixRain; if (!rain) return;
     for (const t of rain.tickets) { this.scene.remove(t); t.geometry.dispose(); }
     this.tixRain = null;
+  }
+  initVoice() {
+    if (this.voice) return;
+    this.voice = new VoiceChat(this);
+    // Mic button in HUD
+    const btn = document.createElement('button');
+    btn.className = 'voice-btn';
+    btn.textContent = '🎤';
+    btn.title = 'Voice chat (proximity)';
+    btn.onclick = async () => {
+      const on = await this.voice.toggle();
+      btn.classList.toggle('on', on);
+      btn.textContent = on ? '🎤' : '🎤';
+    };
+    this.c.appendChild(btn);
+    // Volume updates
+    setInterval(() => this.voice.updateVolumes(), 500);
   }
   showNews(b) {
     if (typeof b === 'string') b = { type: 'video', video: b, title: 'Breaking News' };
@@ -1216,6 +1234,8 @@ export class Game {
       else if (m.t === 'tourneyEnd') this.onTourneyEnd(m);
       else if (m.t === 'news') this.showNews(m);
       else if (m.t === 'tix_rain') this.startTixRain(m);
+      else if (m.t === 'voice_peer') this.voice?.onPeer(m);
+      else if (m.t === 'voice_signal') this.voice?.onSignal(m);
       else if (m.t === 'error') { this.hideLoading(); this.showBig(m.error, 6000); this.sys(m.error); }
     };
     ws.onclose = () => { if (!this.destroyed) { this.sys('Disconnected from server.'); this.showBig('Disconnected', 5000); } };
