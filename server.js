@@ -805,6 +805,18 @@ app.post('/api/admin/site/command', auth, async (req, res) => {
   return res.status(400).json({ error: 'Unknown site command' });
 });
 app.get('/api/site', (req, res) => res.json({ announce: siteAnnounce, maintenance }));
+app.get('/api/admin/farms', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
+  res.json({ reports: farmReports });
+});
+app.post('/api/admin/farms/:gameId/delete', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
+  const { error } = await supabase.from('games').delete().eq('id', req.params.gameId);
+  if (error) return res.status(500).json({ error: 'Delete failed' });
+  const idx = farmReports.findIndex(r => r.gameId === req.params.gameId);
+  if (idx >= 0) farmReports.splice(idx, 1);
+  res.json({ ok: true });
+});
 
 // ---------- Moderation ----------
 // Named moderator group (seeded by Zayd). Moderators can mute, kick and review
@@ -1711,6 +1723,15 @@ wss.on('connection', (ws) => {
       player.user = updated;
       send(ws, { t: 'money', ...money(updated), earned: amt });
     }
+    else if (m.t === 'scriptTp') {
+      // Fun Plugin teleport: moves the script runner (never anyone else), throttled
+      const now = Date.now();
+      const tp = player.scriptTp || (player.scriptTp = { last: 0 });
+      if (now - tp.last < 1000) return;
+      tp.last = now;
+      const cl = (v, d, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+      send(ws, { t: 'scriptTpDo', x: cl(m.x, 0, -500, 500), y: cl(m.y, 10, 0, 500), z: cl(m.z, 0, -500, 500) });
+    }
     else if (m.t === 'win') {
       if (player.won) return; player.won = true;
       const earnedBadges = [...new Set([...list(player.user, 'earnedBadges'), ...winBadges(player.game)])];
@@ -1751,6 +1772,54 @@ setInterval(() => {
     broadcast(room, { t: 'S', p: states });
   }
 }, 66);
+
+// 🚨 Always-on FunTix farm scanner
+const farmReports = []; // { gameId, gameName, creator, reasons, at }
+const FARM_KEYWORDS = ['farm', 'free tix', 'afk', 'auto farm', 'tix farm', 'grind'];
+function scanGameForFarm(g) {
+  const reasons = [];
+  const world = g.world || {};
+  const parts = world.parts || [];
+  // Count coin/tix-granting parts
+  let coinCount = 0;
+  for (const p of parts) {
+    if (p.k === 'coin' || p.k === 'tix') coinCount++;
+  }
+  if (coinCount > 50) reasons.push(`${coinCount} coin parts (excessive)`);
+  // Check scripts for tix grants
+  const scripts = world.scripts || [];
+  for (const s of scripts) {
+    const code = JSON.stringify(s);
+    if (code.includes('giveTix') || code.includes('funtix')) {
+      reasons.push('Script grants FunTix');
+      break;
+    }
+  }
+  // Check name/description keywords
+  const text = ((g.name || '') + ' ' + (g.description || '')).toLowerCase();
+  for (const kw of FARM_KEYWORDS) {
+    if (text.includes(kw)) { reasons.push(`Keyword: "${kw}"`); break; }
+  }
+  return reasons;
+}
+async function farmScan() {
+  try {
+    const { data: games } = await supabase.from('games').select('id,name,description,creator,world').limit(200);
+    if (!games) return;
+    for (const g of games) {
+      const reasons = scanGameForFarm(g);
+      if (reasons.length && !farmReports.some(r => r.gameId === g.id)) {
+        farmReports.push({ gameId: g.id, gameName: g.name, creator: g.creator, reasons, at: Date.now() });
+        console.log(`🚨 Farm detected: ${g.name} by ${g.creator} — ${reasons.join(', ')}`);
+      }
+    }
+    // Keep only last 50
+    if (farmReports.length > 50) farmReports.splice(0, farmReports.length - 50);
+  } catch {}
+}
+// Scan every 5 minutes + on boot
+setInterval(farmScan, 5 * 60 * 1000);
+farmScan();
 
 // AI Coder (rule-based)
 function aiGenerateParts(prompt) {
