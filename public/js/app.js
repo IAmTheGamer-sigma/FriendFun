@@ -1,4 +1,4 @@
-import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js?v=4a030db';
+import { nameColor, tix, LOGO, CLUB, badgeIcon } from './ui.js?v=4afa3277';
 
 // Badge definitions
 let BADGE_DEFS = {};
