@@ -140,7 +140,77 @@ export function coinRush() {
   return w;
 }
 
-export const templates = { baseplate, obby, hangout, tower, coinRush, shooterArena, shooterFort, shooterRooftop };
+export function soccerField() {
+  const w = startWorld('#87ceeb');
+  // Field
+  w.parts.push(part([0, -0.5, 0], [60, 1, 40], '#3a9e3a', { name: 'Field', m: 'grass' }));
+  // Center line
+  w.parts.push(part([0, 0.05, 0], [0.5, 0.1, 40], '#ffffff', { name: 'CenterLine' }));
+  w.parts.push(part([0, 0.05, 0], [8, 0.1, 8], '#ffffff', { name: 'CenterCircle', k: 'part' }));
+  // Goals (two ends)
+  for (const sx of [-1, 1]) {
+    const gx = sx * 28;
+    w.parts.push(part([gx, 1.5, -4], [0.5, 3, 0.5], '#ffffff', { name: 'GoalPostL' }));
+    w.parts.push(part([gx, 1.5, 4], [0.5, 3, 0.5], '#ffffff', { name: 'GoalPostR' }));
+    w.parts.push(part([gx, 3, 0], [0.5, 0.5, 8.5], '#ffffff', { name: 'GoalBar' }));
+    // Goal detection zone
+    w.parts.push(part([gx + sx * 1, 1, 0], [2, 2, 8], '#ffeb3b', { name: sx < 0 ? 'GoalBlue' : 'GoalRed', k: 'score', team: sx < 0 ? 'blue' : 'red', m: 'neon', tr: 0.5 }));
+  }
+  // Ball (spawns at center)
+  w.parts.push(part([0, 1, 0], [1.5, 1.5, 1.5], '#ffffff', { name: 'Ball', k: 'ball', m: 'smooth' }));
+  // Spawn areas
+  w.parts.push(part([-20, 0.25, 0], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  w.soccer = true;
+  return w;
+}
+
+export function mysteryMansion() {
+  const w = startWorld('#1a1a2e');
+  // Mansion floor
+  w.parts.push(part([0, -0.5, 0], [40, 1, 40], '#5d4037', { name: 'Floor', m: 'wood' }));
+  // Walls (four rooms)
+  const wallC = '#4e342e';
+  w.parts.push(part([0, 3, -20], [40, 6, 1], wallC, { name: 'WallN' }));
+  w.parts.push(part([0, 3, 20], [40, 6, 1], wallC, { name: 'WallS' }));
+  w.parts.push(part([-20, 3, 0], [1, 6, 40], wallC, { name: 'WallW' }));
+  w.parts.push(part([20, 3, 0], [1, 6, 40], wallC, { name: 'WallE' }));
+  // Interior dividers (rooms)
+  w.parts.push(part([-10, 3, 0], [1, 6, 20], wallC, { name: 'Divider1' }));
+  w.parts.push(part([10, 3, 0], [1, 6, 20], wallC, { name: 'Divider2' }));
+  // Clues (5 hidden items)
+  const clues = ['Fingerprint', 'Footprint', 'Note', 'Key', 'Photo'];
+  const positions = [[-15, 1, -15], [15, 1, -15], [-15, 1, 15], [15, 1, 15], [0, 1, 0]];
+  clues.forEach((name, i) => {
+    w.parts.push(part(positions[i], [1, 1, 1], '#ffd400', { name: 'Clue_' + name, k: 'clue', m: 'neon' }));
+  });
+  w.parts.push(part([0, 0.25, 18], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  w.mystery = { clues: 5 };
+  return w;
+}
+
+export function garden() {
+  const w = startWorld('#aee2ff');
+  // Grass base
+  w.parts.push(part([0, -0.5, 0], [50, 1, 50], '#7cb342', { name: 'Grass', m: 'grass' }));
+  // Soil plots (3x3 grid)
+  for (let x = -1; x <= 1; x++) {
+    for (let z = -1; z <= 1; z++) {
+      w.parts.push(part([x * 8, 0.1, z * 8], [6, 0.2, 6], '#5d4037', { name: `Plot_${x}_${z}`, k: 'plot', m: 'soil' }));
+    }
+  }
+  // Water pond
+  w.parts.push(part([18, 0.1, 18], [8, 0.2, 8], '#4fc3f7', { name: 'Pond', m: 'water', tr: 0.3 }));
+  // Fence
+  for (let i = -24; i <= 24; i += 6) {
+    w.parts.push(part([i, 1, -24], [0.5, 2, 0.5], '#8d6e63', { name: 'Fence' }));
+    w.parts.push(part([i, 1, 24], [0.5, 2, 0.5], '#8d6e63', { name: 'Fence' }));
+  }
+  w.parts.push(part([0, 0.25, -20], [6, 0.5, 6], '#3a7bd5', { name: 'SpawnLocation', k: 'spawn', m: 'spawn' }));
+  w.garden = true;
+  return w;
+}
+
+export const templates = { baseplate, obby, hangout, tower, coinRush, shooterArena, shooterFort, shooterRooftop, soccerField, mysteryMansion, garden };
 
 export function shooterArena() {
   const w = startWorld('#ff9e57');
