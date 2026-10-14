@@ -714,3 +714,5 @@ body.hk-corrupt #app { animation: hkJitter .18s infinite; }
 .scripts-editor input { width: 100%; padding: 10px; margin-bottom: 8px; background: #0a0a18; border: 1px solid rgba(124,108,245,.3); border-radius: 8px; color: #fff; }
 .github-sync { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(124,108,245,.2); }
 .github-sync input { width: 100%; padding: 8px; margin: 4px 0; background: #0a0a18; border: 1px solid rgba(124,108,245,.3); border-radius: 6px; color: #fff; font-size: 13px; }
+.farm-report { background: rgba(255,60,60,.08); border: 1px solid rgba(255,60,60,.3); border-radius: 10px; padding: 12px; margin: 8px 0; }
+.farm-report .row { display: flex; gap: 8px; margin-top: 8px; }
