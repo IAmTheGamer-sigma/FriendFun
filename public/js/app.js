@@ -1518,7 +1518,7 @@ async function route() {
         }
         location.hash = '#/home'; return;
       case 'studio': return await studioPage(seg[1], seg[2]);
-      case 'scripts': { const m = await import('./scripts-page.js?v=5919ffb8'); return m.scriptsPage(D); }
+      case 'scripts': { const m = await import('./scripts-page.js?v=125d520e'); return m.scriptsPage(D); }
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
       case 'admin': if (me && me.owner) { location.hash = '#/owner'; return; } return await adminPage();
