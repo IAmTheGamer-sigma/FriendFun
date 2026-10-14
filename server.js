@@ -805,6 +805,19 @@ app.post('/api/admin/site/command', auth, async (req, res) => {
   return res.status(400).json({ error: 'Unknown site command' });
 });
 app.get('/api/site', (req, res) => res.json({ announce: siteAnnounce, maintenance }));
+app.post('/api/admin/club/reset-all', auth, async (req, res) => {
+  if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
+  // Remove FriendClub from everyone except @fun
+  const { data: users } = await supabase.from('users').select('name').neq('name', 'fun');
+  let count = 0;
+  for (const u of (users || [])) {
+    try {
+      await supabase.from('users').update({ clubForever: false, clubUntil: 0 }).eq('name', u.name);
+      count++;
+    } catch {}
+  }
+  res.json({ ok: true, cleared: count });
+});
 app.get('/api/admin/farms', auth, async (req, res) => {
   if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
   res.json({ reports: farmReports });
