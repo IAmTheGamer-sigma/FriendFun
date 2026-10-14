@@ -268,6 +268,7 @@ app.post('/api/signup', async (req, res) => {
     name: key(username), salt, pw: hash(password, salt), created: Date.now(), funtix: ECON.START_TIX,
     avatar: structuredClone(DEFAULT_AVATAR), inventory: CATALOG.filter(i => i.free).map(i => i.id),
     friends: [], requests: [], favorites: [], recent: [], earnedBadges: [], bio: '',
+    clubForever: false, clubUntil: 0,
   };
   const { data: user, error: uErr } = await supabase.from('users').insert(userData).select().single();
   if (uErr) return res.status(500).json({ error: uErr.message });
