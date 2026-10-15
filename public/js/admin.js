@@ -331,8 +331,13 @@ export async function ownerPage(D, q = '') {
       const reason = prompt(`Ban ${b.dataset.name}? Enter reason:`, 'Making FunTix farms');
       if (!reason) return;
       if (!confirm(`Ban ${b.dataset.name} for: ${reason}?`)) return;
-      await api('POST', `/api/admin/users/${b.dataset.name}/command`, { command: 'ban', reason });
-      toast(`${b.dataset.name} banned`);
+      try {
+        const r = await api('POST', `/api/admin/users/${b.dataset.name}/command`, { command: 'ban', reason });
+        if (r.user?.banned) toast(`${b.dataset.name} banned`);
+        else toast(`Ban may have failed - check user`, true);
+      } catch (e) {
+        toast(`Ban failed: ${e.message}`, true);
+      }
     });
     ownerCmd('.wipe-games', 'wipe_games', null, b => `DELETE ALL games by ${b.dataset.name}? This cannot be undone.`);
     ownerCmd('.clear-friends', 'clear_friends', null, b => `Clear all friends of ${b.dataset.name}?`);
