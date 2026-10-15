@@ -98,6 +98,7 @@ export class Studio {
         </div><div class="rb-label">Edit</div></div>
         <div class="rb-group"><div class="rb-row">
           <button class="rb-btn play" data-a="play" title="Play test (F5)"><span class="rb-ico">&#x25B6;</span>Play</button>
+          <button class="rb-btn" data-a="testobby" title="Test if obby is completable"><span class="rb-ico">🤖</span>Obby</button>
         </div><div class="rb-label">Test</div></div>
         <div class="rb-group"><div class="rb-row rb-light">
           <label class="rb-btn" title="Sky color"><input type="color" class="rb-sky" value="${toHex(this.world.sky || '#8fc8ff')}">Sky</label>
@@ -127,7 +128,7 @@ export class Studio {
       const i = e.target.closest('[data-insert]'); if (i) this.insert(i.dataset.insert);
       const a = e.target.closest('[data-a]')?.dataset.a;
       if (a === 'dup') this.duplicate(); if (a === 'del') this.remove(); if (a === 'undo') this.undo(); if (a === 'redo') this.redo();
-      if (a === 'play') this.play(); if (a === 'save') this.save(); if (a === 'publish') this.publishDialog(); if (a === 'exit') this.exit();
+      if (a === 'play') this.play(); if (a === 'testobby') this.testObby(); if (a === 'save') this.save(); if (a === 'publish') this.publishDialog(); if (a === 'exit') this.exit();
     });
     q('.rb-color').oninput = e => { if (this.multi.length) { this.pushUndo(); for (const p of this.multi) { p.c = e.target.value; this.refresh(p); } } };
     q('.rb-mat').onchange = e => { if (this.multi.length) { this.pushUndo(); for (const p of this.multi) { p.m = e.target.value; this.refresh(p); } } };
@@ -739,6 +740,19 @@ export class Studio {
   }
 
   // ---------- play / save / publish ----------
+  async testObby() {
+    try {
+      const token = localStorage.getItem('token') || '';
+      const r = await fetch('/api/test-obby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ world: this.world })
+      });
+      const res = await r.json();
+      if (res.ok) alert(`✅ Obby is completable!\n${res.checkpoints} checkpoints verified.`);
+      else alert(`❌ Obby has issues:\n\n${res.issues.join('\n')}`);
+    } catch (e) { alert('Test failed: ' + e.message); }
+  }
   play() {
     const box = this.c.querySelector('.st-play'); box.classList.remove('hidden');
     this.keys = {};
