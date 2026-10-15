@@ -2,7 +2,6 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import { createClient } from '@supabase/supabase-js';
-import { createTourney } from './tourney.js';
 import { createNews } from './news.js';
 import { createUgc, ugcState } from './ugc.js';
 import { createHacker } from './hacker.js';
@@ -1651,7 +1650,6 @@ wss.on('connection', (ws) => {
 
       touch(u.name, g.id);
       send(ws, { t: 'welcome', id: player.id, players: [...room.players.values()].map(p => ({ id: p.id, name: p.name, avatar: p.avatar, s: p.s, club: isClub(p.user), badge: badgeOf(p.user) })), ...money(u), club: isClub(u), badge: badgeOf(u) });
-      T.tourneyJoin(player, room, ws);
       room.players.set(player.id, player);
       broadcast(room, { t: 'joined', id: player.id, name: player.name, avatar: player.avatar, club: isClub(u), badge: badgeOf(u) }, ws);
       broadcast(room, { t: 'chat', system: true, text: `${player.name} has joined the game.` });
@@ -1769,7 +1767,6 @@ wss.on('connection', (ws) => {
   });
   ws.on('close', () => {
     if (!player || !room) return;
-    T.tourneyLeave(player, room);
     room.players.delete(player.id);
     if (room.private && !room.players.size) { rooms.delete(room.private); privateServers.delete(room.private.split(':')[1]); }
     broadcast(room, { t: 'left', id: player.id });
@@ -2336,7 +2333,6 @@ const SHOOTER_GAMES = [
   { id: 'g_arena1', name: 'Block Arena', desc: 'Close-quarters shooter arena. Grab a gear and fight! 🔫', build: shooterArena },
   { id: 'g_arena2', name: 'Fort Battle', desc: 'Storm the enemy fort in this team-style shooter battleground! 🏰', build: shooterFort },
   { id: 'g_arena3', name: 'Rooftop Rumble', desc: 'Night-city rooftop shootout. Watch your step! 🌃', build: shooterRooftop },
-  { id: 'g_spookyrivals', name: '🎃 Spooky Rivals', desc: 'Tournament 1v1 arena. Most wins by Wednesday takes the Champion Pumpkin! 👑', build: spookyRivals, tourney: true, maxPlayers: 2 },
 ];
 async function seedShooterGames() {
   try {
