@@ -23,7 +23,7 @@ let _avatar3dLoading = null;
 async function ensureAvatar3d() {
   if (_avatar3d) return _avatar3d;
   if (!_avatar3dLoading) {
-    _avatar3dLoading = import('./avatar3d.js?v=4b390e65').then(m => {
+    _avatar3dLoading = import('./avatar3d.js?v=8e5e0e25').then(m => {
       _avatar3d = m;
       refreshAvatars(); // swap placeholders for real avatars
       return m;
@@ -195,11 +195,20 @@ function markUpdatesSeen() { try { localStorage.setItem('updatesSeen', UPDATES[0
 function settingsPage() {
   const sfxOn = localStorage.getItem('ff_sfx') !== '0';
   const musicOn = localStorage.getItem('ff_music') !== '0';
+  const gfxMode = localStorage.getItem('ff_gfx') || 'classic';
   mount('settings', `<h1>⚙️ Settings</h1>
     <p class="muted">Make Funtopia yours.</p>
     <section class="admin-section"><h3>🔊 Sound</h3>
       <label class="set-row"><span>Sound effects</span><input type="checkbox" class="set-sfx" ${sfxOn ? 'checked' : ''}></label>
       <label class="set-row"><span>Music</span><input type="checkbox" class="set-music" ${musicOn ? 'checked' : ''}></label>
+    </section>
+    <section class="admin-section"><h3>✨ Graphics</h3>
+      <div class="set-row"><span>Game version</span></div>
+      <div class="gfx-picks">
+        <button class="btn-secondary gfx-pick ${gfxMode === 'classic' ? 'active' : ''}" data-gfx="classic">🧱 Classic</button>
+        <button class="btn-secondary gfx-pick ${gfxMode === 'advanced' ? 'active' : ''}" data-gfx="advanced">✨ Advanced</button>
+      </div>
+      <p class="muted small">Advanced: smooth Roblox-style characters, dynamic shadows, richer lighting.</p>
     </section>
     <section class="admin-section"><h3>🔒 Account</h3>
       <div class="set-row"><span>Change password</span></div>
@@ -223,6 +232,11 @@ function settingsPage() {
       if (!on) { try { stopSpooky(); } catch {} }
       toast(on ? 'Music on' : 'Music off');
     };
+    app.querySelectorAll('.gfx-pick').forEach(b => b.onclick = () => {
+      try { localStorage.setItem('ff_gfx', b.dataset.gfx); } catch {}
+      toast(b.dataset.gfx === 'advanced' ? '✨ Advanced graphics on — rejoin a game to see it' : '🧱 Classic graphics on');
+      settingsPage();
+    });
     app.querySelector('.set-pw-btn').onclick = async () => {
       const cur = app.querySelector('.set-curpw').value, nw = app.querySelector('.set-newpw').value;
       if (!cur || !nw) { toast('Fill in both password fields', true); return; }
@@ -657,7 +671,7 @@ async function playPage(id, server) {
   const g = await api('GET', '/api/games/' + id);
   me = await api('GET', '/api/me');
   app.className = 'fullscreen'; app.innerHTML = '<div class="play-container"></div>';
-  const { Game } = await import('./game.js?v=92b178c6');
+  const { Game } = await import('./game.js?v=f412d1f2');
   const game = new Game(app.querySelector('.play-container'), {
     world: g.world, gameId: g.id, gameName: g.name, server, shooter: g.event === 'shooter' || g.world?.shooter === true, gameGears: g.world?.gears || [], me, token, funtix: me.funtix,
     onMoney: r => setMoney(r), onExit: () => { cleanup = null; history.length > 1 ? history.back() : (location.hash = '#/games/' + g.id); },
@@ -1199,7 +1213,7 @@ async function studioPage(id, tpl) {
     onCreated: newId => history.replaceState(null, '', '#/studio/' + newId),
     onExit: gid => { cleanup = null; location.hash = gid ? '#/create' : '#/create'; },
     playTest: async (box, world, name, done) => {
-      const { Game: GameClass } = await import('./game.js?v=92b178c6');
+      const { Game: GameClass } = await import('./game.js?v=f412d1f2');
       game = new GameClass(box, { world, gameName: name + ' (Test)', me, token, test: true, onExit: () => { game = null; done(); } });
     },
   });
@@ -1380,11 +1394,11 @@ const adminDeps = { api, mount, esc, avatarImgTag, toast, loadBadgeDefs, tix, CL
 const ugcDeps = { api, mount, esc, tix, fmt, toast, itemImage, loadUgc, ensureAvatar3d, ugcCardImg, setCleanup: fn => { cleanup = fn; }, get me() { return me; } };
 const horrorDeps = { avatarImgTag, esc, route, get me() { return me; }, getCleanup: () => cleanup, setCleanup: fn => { cleanup = fn; } };
 async function adminPage(q = '') {
-  const m = await import('./admin.js?v=9cb46cb7');
+  const m = await import('./admin.js?v=d572c4e4');
   return m.adminPage(adminDeps, q);
 }
 async function ownerPage(q = '') {
-  const m = await import('./admin.js?v=9cb46cb7');
+  const m = await import('./admin.js?v=d572c4e4');
   return m.ownerPage(adminDeps, q);
 }
 
