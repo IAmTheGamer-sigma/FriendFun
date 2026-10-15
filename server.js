@@ -1786,27 +1786,29 @@ setInterval(() => {
 
 // 🚨 Always-on FunTix farm scanner
 const farmReports = []; // { gameId, gameName, creator, reasons, at }
-const FARM_KEYWORDS = ['farm', 'free tix', 'afk', 'auto farm', 'tix farm', 'grind'];
+const FARM_KEYWORDS = ['farm', 'free tix', 'afk', 'auto farm', 'tix farm', 'grind', 'easy tix', 'tix grinder', 'infinite'];
 function scanGameForFarm(g) {
   const reasons = [];
   const world = g.world || {};
   const parts = world.parts || [];
-  // Count coin/tix-granting parts
+  // Count coin/tix-granting parts (lower threshold)
   let coinCount = 0;
   for (const p of parts) {
-    if (p.k === 'coin' || p.k === 'tix') coinCount++;
+    const k = String(p.k || '').toLowerCase();
+    const n = String(p.name || '').toLowerCase();
+    if (k === 'coin' || k === 'tix' || n.includes('coin') || n.includes('tix')) coinCount++;
   }
-  if (coinCount > 50) reasons.push(`${coinCount} coin parts (excessive)`);
-  // Check scripts for tix grants
+  if (coinCount > 20) reasons.push(`${coinCount} coin parts`);
+  // Check scripts for tix grants (broader patterns)
   const scripts = world.scripts || [];
   for (const s of scripts) {
-    const code = JSON.stringify(s);
-    if (code.includes('giveTix') || code.includes('funtix')) {
+    const code = JSON.stringify(s).toLowerCase();
+    if (code.includes('givetix') || code.includes('funtix') || code.includes('scripttix') || code.includes('tix')) {
       reasons.push('Script grants FunTix');
       break;
     }
   }
-  // Check name/description keywords
+  // Check name/description keywords (broader)
   const text = ((g.name || '') + ' ' + (g.description || '')).toLowerCase();
   for (const kw of FARM_KEYWORDS) {
     if (text.includes(kw)) { reasons.push(`Keyword: "${kw}"`); break; }
