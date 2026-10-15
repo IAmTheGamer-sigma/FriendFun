@@ -269,7 +269,7 @@ function shell(active, content) {
     </div>
   </header>
   <aside class="sidebar">
-    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['tourney', '🏆 Tournament', icons.trophy], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin && !me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
+    ${[['home', 'Home', icons.home], ['discover', 'Discover', icons.discover], ['avatar', 'Avatar', icons.avatar], ['catalog', 'Marketplace', icons.shop], ['create', 'Create', icons.create], ['friends', 'Friends', icons.friends, me.requests?.length], ['groups', 'Groups', icons.groups], ['users/' + encodeURIComponent(me.name), 'Profile', icons.profile], ['club', 'FriendClub', icons.club], ['moderation', 'Moderation', icons.shield], ['settings', 'Settings', icons.gear], ...(me.admin && !me.owner ? [['admin', 'Admin', icons.shield]] : []), ...(me.owner ? [['owner', '👑 Owner', icons.shield]] : [])]
       .map(([h, l, i, badge]) => h.startsWith('http') ? `<a href="${h}" target="_blank" rel="noopener"><span class="sb-ico">${i}</span>${l}<span class="badge">↗</span></a>` : `<a href="#/${h}" class="${active === h.split('/')[0] ? 'active' : ''}"><span class="sb-ico">${i}</span>${l}${badge ? `<span class="badge">${badge}</span>` : ''}</a>`).join('')}
     <button class="sidebar-logout"><span class="sb-ico">&#9094;</span>Log Out</button>
   </aside>
@@ -1502,23 +1502,8 @@ async function route() {
       case 'avatar': return avatarPage();
       case 'catalog': return await catalogPage(seg[1]);
       case 'ugc': { const m = await import('./ugc-studio.js?v=07967ed1'); return m.ugcPage(ugcDeps); }
-      case 'tourney': return await tourneyPage();
-      case 'friends': return await friendsPage();
-      case 'halloween': return await halloweenPage();
-      case 'messages': return seg[1] ? await dmPage(decodeURIComponent(seg[1])) : await messagesPage();
-      case 'groups': return await groupsPage();
-      case 'users': return await profilePage(decodeURIComponent(seg[1]));
-      case 'create': return await createPage();
-      case 'updates': return updatesPage();
-      case 'party':
-        if (seg[1] === 'join' && seg[2]) {
-          try { await api('POST', '/api/party/join/' + seg[2]); toast('Joined the party! 🎉'); }
-          catch (err) { toast(err.message, true); }
-          location.hash = '#/home'; return;
-        }
-        location.hash = '#/home'; return;
       case 'studio': return await studioPage(seg[1], seg[2]);
-      case 'scripts': { const m = await import('./scripts-page.js?v=0041b8bd'); return m.scriptsPage(D); }
+      case 'scripts': { const m = await import('./scripts-page.js?v=e67b220b'); return m.scriptsPage(D); }
       case 'leaderboard': return await leaderboardPage();
       case 'club': return clubPage();
       case 'admin': if (me && me.owner) { location.hash = '#/owner'; return; } return await adminPage();
