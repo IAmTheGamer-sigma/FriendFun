@@ -606,7 +606,10 @@ app.post('/api/admin/users/:name/command', auth, adminOnly, async (req, res) => 
     updates = { aiAccess: false };
     message = `Revoked AI coder access from ${user.name}`;
   } else if (command === 'ban') {
-    return res.status(400).json({ error: 'Bans now need two confirmations: use POST /api/mod/ban/initiate, then /api/mod/ban/confirm with a different staff member.' });
+    if (!isOwner(req.user) && !isAdmin(req.user)) return res.status(403).json({ error: 'Staff only' });
+    const reason = String(req.body?.reason || 'No reason given').slice(0, 200);
+    updates = { banned: true, banReason: reason, bannedUntil: 0 };
+    message = `Banned ${user.name}: ${reason}`;
   } else if (command === 'unban') {
     updates = { banned: false, banReason: '', bannedUntil: 0 };
     message = `Unbanned ${user.name}`;
