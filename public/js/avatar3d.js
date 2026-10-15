@@ -469,6 +469,47 @@ export function buildCharacter(avatar, opts = {}) {
   return root;
 }
 
+// ✨ Advanced: smooth Roblox-style humanoid (original design, not a copy)
+export function buildCharacterSmooth(avatar, opts = {}) {
+  const C = { ...avatar.colors };
+  const root = new THREE.Group();
+  const smooth = (color, rough = 0.5) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.05 });
+
+  // Torso: rounded capsule-ish (cylinder + spheres)
+  const torsoG = new THREE.Group(); torsoG.position.y = 3; root.add(torsoG);
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 1.8, 20), smooth(C.torso));
+  torso.castShadow = true; torsoG.add(torso);
+  const chestCap = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 12), smooth(C.torso));
+  chestCap.position.y = 0.9; chestCap.castShadow = true; torsoG.add(chestCap);
+
+  // Head: smooth sphere
+  const headPivot = new THREE.Group(); headPivot.position.y = 4.6; root.add(headPivot);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.75, 24, 18), smooth(C.head, 0.4));
+  head.position.y = 0.55; head.castShadow = true; headPivot.add(head);
+  // Face
+  const faceMat = new THREE.MeshBasicMaterial({ map: faceTexture(avatar.face), transparent: true });
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), faceMat);
+  face.position.set(0, 0.55, 0.72); headPivot.add(face);
+  // Hat
+  const hat = buildHat(avatar.hat);
+  if (hat) { hat.position.y = 1.25; headPivot.add(hat); }
+
+  // Limbs: capsules
+  const limb = (x, y, color, len = 1.8, r = 0.32) => {
+    const p = new THREE.Group(); p.position.set(x, y, 0);
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 8, 16), smooth(color));
+    m.position.y = -len / 2; m.castShadow = true; p.add(m);
+    root.add(p); return p;
+  };
+  const larm = limb(-1.15, 3.8, C.larm), rarm = limb(1.15, 3.8, C.rarm);
+  const lleg = limb(-0.42, 2.0, C.lleg, 1.7, 0.36), rleg = limb(0.42, 2.0, C.rleg, 1.7, 0.36);
+
+  root.userData.limbs = { larm, rarm, lleg, rleg, headPivot, torso: torsoG };
+  root.userData.smooth = true;
+  return root;
+}
+
+
 export function animateCharacter(ch, state, t, dt) {
   const L = ch.userData.limbs; if (!L) return;
   // Classic Roblox style: idle is statue-still, walk swings big, jump = arms straight up, fall = arms out
