@@ -235,6 +235,7 @@ export async function ownerPage(D, q = '') {
           <button class="btn-secondary avatar-reset" data-name="${esc(u.name)}" title="Reset avatar">Reset Avatar</button>
           <button class="btn-secondary unmute-btn" data-name="${esc(u.name)}" title="Unmute">Unmute</button>
           <button class="btn-secondary sysdm-btn" data-name="${esc(u.name)}" title="System DM">System DM</button>
+          <button class="btn-danger ban-btn" data-name="${esc(u.name)}" title="Ban user">🔨 Ban</button>
           <button class="btn-danger wipe-games" data-name="${esc(u.name)}" title="Delete games">Wipe Games</button>
           <button class="btn-secondary clear-friends" data-name="${esc(u.name)}" title="Clear friends">Clear Friends</button>
           <button class="btn-secondary clear-badges" data-name="${esc(u.name)}" title="Clear badges">Clear Badges</button>
@@ -325,6 +326,13 @@ export async function ownerPage(D, q = '') {
     app.querySelectorAll('.sysdm-btn').forEach(b => b.onclick = () => {
       const v = prompt(`System DM to ${b.dataset.name}:`);
       if (v && v.trim()) cmd(b.dataset.name, 'system_dm', { text: v.trim() });
+    });
+    app.querySelectorAll('.ban-btn').forEach(b => b.onclick = async () => {
+      const reason = prompt(`Ban ${b.dataset.name}? Enter reason:`, 'Making FunTix farms');
+      if (!reason) return;
+      if (!confirm(`Ban ${b.dataset.name} for: ${reason}?`)) return;
+      await api('POST', `/api/admin/users/${b.dataset.name}/command`, { command: 'ban', reason });
+      toast(`${b.dataset.name} banned`);
     });
     ownerCmd('.wipe-games', 'wipe_games', null, b => `DELETE ALL games by ${b.dataset.name}? This cannot be undone.`);
     ownerCmd('.clear-friends', 'clear_friends', null, b => `Clear all friends of ${b.dataset.name}?`);
