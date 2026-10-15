@@ -1803,7 +1803,7 @@ function scanGameForFarm(g) {
     const n = String(p.name || '').toLowerCase();
     if (k === 'coin' || k === 'tix' || n.includes('coin') || n.includes('tix')) coinCount++;
   }
-  if (coinCount > 20) reasons.push(`${coinCount} coin parts`);
+  if (coinCount > 100) reasons.push(`${coinCount} coin parts (excessive)`);
   // Check scripts for tix grants (broader patterns)
   const scripts = world.scripts || [];
   for (const s of scripts) {
@@ -1817,12 +1817,6 @@ function scanGameForFarm(g) {
   const text = ((g.name || '') + ' ' + (g.description || '')).toLowerCase();
   for (const kw of FARM_KEYWORDS) {
     if (text.includes(kw)) { reasons.push(`Keyword: "${kw}"`); break; }
-  }
-  // Obby disguised as farm: has obby elements BUT also grants tix
-  const isObby = text.includes('obby') || parts.some(p => p.k === 'checkpoint');
-  const grantsTix = reasons.some(r => r.includes('FunTix') || r.includes('coin'));
-  if (isObby && grantsTix) {
-    reasons.push('Obby with farm rewards');
   }
   return reasons;
 }
