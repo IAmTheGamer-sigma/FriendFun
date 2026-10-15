@@ -1818,6 +1818,12 @@ function scanGameForFarm(g) {
   for (const kw of FARM_KEYWORDS) {
     if (text.includes(kw)) { reasons.push(`Keyword: "${kw}"`); break; }
   }
+  // Obby disguised as farm: has obby elements BUT also grants tix
+  const isObby = text.includes('obby') || parts.some(p => p.k === 'checkpoint');
+  const grantsTix = reasons.some(r => r.includes('FunTix') || r.includes('coin'));
+  if (isObby && grantsTix) {
+    reasons.push('Obby with farm rewards');
+  }
   return reasons;
 }
 async function farmScan() {
