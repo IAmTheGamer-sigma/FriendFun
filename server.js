@@ -1604,7 +1604,6 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 function send(ws, msg) { if (ws.readyState === 1) ws.send(JSON.stringify(msg)); }
 function broadcast(room, msg, except) { const s = JSON.stringify(msg); for (const p of room.players.values()) if (p.ws !== except && p.ws.readyState === 1) p.ws.send(s); }
-const T = createTourney({ app, auth, supabase, privateServers, rooms, notify, key, list, broadcast, send });
 createNews({ app, auth, rooms, broadcast, isOwner });
 createUgc({ app, auth, modOnly, supabase, supabaseAdmin, SUPABASE_URL, ITEM, UGC_TEMPLATES, UGC_MAX_PRICE, UGC_CREATOR_CUT, UGC_BUCKET, UGC_GLB_MAX, filter, key, list, ugcDef, validUgcTransform, ensureUgcBucket });
 createHacker({ app, auth, rooms, broadcast, isOwner });
@@ -1763,7 +1762,6 @@ wss.on('connection', (ws) => {
       const target = room.players.get(m.id);
       if (target && target.ws && target.id !== player.id) send(target.ws, { t: 'gearHit', from: player.name, dmg: Math.max(1, Math.min(150, m.dmg | 0 || 100)) });
     }
-    else if (m.t === 'rivalsDeath' && typeof m.by === 'string') T.rivalsDeath(player, room, m.by);
   });
   ws.on('close', () => {
     if (!player || !room) return;
