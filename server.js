@@ -818,6 +818,12 @@ app.post('/api/admin/club/reset-all', auth, async (req, res) => {
   }
   res.json({ ok: true, cleared: count });
 });
+app.post('/api/test-obby', auth, async (req, res) => {
+  const { world } = req.body || {};
+  if (!world) return res.status(400).json({ error: 'No world provided' });
+  const result = validateObby(world);
+  res.json(result);
+});
 app.get('/api/admin/farms', auth, async (req, res) => {
   if (!isOwner(req.user)) return res.status(403).json({ error: 'Owners only' });
   res.json({ reports: farmReports });
@@ -1782,6 +1788,7 @@ setInterval(() => {
   }
 }, 66);
 
+import { validateObby } from './obby-tester.js';
 // 🚨 Always-on FunTix farm scanner
 const farmReports = []; // { gameId, gameName, creator, reasons, at }
 const FARM_KEYWORDS = ['farm', 'free tix', 'afk', 'auto farm', 'tix farm', 'grind', 'easy tix', 'tix grinder', 'infinite'];
