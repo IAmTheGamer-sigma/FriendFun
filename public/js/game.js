@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { setupLighting, buildWorld, findSpawn } from './three-util.js?v=ac3e6f2b';
-import { buildCharacter, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=4b390e65';
+const gfxAdvanced = () => { try { return localStorage.getItem('ff_gfx') === 'advanced'; } catch { return false; } };
+const buildChar = (av, opts) => gfxAdvanced() ? buildCharacterSmooth(av, opts) : buildCharacter(av, opts);
+import { buildCharacter, buildCharacterSmooth, animateCharacter, makeNameTag, avatarImage, CLUB_PATH, buildVehicle } from './avatar3d.js?v=8e5e0e25';
 import { NEWSBOY_AVATAR, buildNewsStudio } from './news-studio.js?v=9285cfef';
 import { VoiceChat } from './voice.js?v=9d41bd66';
 import { sfx } from './sound.js?v=89850e26';
@@ -248,7 +250,7 @@ export class Game {
       colors: { head: '#f5cd30', torso: torsos[seed % torsos.length], larm: '#f5cd30', rarm: '#f5cd30', lleg: '#5c6bc0', rleg: '#5c6bc0' },
       hat: 'hat_none', face: 'face_smile', shirt: 'shirt_none', head: 'head_classic', pet: 'pet_none', gear: 'gear_none',
     };
-    const char = buildCharacter(avatar, { pet: false, gear: false });
+    const char = buildChar(avatar, { pet: false, gear: false });
     const tag = makeNameTag(p.enemy ? '👹 ' + (p.name || 'Enemy') : (p.name || 'NPC')); tag.userData.isTag = true; char.add(tag);
     const baseY = p.p[1] - p.s[1] / 2;
     char.position.set(p.p[0], baseY, p.p[2]);
@@ -674,7 +676,7 @@ export class Game {
           r.setSize(420, 420);
           const sc = new THREE.Scene();
           const studio = buildNewsStudio(THREE); sc.add(studio.group);
-          const ch = buildCharacter(av); ch.position.set(0, 0, 0); sc.add(ch);
+          const ch = buildChar(av); ch.position.set(0, 0, 0); sc.add(ch);
           const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
           cam.position.set(0, 5.2, 13); cam.lookAt(0, 3.5, 0);
           sc.add(new THREE.AmbientLight(0xffffff, 0.9));
@@ -840,10 +842,16 @@ export class Game {
   // ---------- 3D ----------
   build3D() {
     const r = this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-    r.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const adv = gfxAdvanced();
+    r.setPixelRatio(Math.min(devicePixelRatio, adv ? 3 : 2));
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.outputColorSpace = THREE.SRGBColorSpace;
+    if (adv) {
+      r.toneMapping = THREE.ACESFilmicToneMapping;
+      r.toneMappingExposure = 1.15;
+    }
     this.scene = new THREE.Scene();
+    if (adv) this.scene.add(new THREE.HemisphereLight(0xbdd7ff, 0x3a2f2f, 0.55));
     this.sun = setupLighting(this.scene, this.world.sky || '#8fc8ff', this.world.light);
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 3000);
     this.meshes = buildWorld(this.scene, this.world);
@@ -864,7 +872,7 @@ export class Game {
       const m = this.meshes.get(p.id); if (m) { this.scene.remove(m); this.meshes.delete(p.id); }
       this.spawnNPC(p);
     }
-    this.char = buildCharacter(this.me.avatar, { pet: false, gear: false });
+    this.char = buildChar(this.me.avatar, { pet: false, gear: false });
     this.scene.add(this.char);
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
     this.setPet(); this.setGear();
@@ -1196,7 +1204,7 @@ export class Game {
     this.jumpBuf = 0; this.coyote = 0; this.jumping = false;
     if (this.debris) { for (const d of this.debris) this.scene.remove(d.m); this.debris = null; }
     this.scene.remove(this.char);
-    this.char = buildCharacter(this.me.avatar, { pet: false, gear: false }); this.scene.add(this.char);
+    this.char = buildChar(this.me.avatar, { pet: false, gear: false }); this.scene.add(this.char);
     this.setGear();
     this.char.position.copy(this.pos);
     if (this.pet) { this.pet.position.copy(this.pos); this.pet.visible = true; }
@@ -1318,6 +1326,7 @@ export class Game {
       else if (m.t === 'emote') { const p = this.players.get(m.id); if (p) { p.emote = m.e; } }
       else if (m.t === 'gearHit' && this.rivals && m.dmg) { this.applyRivalsDamage(m.dmg, m.from); }
       else if (m.t === 'gearHit') { if (!this.dead) this.die(); }
+      else if (m.t === 'scriptTpDo') { this.pos.set(Number(m.x) || 0, Number(m.y) || 10, Number(m.z) || 0); this.vel.set(0, 0, 0); }
       else if (m.t === 'tp') { this.pos.set(m.x, m.y, m.z); this.vel.set(0, 0, 0); this.sys('Teleported by a moderator'); }
       else if (m.t === 'freeze') {
         this.frozen = !!m.on;
@@ -1345,7 +1354,7 @@ export class Game {
   hideLoading() { const l = this.c.querySelector('.loading'); if (l) { l.classList.add('fade'); setTimeout(() => l.remove(), 500); } }
   addPlayer(p) {
     if (this.players.has(p.id)) return;
-    const char = buildCharacter(p.avatar, { pet: false, gear: false }); const tag = makeNameTag(p.name, p.badge); tag.userData.isTag = true; char.add(tag);
+    const char = buildChar(p.avatar, { pet: false, gear: false }); const tag = makeNameTag(p.name, p.badge); tag.userData.isTag = true; char.add(tag);
     this.scene.add(char);
     const pet = buildPet(p.avatar?.pet);
     if (pet) { pet.position.copy(char.position); this.scene.add(pet); }
@@ -1354,6 +1363,7 @@ export class Game {
     const pl = { id: p.id, name: p.name, avatar: p.avatar, club: p.club, badge: p.badge, char, pet: pet || null, target: p.s ? [p.id, ...p.s] : null, emote: null };
     if (pl.target) char.position.set(pl.target[1], pl.target[2], pl.target[3]);
     this.players.set(p.id, pl);
+    for (const fn of (this._scriptJoin || [])) { try { fn({ name: p.name, id: p.id }); } catch (e) { console.warn('Script onJoin error:', e); } }
   }
 
   // ---------- physics ----------
