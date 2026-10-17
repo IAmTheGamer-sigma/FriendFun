@@ -22,9 +22,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { global: { WebSocket } });
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { transport: WebSocket } });
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAdmin = SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { global: { WebSocket } }) : supabase;
+const supabaseAdmin = SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { realtime: { transport: WebSocket } }) : supabase;
 
 // ---- Custom badges (admin-created) ----
 let CUSTOM_BADGES = {};
