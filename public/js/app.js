@@ -262,7 +262,7 @@ function shell(active, content) {
   <header class="topbar">
     <button class="tb-burger" onclick="document.body.classList.toggle('nav-open')">&#9776;</button>
     <a class="logo" href="#/home"><span class="logo-icon">${LOGO}</span><span class="logo-text">Funtopia</span></a>
-    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a><a href="https://muse.ai/s/puzzlevision-dxl6dxbqxe67xoj" target="_blank" rel="noopener">📺 Puzzlevision</a></nav>
+    <nav class="tb-nav"><a href="#/discover">Discover</a><a href="#/catalog">Marketplace</a><a href="#/create">Create</a><a href="#/funtix">FunTix</a><a href="#/club">FriendClub</a></nav>
     <form class="tb-search" onsubmit="event.preventDefault(); location.hash='#/discover?q='+encodeURIComponent(this.q.value)"><input name="q" placeholder="Search"></form>
     <div class="tb-right">
       <div class="tb-user-wrap">
