@@ -64,7 +64,7 @@ function buildCharacter(avatar) {
   if (!_avatar3d) throw new Error('avatar3d not loaded yet');
   return _avatar3d.buildCharacter(avatar);
 }
-import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS, UGC_TEMPLATES, UGC_CREATOR_CUT } from './catalog.js?v=94017c68';
+import { CATALOG, ITEM, ECON, BADGES, PET_MODELS, GEAR_MODELS, UGC_TEMPLATES, UGC_CREATOR_CUT } from './catalog.js?v=1d24a70d';
 import { templates } from './worlds.js?v=a0431b48';
 import { startSpooky, stopSpooky, sfx } from './sound.js?v=89850e26';
 try { sfx.enabled = localStorage.getItem('ff_sfx') !== '0'; } catch {}
@@ -484,7 +484,18 @@ function showAddAccountModal() {
 function setMoney(r) {
   if (r.funtix != null) { if (me) me.funtix = r.funtix; document.querySelectorAll('.me-tix').forEach(e => (e.textContent = fmt(r.funtix))); }
 }
-function dailyToast(r) { if (r?.daily) toast(`Daily reward: +${r.daily} FunTix!`); }
+function dailyToast(r) {
+  if (r?.daily) {
+    const streakMsg = r.streak > 1 ? ` (🔥 ${r.streak}-day streak!)` : '';
+    toast(`Daily reward: +${r.daily} FunTix!${streakMsg}`);
+  }
+  if (r?.newBadges?.length) {
+    r.newBadges.forEach(id => {
+      const b = BADGES[id];
+      toast(`🏆 Achievement unlocked: ${b ? b.name : id}!`);
+    });
+  }
+}
 
 // ---------- pages ----------
 function loginPage() {
