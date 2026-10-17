@@ -300,12 +300,16 @@ app.post('/api/logout', auth, async (req, res) => {
 
 async function dailyTix(u) {
   const day = new Date().toISOString().slice(0, 10);
-  if (u.tixDay === day) return { amount: 0, user: u };
-  const amt = (ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0)) * (halloweenActive() ? 2 : 1);
-  const { data: updated, error } = await supabase.from('users').update({ tixDay: day, funtix: (Number(u.funtix) || 0) + amt }).eq('name', u.name).select().single();
+  if (u.tixDay === day) return { amount: 0, user: u, streak: u.tixStreak || 0 };
+  // Streak: consecutive days (yesterday = +1, else reset to 1)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const streak = (u.tixDay === yesterday) ? (Number(u.tixStreak) || 0) + 1 : 1;
+  const streakBonus = Math.min((streak - 1) * 5, 50); // +5/day, cap +50
+  const amt = (ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0) + streakBonus) * (halloweenActive() ? 2 : 1);
+  const { data: updated, error } = await supabase.from('users').update({ tixDay: day, tixStreak: streak, funtix: (Number(u.funtix) || 0) + amt }).eq('name', u.name).select().single();
   if (error) throw new Error(error.message);
   Object.assign(u, updated);
-  return { amount: amt, user: updated };
+  return { amount: amt, user: updated, streak };
 }
 
 app.get('/api/player-count', auth, async (req, res) => {
@@ -331,7 +335,19 @@ app.get('/api/me', auth, async (req, res) => {
       u.inventory = updatedInv;
     }
   }
-  const { amount: daily } = await dailyTix(u);
+  const { amount: daily, streak } = await dailyTix(u);
+  // Achievement badges: grant automatically when earned
+  const earned = list(u, 'earnedBadges');
+  const newBadges = [];
+  if (streak >= 7 && !earned.includes('streak7')) newBadges.push('streak7');
+  if (streak >= 30 && !earned.includes('streak30')) newBadges.push('streak30');
+  if ((Number(u.funtix) || 0) >= 5000 && !earned.includes('tycoon')) newBadges.push('tycoon');
+  if (list(u, 'friends').length >= 25 && !earned.includes('social')) newBadges.push('social');
+  if (newBadges.length) {
+    const badges = [...earned, ...newBadges];
+    await supabase.from('users').update({ earnedBadges: badges }).eq('name', u.name);
+    u.earnedBadges = badges;
+  }
   // Looney farewell prize (event deleted Oct 6, 2026): every user keeps the prize
   const missPrize = LOONEY_PRIZE.filter(id => !u.inventory.includes(id));
   if (missPrize.length) {
@@ -357,7 +373,7 @@ app.get('/api/me', auth, async (req, res) => {
     if (u.avatar?.head === 'head_slimebody') { u.avatar = { ...u.avatar, head: 'head_classic' }; upd.avatar = u.avatar; }
     await supabase.from('users').update(upd).eq('name', u.name);
   }
-  res.json({ ...await publicUser(u), daily, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isOwner(u) || isAdmin(u) || !!u.aiAccess });
+  res.json({ ...await publicUser(u), daily, streak: streak || 0, newBadges, funtix: u.funtix, inventory: u.inventory, requests: u.requests, friendList: u.friends, favorites: u.favorites, recent: u.recent, clubUntil: u.clubUntil || 0, clubForever: isAdmin(u) || !!u.clubForever, aiAccess: isOwner(u) || isAdmin(u) || !!u.aiAccess });
 });
 
 // Change own password
