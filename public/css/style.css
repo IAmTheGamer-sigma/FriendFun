@@ -314,6 +314,9 @@ button.badge-card { cursor: pointer; } button.badge-card:hover { border-color: #
 .tb-accounts { max-height: 200px; overflow-y: auto; }
 .sidebar-logout { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-weight: 600; font-size: 16px; color: #ff6b63; background: none; border: 0; cursor: pointer; margin-top: auto; width: 100%; text-align: left; }
 .sidebar-logout:hover { background: #2a2c2f; }
+.sidebar-footer { margin-top: 12px; padding: 8px 12px; font-size: 12px; color: var(--muted); text-align: center; }
+.sidebar-footer a { color: var(--blue); font-weight: 700; }
+.sidebar-footer a:hover { text-decoration: underline; }
 
 /* ---------- studio explorer folders & scripts ---------- */
 .ex-toolbar { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid #45474a; }
