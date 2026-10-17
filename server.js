@@ -306,8 +306,14 @@ async function dailyTix(u) {
   const streak = (u.tixDay === yesterday) ? (Number(u.tixStreak) || 0) + 1 : 1;
   const streakBonus = Math.min((streak - 1) * 5, 50); // +5/day, cap +50
   const amt = (ECON.DAILY_TIX + (isClub(u) ? ECON.CLUB_DAILY : 0) + streakBonus) * (halloweenActive() ? 2 : 1);
-  const { data: updated, error } = await supabase.from('users').update({ tixDay: day, tixStreak: streak, funtix: (Number(u.funtix) || 0) + amt }).eq('name', u.name).select().single();
-  if (error) throw new Error(error.message);
+  const baseUpdate = { tixDay: day, funtix: (Number(u.funtix) || 0) + amt };
+  // Try with streak column; fall back without it if the column doesn't exist yet
+  let updated, error;
+  ({ data: updated, error } = await supabase.from('users').update({ ...baseUpdate, tixStreak: streak }).eq('name', u.name).select().single());
+  if (error && /tixStreak/i.test(error.message || '')) {
+    ({ data: updated, error } = await supabase.from('users').update(baseUpdate).eq('name', u.name).select().single());
+  }
+  if (error) { console.error('dailyTix failed:', error.message); return { amount: 0, user: u, streak: 0 }; }
   Object.assign(u, updated);
   return { amount: amt, user: updated, streak };
 }
