@@ -747,4 +747,8 @@ export const BADGES = {
   creator: { name: 'Creator', desc: 'Published a game.', color: '#00b06f', path: 'M3 17.25V21h3.75L17.8 9.94l-3.75-3.75zM20.7 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z' },
   champ: { name: 'Obby Champ', desc: 'Beat an obby.', color: '#4aa3ff', path: 'M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3zM6 7v1a2 2 0 0 0 2 2V7zm10 0v3a2 2 0 0 0 2-2V7z' },
   looney: { name: 'Looney Tunes', desc: 'Collected all 20 Looney Coins in the Looney Tunes event.', color: '#ff6d00', path: 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 12.2l7.1-.6z' },
+  streak7: { name: 'Week Warrior', desc: 'Logged in 7 days in a row.', color: '#ff4757', path: 'M13 2L3 14h7l-1 8 10-12h-7z' },
+  streak30: { name: 'Dedicated', desc: 'Logged in 30 days in a row.', color: '#a55eea', path: 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 12.2l7.1-.6z' },
+  tycoon: { name: 'FunTix Tycoon', desc: 'Held 5,000 FunTix at once.', color: '#ffd400', path: 'M12 2v20M17 7H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H6' },
+  social: { name: 'Social Butterfly', desc: 'Made 25 friends.', color: '#4aa3ff', path: 'M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z' },
 };
