@@ -6,11 +6,23 @@ import { buildCharacter, buildCharacterSmooth, animateCharacter, makeNameTag, av
 import { NEWSBOY_AVATAR, buildNewsStudio } from './news-studio.js?v=9285cfef';
 import { VoiceChat } from './voice.js?v=9d41bd66';
 import { sfx } from './sound.js?v=89850e26';
-import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=94017c68';
+import { ECON, BADGES, PET_MODELS, GEAR_MODELS, CATALOG, ITEM } from './catalog.js?v=1d24a70d';
 
 const GRAVITY = 196.2, WALK = 16, JUMP = 50, HW = 0.9, H = 5.2;
 const VEHICLES = ['vehicle_car', 'vehicle_truck', 'vehicle_kart', 'vehicle_taxi', 'vehicle_race', 'vehicle_icecream']; // net code = index + 1
 const ANIMS = ['idle', 'walk', 'jump', 'fall', 'wave', 'dance', 'dead', 'sit'];
+const GAME_TIPS = [
+  'Press / to chat with other players!',
+  'Type /e dance to show off your moves!',
+  'Collect coins in obbies to earn FunTix!',
+  'Log in daily to build your streak for bonus FunTix!',
+  'Press V near a vehicle to hop in and drive!',
+  'Check the Marketplace for new avatar items!',
+  'Add friends to see what games they\'re playing!',
+  'Press Shift to toggle shift-lock camera!',
+  'Complete achievements to earn exclusive badges!',
+  'Right-drag to rotate the camera around you!',
+];
 
 // ---------- Halloween in-game decor (Oct 24 - Nov 2) ----------
 const HALLOWEEN_DATES = { starts: Date.parse('2026-10-06T00:00:00Z'), ends: Date.parse('2026-11-02T00:00:00Z') };
@@ -130,7 +142,7 @@ export class Game {
           <div class="esc-help">WASD / arrows: move &middot; Space: jump &middot; Right-drag: rotate camera &middot; Wheel: zoom &middot; Shift: shift-lock &middot; /: chat &middot; /e wave, /e dance<br>Touch: left thumbstick to move &middot; jump button &middot; drag to look &middot; pinch to zoom</div>
         </div>
       </div>
-      <div class="loading"><div class="loading-card"><div class="ff-logo-big">${LOGO}Funtopia</div><div class="loading-name">${esc(this.o.gameName || '')}</div><div class="loading-sub">${this.o.test ? 'Starting test...' : 'Joining server...'}</div><div class="spinner"></div></div></div>
+      <div class="loading"><div class="loading-card"><div class="ff-logo-big">${LOGO}Funtopia</div><div class="loading-name">${esc(this.o.gameName || '')}</div><div class="loading-sub">${this.o.test ? 'Starting test...' : 'Joining server...'}</div><div class="spinner"></div><div class="loading-tip">💡 ${esc(GAME_TIPS[Math.floor(Math.random() * GAME_TIPS.length)])}</div></div></div>
     </div>`;
     const q = s => this.c.querySelector(s);
     this.canvas = q('.game-canvas'); this.chatLog = q('.chat-log'); this.chatInput = q('.chat-input');
