@@ -1,5 +1,5 @@
 import express from 'express';
-import { WebSocketServer } from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import http from 'http';
 import { createClient } from '@supabase/supabase-js';
 import { createNews } from './news.js';
@@ -22,9 +22,9 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { global: { WebSocket } });
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAdmin = SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY) : supabase;
+const supabaseAdmin = SUPABASE_SERVICE_KEY ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { global: { WebSocket } }) : supabase;
 
 // ---- Custom badges (admin-created) ----
 let CUSTOM_BADGES = {};
